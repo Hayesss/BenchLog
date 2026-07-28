@@ -43,7 +43,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import ProtocolCharTitle from '@/components/protocols/ProtocolCharTitle'
 import ProtocolEditorDialog from '@/components/protocols/ProtocolEditorDialog'
@@ -659,19 +658,17 @@ function GridCard({
   const navigate = useNavigate()
   const Icon = isTemplate ? (TEMPLATE_META[p.name]?.icon ?? FlaskConical) : FlaskConical
   return (
-    <HoverCard openDelay={200} closeDelay={120}>
-      <HoverCardTrigger asChild>
-        <motion.div
-          custom={index}
-          variants={cardVariants}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, amount: 0.15 }}
-          whileHover={{ y: -2 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => navigate(`/protocols/${p.id}`)}
-          className="group relative flex h-40 cursor-pointer flex-col rounded-lg border border-line bg-surface p-4 shadow-card transition-shadow duration-180 hover:shadow-card-hover"
-        >
+    <motion.div
+      custom={index}
+      variants={cardVariants}
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, amount: 0.15 }}
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={() => navigate(`/protocols/${p.id}`)}
+      className="group relative flex h-40 cursor-pointer flex-col rounded-lg border border-line bg-surface p-4 shadow-card transition-shadow duration-180 hover:shadow-card-hover"
+    >
       {iteratedRecently(p) && (
         <span
           className="absolute right-3 top-3 h-2 w-2 rounded-full bg-warning"
@@ -701,102 +698,7 @@ function GridCard({
           <ProtocolCardMenu p={p} onDuplicate={onDuplicate} onDelete={onDelete} />
         </div>
       </div>
-        </motion.div>
-      </HoverCardTrigger>
-      <HoverCardContent
-        side="top"
-        align="start"
-        collisionPadding={16}
-        className="w-[340px] rounded-xl border-line bg-surface p-0 shadow-lg"
-      >
-        <ProtocolHoverContent p={p} tagColors={tagColors} />
-      </HoverCardContent>
-    </HoverCard>
-  )
-}
-
-/* ---------------- hover 浮窗：协议简略信息 ---------------- */
-
-function ProtocolHoverContent({ p, tagColors }: { p: ProtocolListItem; tagColors: Map<string, string> }) {
-  const groups = Array.isArray(p.stepGroups) ? p.stepGroups : []
-  const totalSteps = groups.reduce((n, g) => n + (g.steps?.length ?? 0), 0)
-  const materials = Array.isArray(p.materials) ? p.materials : []
-  const params = Array.isArray(p.params) ? p.params : []
-  return (
-    <div className="p-4">
-      {/* 头部 */}
-      <div className="flex items-start gap-2.5">
-        <span
-          className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-          style={{ backgroundColor: wash(p.color), color: p.color }}
-        >
-          <FlaskConical className="h-3.5 w-3.5" strokeWidth={1.8} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h4 className="font-display text-[14.5px] font-semibold leading-[20px] text-ink">{p.name}</h4>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-ink-mute">
-            <span className="rounded-full bg-bench-wash px-1.5 py-px font-mono font-medium text-bench-ink">{p.version}</span>
-            <span>{p.category}</span>
-            <span>·</span>
-            <span>使用 {p.useCount ?? 0} 次</span>
-            <span>·</span>
-            <span>更新于 {relativeDate(p.updatedAt)}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 描述 */}
-      {p.description && (
-        <p className="mt-2.5 line-clamp-3 border-t border-line-soft pt-2.5 text-[12px] leading-[18px] text-ink-soft">
-          {p.description}
-        </p>
-      )}
-
-      {/* 步骤概要 */}
-      {groups.length > 0 && (
-        <div className="mt-2.5 border-t border-line-soft pt-2.5">
-          <div className="mb-1.5 text-[11px] font-medium text-ink-mute">
-            步骤概要 · 共 {totalSteps} 步
-          </div>
-          <ul className="space-y-1">
-            {groups.slice(0, 4).map((g, i) => (
-              <li key={i} className="flex items-center gap-1.5 text-[12px] text-ink-soft">
-                <span className="h-1 w-1 shrink-0 rounded-full bg-bench" />
-                <span className="truncate">{g.title || `步骤组 ${i + 1}`}</span>
-                <span className="ml-auto shrink-0 font-mono text-[11px] text-ink-mute">{g.steps?.length ?? 0} 步</span>
-              </li>
-            ))}
-            {groups.length > 4 && (
-              <li className="text-[11px] text-ink-mute">… 另 {groups.length - 4} 个步骤组</li>
-            )}
-          </ul>
-        </div>
-      )}
-
-      {/* 材料与参数 */}
-      {(materials.length > 0 || params.length > 0) && (
-        <div className="mt-2.5 flex items-center gap-3 border-t border-line-soft pt-2.5 text-[11.5px] text-ink-mute">
-          {materials.length > 0 && <span>材料 {materials.length} 项</span>}
-          {params.length > 0 && (
-            <span className="truncate">
-              关键参数：{params.slice(0, 3).map((pm) => `${pm.name} ${pm.value}${pm.unit ?? ''}`).join('，')}
-              {params.length > 3 ? ` 等 ${params.length} 项` : ''}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* 标签 */}
-      {p.tags.length > 0 && (
-        <div className="mt-2.5 flex flex-wrap gap-1 border-t border-line-soft pt-2.5">
-          {p.tags.map((t) => (
-            <ProtocolTagChip key={t} name={t} color={tagColors.get(t)} />
-          ))}
-        </div>
-      )}
-
-      <div className="mt-3 text-[11px] text-ink-mute">点击查看完整协议 →</div>
-    </div>
+    </motion.div>
   )
 }
 
