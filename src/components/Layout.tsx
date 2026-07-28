@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { motion } from 'framer-motion'
 import Lenis from 'lenis'
 import {
+  BookMarked,
   CalendarDays,
   ChevronDown,
   FileDown,
@@ -23,6 +24,7 @@ import CommandPalette, { openCommandPalette } from '@/components/CommandPalette'
 const NAV_ITEMS = [
   { to: '/', label: '工作台', en: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/protocols', label: '实验方法', en: 'Protocols', icon: FlaskConical },
+  { to: '/library', label: '方法库', en: 'Library', icon: BookMarked },
   { to: '/records', label: '实验记录', en: 'Records', icon: NotebookPen },
   { to: '/schedule', label: '实验安排', en: 'Schedule', icon: CalendarDays },
   { to: '/export', label: '汇报导出', en: 'Export', icon: FileDown },

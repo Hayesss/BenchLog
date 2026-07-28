@@ -12,6 +12,8 @@ const ROUTE_LABELS: Array<[RegExp, string[]]> = [
   [/^\/records\/[^/]+/, ['实验记录', '记录详情']],
   [/^\/records/, ['实验记录']],
   [/^\/schedule/, ['实验安排']],
+  [/^\/library\/[^/]+/, ['方法库', '条目详情']],
+  [/^\/library/, ['方法库']],
   [/^\/export/, ['汇报导出']],
 ]
 

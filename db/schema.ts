@@ -234,3 +234,38 @@ export const exportLogs = mysqlTable(
   (t) => [index("export_logs_user_idx").on(t.userId)],
 );
 export type ExportLog = typeof exportLogs.$inferSelect;
+
+/* ------------------------------------------------------------------ */
+/* 实验方法库（全局共享数据，无 userId，由种子脚本维护）                    */
+/* ------------------------------------------------------------------ */
+
+/** 方法库章节（12 章） */
+export const methodChapters = mysqlTable("method_chapters", {
+  id: serial("id").primaryKey(),
+  chapterNo: int("chapterNo").notNull().unique(),
+  title: varchar("title", { length: 128 }).notNull(),
+});
+export type MethodChapter = typeof methodChapters.$inferSelect;
+
+/** 方法库条目（full=完整方案，pointer=跨章指引） */
+export const methodEntries = mysqlTable(
+  "method_entries",
+  {
+    id: serial("id").primaryKey(),
+    entryId: int("entryId").notNull().unique(), // methods.json 中的 id
+    chapterNo: int("chapterNo").notNull(),
+    section: varchar("section", { length: 128 }).notNull().default(""),
+    nameCn: varchar("nameCn", { length: 255 }).notNull(),
+    nameEn: varchar("nameEn", { length: 255 }).notNull().default(""),
+    type: varchar("type", { length: 16 }).notNull().default("full"),
+    source: text("source"),
+    journal: varchar("journal", { length: 64 }).notNull().default(""),
+    year: varchar("year", { length: 8 }).notNull().default(""),
+    doi: varchar("doi", { length: 128 }).notNull().default(""),
+    steps: json("steps").$type<string[]>().notNull(),
+    purpose: text("purpose"),
+    principle: text("principle"),
+  },
+  (t) => [index("method_entries_chapter_idx").on(t.chapterNo)],
+);
+export type MethodEntry = typeof methodEntries.$inferSelect;

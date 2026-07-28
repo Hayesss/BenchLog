@@ -2,10 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
+  BookMarked,
   CalendarDays,
   CheckSquare,
+  FileDown,
   FlaskConical,
   Folder,
+  LayoutDashboard,
   NotebookPen,
   Search,
   Tag,
@@ -20,6 +23,16 @@ export function openCommandPalette() {
 }
 
 type Hit = { group: string; icon: typeof Search; label: string; meta?: string; to: string }
+
+/** ⌘K 页面跳转项（按中文名匹配） */
+const NAV_PAGES: Hit[] = [
+  { group: '页面', icon: LayoutDashboard, label: '工作台', to: '/' },
+  { group: '页面', icon: FlaskConical, label: '实验方法', to: '/protocols' },
+  { group: '页面', icon: BookMarked, label: '方法库', to: '/library' },
+  { group: '页面', icon: NotebookPen, label: '实验记录', to: '/records' },
+  { group: '页面', icon: CalendarDays, label: '实验安排', to: '/schedule' },
+  { group: '页面', icon: FileDown, label: '汇报导出', to: '/export' },
+]
 
 function Highlight({ text, q }: { text: string; q: string }) {
   if (!q) return <>{text}</>
@@ -82,9 +95,10 @@ export default function CommandPalette() {
   )
 
   const hits = useMemo<Hit[]>(() => {
+    const navHits = NAV_PAGES.filter((h) => h.label.includes(debouncedQ))
     const d = search.data
-    if (!d) return []
-    const out: Hit[] = []
+    if (!d) return navHits
+    const out: Hit[] = [...navHits]
     for (const p of d.protocols)
       out.push({
         group: '实验方法',
@@ -134,7 +148,7 @@ export default function CommandPalette() {
         to: `/schedule?date=${t.todoDate}`,
       })
     return out
-  }, [search.data])
+  }, [search.data, debouncedQ])
 
   const go = useCallback(
     (hit: Hit) => {
