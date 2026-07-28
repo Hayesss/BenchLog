@@ -1,5 +1,7 @@
 import { Link, useLocation } from 'react-router'
-import { Bell, ChevronRight, Plus, Search } from 'lucide-react'
+import { Bell, ChevronRight, LogOut, Plus, Search } from 'lucide-react'
+import { useAuth } from '@/hooks/useAuth'
+import { LOGIN_PATH } from '@/const'
 
 const ROUTE_LABELS: Array<[RegExp, string[]]> = [
   [/^\/$/, ['工作台']],
@@ -27,6 +29,7 @@ function useBreadcrumb(): string[] {
  */
 export default function Navbar() {
   const crumbs = useBreadcrumb()
+  const { user, isAuthenticated, isLoading, logout } = useAuth()
 
   return (
     <header className="sticky top-0 z-50 hidden h-14 items-center gap-4 border-b border-line bg-paper/90 px-6 backdrop-blur md:flex">
@@ -71,13 +74,37 @@ export default function Navbar() {
         >
           <Bell className="h-4 w-4" />
         </button>
-        {/* AUTH-SLOT: rewired to useAuth() in Phase 5 */}
-        <Link
-          to="/login"
-          className="flex h-9 items-center rounded-lg border border-line bg-surface px-3 text-[13px] font-medium text-ink-soft shadow-card transition-colors duration-150 hover:text-bench"
-        >
-          Sign in
-        </Link>
+        {isLoading ? (
+          <div className="h-9 w-20 animate-pulse rounded-lg border border-line bg-surface" />
+        ) : isAuthenticated && user ? (
+          <div className="flex items-center gap-2">
+            <span className="flex h-9 items-center gap-2 rounded-lg border border-line bg-surface px-3 shadow-card">
+              {user.avatar ? (
+                <img src={user.avatar} alt="" className="h-5 w-5 rounded-full" />
+              ) : (
+                <img src="/avatar-user.png" alt="" className="h-5 w-5 rounded-full" />
+              )}
+              <span className="max-w-[120px] truncate text-[13px] font-medium text-ink">
+                {user.name ?? '研究者'}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={logout}
+              aria-label="退出登录"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-surface text-ink-soft shadow-card transition-colors duration-150 hover:text-danger"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <Link
+            to={LOGIN_PATH}
+            className="flex h-9 items-center rounded-lg border border-line bg-surface px-3 text-[13px] font-medium text-ink-soft shadow-card transition-colors duration-150 hover:text-bench"
+          >
+            Sign in
+          </Link>
+        )}
       </div>
     </header>
   )

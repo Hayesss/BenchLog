@@ -15,6 +15,9 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Navbar from '@/components/Navbar'
+import { useAuth } from '@/hooks/useAuth'
+import { trpc } from '@/providers/trpc'
+import { LOGIN_PATH } from '@/const'
 
 const NAV_ITEMS = [
   { to: '/', label: '工作台', en: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -24,14 +27,7 @@ const NAV_ITEMS = [
   { to: '/export', label: '汇报导出', en: 'Export', icon: FileDown },
 ] as const
 
-const PROJECTS = [
-  { name: '慢病毒包装', color: '#3E7C6B' },
-  { name: '流式分选', color: '#5B7C99' },
-  { name: '转染优化', color: '#B0707C' },
-  { name: '单细胞多组学', color: '#8A7CA8' },
-  { name: 'WB · 蛋白', color: '#B08D57' },
-  { name: '细胞培养日常', color: '#7C9161' },
-]
+const FALLBACK_COLORS = ['#3E7C6B', '#5B7C99', '#B0707C', '#8A7CA8', '#B08D57', '#7C9161']
 
 /** Desktop smooth scrolling (design.md §6) — native scroll on mobile. */
 function useLenis() {
@@ -55,6 +51,13 @@ function useLenis() {
 
 function Sidebar() {
   const [projectsOpen, setProjectsOpen] = useState(true)
+  const { user, isAuthenticated, isLoading, logout } = useAuth()
+  const projectsQuery = trpc.project.list.useQuery(undefined, { enabled: isAuthenticated })
+  const sidebarProjects = (projectsQuery.data ?? []).map((p, i) => ({
+    id: p.id,
+    name: p.name,
+    color: p.color || FALLBACK_COLORS[i % FALLBACK_COLORS.length],
+  }))
 
   return (
     <aside className="sticky top-0 hidden h-[100dvh] w-60 shrink-0 flex-col border-r border-line bg-paper md:flex">
@@ -111,16 +114,25 @@ function Sidebar() {
         </button>
         {projectsOpen && (
           <div className="mt-1 flex flex-col gap-0.5">
-            {PROJECTS.map((p) => (
+            {sidebarProjects.length === 0 ? (
               <Link
-                key={p.name}
                 to="/records"
-                className="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-[13px] text-ink-soft transition-colors duration-150 hover:bg-bench-wash/60 hover:text-ink"
+                className="rounded-lg px-3 py-1.5 text-[12.5px] text-ink-mute transition-colors duration-150 hover:text-ink-soft"
               >
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
-                {p.name}
+                暂无项目，可在记录页创建
               </Link>
-            ))}
+            ) : (
+              sidebarProjects.map((p) => (
+                <Link
+                  key={p.id}
+                  to={`/records?project=${p.id}`}
+                  className="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-[13px] text-ink-soft transition-colors duration-150 hover:bg-bench-wash/60 hover:text-ink"
+                >
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
+                  <span className="truncate">{p.name}</span>
+                </Link>
+              ))
+            )}
           </div>
         )}
         <Link
@@ -133,18 +145,37 @@ function Sidebar() {
         </Link>
       </div>
 
-      {/* user card — AUTH-SLOT: rewired to useAuth() in Phase 5 */}
+      {/* user card */}
       <div className="border-t border-line p-3">
-        <Link
-          to="/login"
-          className="flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors duration-150 hover:bg-bench-wash/60"
-        >
-          <img src="/avatar-user.png" alt="" className="h-8 w-8 rounded-full" />
-          <span className="min-w-0">
-            <span className="block truncate text-[13px] font-medium text-ink">Sign in</span>
-            <span className="block text-[11.5px] text-ink-mute">登录以同步实验数据</span>
-          </span>
-        </Link>
+        {isLoading ? (
+          <div className="h-12 animate-pulse rounded-lg bg-bench-wash/50" />
+        ) : isAuthenticated && user ? (
+          <button
+            type="button"
+            onClick={logout}
+            title="点击退出登录"
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors duration-150 hover:bg-bench-wash/60"
+          >
+            <img src={user.avatar || '/avatar-user.png'} alt="" className="h-8 w-8 rounded-full" />
+            <span className="min-w-0">
+              <span className="block truncate text-[13px] font-medium text-ink">
+                {user.name ?? '研究者'}
+              </span>
+              <span className="block text-[11.5px] text-ink-mute">点击退出登录</span>
+            </span>
+          </button>
+        ) : (
+          <Link
+            to={LOGIN_PATH}
+            className="flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors duration-150 hover:bg-bench-wash/60"
+          >
+            <img src="/avatar-user.png" alt="" className="h-8 w-8 rounded-full" />
+            <span className="min-w-0">
+              <span className="block truncate text-[13px] font-medium text-ink">Sign in</span>
+              <span className="block text-[11.5px] text-ink-mute">登录以同步实验数据</span>
+            </span>
+          </Link>
+        )}
       </div>
     </aside>
   )
@@ -152,6 +183,7 @@ function Sidebar() {
 
 /** Mobile: 48px slim top bar + 56px bottom tab bar with central FAB (design.md §7/§8.1). */
 function MobileChrome() {
+  const { user, isAuthenticated, isLoading } = useAuth()
   return (
     <>
       <header className="sticky top-0 z-50 flex h-12 items-center gap-3 border-b border-line bg-paper/90 px-4 backdrop-blur md:hidden">
@@ -163,10 +195,15 @@ function MobileChrome() {
         <button type="button" aria-label="搜索" className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft">
           <Search className="h-5 w-5" strokeWidth={1.8} />
         </button>
-        {/* AUTH-SLOT: rewired to useAuth() in Phase 5 */}
-        <Link to="/login" className="text-[13px] font-medium text-bench">
-          Sign in
-        </Link>
+        {isLoading ? (
+          <div className="h-7 w-7 animate-pulse rounded-full bg-bench-wash/60" />
+        ) : isAuthenticated && user ? (
+          <img src={user.avatar || '/avatar-user.png'} alt="" className="h-7 w-7 rounded-full" />
+        ) : (
+          <Link to={LOGIN_PATH} className="text-[13px] font-medium text-bench">
+            Sign in
+          </Link>
+        )}
       </header>
 
       <nav className="fixed inset-x-0 bottom-0 z-50 flex h-14 items-stretch border-t border-line bg-surface md:hidden">
@@ -224,6 +261,21 @@ function MobileTab({
 export default function Layout() {
   useLenis()
   const { pathname } = useLocation()
+  const { isAuthenticated, isLoading } = useAuth({
+    redirectOnUnauthenticated: true,
+    redirectPath: LOGIN_PATH,
+  })
+
+  if (isLoading || !isAuthenticated) {
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center bg-paper">
+        <div className="flex flex-col items-center gap-3">
+          <img src="/logo.svg" alt="BenchLog" className="h-10 w-10 animate-pulse" />
+          <span className="text-[12.5px] text-ink-mute">正在打开实验记录本…</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-h-[100dvh] bg-paper">
