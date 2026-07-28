@@ -1,9 +1,21 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { motion } from 'framer-motion'
-import { ArrowRight, BookMarked, Search } from 'lucide-react'
+import { ArrowRight, BookMarked, BookmarkPlus, FolderInput, Loader2, Search } from 'lucide-react'
+import { toast } from 'sonner'
 import { trpc } from '@/providers/trpc'
 import { cn } from '@/lib/utils'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import ProtocolToaster from '@/components/protocols/ProtocolToaster'
 
 const cardVariants = {
   hidden: { opacity: 0, y: 12 },
@@ -62,13 +74,49 @@ export default function Library() {
     q: searching ? q.trim() : undefined,
   })
 
+  const utils = trpc.useUtils()
+  const importChapterMut = trpc.library.importChapter.useMutation()
+  const importEntryMut = trpc.library.importAsProtocol.useMutation()
+  const [chapterImportOpen, setChapterImportOpen] = useState(false)
+  const [importingEntryId, setImportingEntryId] = useState<number | null>(null)
+
   const chapters = useMemo(() => chaptersQuery.data ?? [], [chaptersQuery.data])
   const entries = (entriesQuery.data ?? []) as EntryItem[]
   const totalEntries = chapters.reduce((n, c) => n + c.entryCount, 0)
   const chapterTitle = (no: number) => chapters.find((c) => c.chapterNo === no)?.title ?? ''
+  /* 当前章节视图中的完整条目数（整章导入的范围） */
+  const fullCount = !searching && chapterNo ? entries.filter((e) => e.type === 'full').length : 0
+
+  async function handleChapterImport() {
+    if (!chapterNo) return
+    try {
+      const res = await importChapterMut.mutateAsync({ chapterNo })
+      toast.success(`导入 ${res.imported} 条，跳过 ${res.skipped} 条同名`)
+      await utils.protocol.list.invalidate()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '整章导入失败，请重试')
+    }
+  }
+
+  async function handleQuickSave(entry: EntryItem, ev: MouseEvent) {
+    ev.stopPropagation()
+    ev.preventDefault()
+    if (importingEntryId != null) return
+    setImportingEntryId(entry.id)
+    try {
+      await importEntryMut.mutateAsync({ id: entry.id })
+      toast.success('已存为 Protocol')
+      await utils.protocol.list.invalidate()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '导入失败，请重试')
+    } finally {
+      setImportingEntryId(null)
+    }
+  }
 
   return (
     <div className="mx-auto w-full max-w-[1080px] px-4 pb-16 md:px-8">
+      <ProtocolToaster />
       {/* 页头 */}
       <div className="pt-8">
         <h1 className="font-display text-[24px] font-bold leading-[32px] text-ink md:text-[30px] md:leading-[38px]">
@@ -154,6 +202,21 @@ export default function Library() {
               {searching ? `「${q.trim()}」的搜索结果` : chapterNo ? `第 ${chapterNo} 章 · ${chapterTitle(chapterNo)}` : '全部条目'}
             </h2>
             <span className="font-mono text-[12px] text-ink-mute">{entries.length}</span>
+            {!searching && chapterNo && (
+              <button
+                type="button"
+                disabled={importChapterMut.isPending || fullCount === 0}
+                onClick={() => setChapterImportOpen(true)}
+                className="ml-auto flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-bench/40 bg-surface px-3 text-[12.5px] font-medium text-bench shadow-card transition-colors duration-150 hover:bg-bench-wash disabled:opacity-60"
+              >
+                {importChapterMut.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <FolderInput className="h-3.5 w-3.5" />
+                )}
+                {importChapterMut.isPending ? '导入中…' : '整章导入为 Protocol'}
+              </button>
+            )}
           </div>
 
           {/* 条目卡片列表 */}
@@ -188,9 +251,26 @@ export default function Library() {
                     <h3 className="min-w-0 font-display text-[16px] font-semibold leading-[23px] text-ink">
                       {e.nameCn}
                     </h3>
-                    <span className="flex shrink-0 items-center gap-0.5 pt-1 text-[12.5px] font-medium text-bench">
-                      查看
-                      <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-1" />
+                    <span className="flex shrink-0 items-center gap-2">
+                      {e.type !== 'pointer' && (
+                        <span
+                          role="button"
+                          aria-label={`存为 Protocol：${e.nameCn}`}
+                          onClick={(ev) => void handleQuickSave(e, ev)}
+                          className="flex h-7 items-center gap-1 rounded-md border border-bench/40 bg-surface px-2 text-[12px] font-medium text-bench transition-colors duration-150 hover:bg-bench-wash"
+                        >
+                          {importingEntryId === e.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <BookmarkPlus className="h-3.5 w-3.5" />
+                          )}
+                          {importingEntryId === e.id ? '存为中…' : '存为'}
+                        </span>
+                      )}
+                      <span className="flex items-center gap-0.5 pt-1 text-[12.5px] font-medium text-bench">
+                        查看
+                        <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-1" />
+                      </span>
                     </span>
                   </div>
                   {e.nameEn && (
@@ -224,6 +304,31 @@ export default function Library() {
           )}
         </div>
       </div>
+
+      {/* 整章导入确认 */}
+      <AlertDialog open={chapterImportOpen} onOpenChange={setChapterImportOpen}>
+        <AlertDialogContent className="rounded-xl border-line">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-[18px]">整章导入为 Protocol？</AlertDialogTitle>
+            <AlertDialogDescription className="text-[13px] text-ink-soft">
+              将把本章 {fullCount} 个完整条目导入你的协议库，同名协议自动跳过。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-lg border-line">取消</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={importChapterMut.isPending}
+              onClick={(ev) => {
+                ev.preventDefault()
+                void handleChapterImport().finally(() => setChapterImportOpen(false))
+              }}
+              className="rounded-lg bg-bench text-white hover:bg-bench-deep"
+            >
+              {importChapterMut.isPending ? '导入中…' : '确认导入'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

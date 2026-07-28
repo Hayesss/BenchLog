@@ -20,6 +20,72 @@ const entryListColumns = {
   purpose: methodEntries.purpose,
 } as const;
 
+type Db = ReturnType<typeof getDb>;
+type MethodEntryRow = typeof methodEntries.$inferSelect;
+
+/** 方法库条目 → 协议名称（与 protocols.name 255 长度对齐） */
+function protocolNameOf(entry: MethodEntryRow): string {
+  return (entry.nameCn || entry.nameEn || "未命名方法").slice(0, 255);
+}
+
+/** 按方法库条目创建 protocols + protocolVersions 快照（importAsProtocol / importChapter 共用） */
+async function createProtocolFromEntry(
+  db: Db,
+  userId: number,
+  entry: MethodEntryRow,
+  chapterTitle: string,
+): Promise<number> {
+  const description = [
+    entry.source ?? "",
+    "",
+    "【目的与用途】",
+    entry.purpose ?? "",
+    "",
+    "【原理】",
+    entry.principle ?? "",
+  ]
+    .join("\n")
+    .trim();
+
+  const protocolInput = {
+    userId,
+    name: protocolNameOf(entry),
+    category: "方法库导入",
+    color: "#3E7C6B",
+    description,
+    version: "v1.0",
+    materials: [],
+    stepGroups: [
+      {
+        title: "核心步骤概要",
+        steps: entry.steps.map((text) => ({ text })),
+      },
+    ],
+    params: [],
+    tags: [entry.journal, chapterTitle].map((t) => t.trim()).filter(Boolean),
+  };
+
+  const [{ id }] = await db.insert(protocols).values(protocolInput).$returningId();
+  await db.insert(protocolVersions).values({
+    protocolId: id,
+    userId,
+    version: protocolInput.version,
+    note: "初始版本（方法库导入）",
+    snapshot: {
+      name: protocolInput.name,
+      category: protocolInput.category,
+      color: protocolInput.color,
+      description: protocolInput.description,
+      version: protocolInput.version,
+      materials: protocolInput.materials,
+      stepGroups: protocolInput.stepGroups,
+      params: protocolInput.params,
+      tags: protocolInput.tags,
+    },
+  });
+  return id;
+}
+
 export const libraryRouter = createRouter({
   /** 12 章及每章条目数 */
   chapters: authedQuery.query(async () => {
@@ -105,54 +171,50 @@ export const libraryRouter = createRouter({
           .where(eq(methodChapters.chapterNo, entry.chapterNo))
       )[0];
 
-      const description = [
-        entry.source ?? "",
-        "",
-        "【目的与用途】",
-        entry.purpose ?? "",
-        "",
-        "【原理】",
-        entry.principle ?? "",
-      ]
-        .join("\n")
-        .trim();
-
-      const protocolInput = {
-        userId: ctx.user.id,
-        name: (entry.nameCn || entry.nameEn || "未命名方法").slice(0, 255),
-        category: "方法库导入",
-        color: "#3E7C6B",
-        description,
-        version: "v1.0",
-        materials: [],
-        stepGroups: [
-          {
-            title: "核心步骤概要",
-            steps: entry.steps.map((text) => ({ text })),
-          },
-        ],
-        params: [],
-        tags: [entry.journal, chapter?.title ?? ""].map((t) => t.trim()).filter(Boolean),
-      };
-
-      const [{ id }] = await db.insert(protocols).values(protocolInput).$returningId();
-      await db.insert(protocolVersions).values({
-        protocolId: id,
-        userId: ctx.user.id,
-        version: protocolInput.version,
-        note: "初始版本（方法库导入）",
-        snapshot: {
-          name: protocolInput.name,
-          category: protocolInput.category,
-          color: protocolInput.color,
-          description: protocolInput.description,
-          version: protocolInput.version,
-          materials: protocolInput.materials,
-          stepGroups: protocolInput.stepGroups,
-          params: protocolInput.params,
-          tags: protocolInput.tags,
-        },
-      });
+      const id = await createProtocolFromEntry(db, ctx.user.id, entry, chapter?.title ?? "");
       return { id };
+    }),
+
+  /** 整章导入：把该章全部完整条目存为当前用户的 Protocol（同名自动跳过） */
+  importChapter: authedQuery
+    .input(z.object({ chapterNo: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const chapter = (
+        await db
+          .select()
+          .from(methodChapters)
+          .where(eq(methodChapters.chapterNo, input.chapterNo))
+      )[0];
+      if (!chapter) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "未找到该章节" });
+      }
+
+      const entries = await db
+        .select()
+        .from(methodEntries)
+        .where(and(eq(methodEntries.chapterNo, input.chapterNo), eq(methodEntries.type, "full")))
+        .orderBy(asc(methodEntries.entryId));
+
+      // 该用户现有协议名集合，同名（截断 255 后精确匹配）跳过
+      const existing = await db
+        .select({ name: protocols.name })
+        .from(protocols)
+        .where(eq(protocols.userId, ctx.user.id));
+      const existingNames = new Set(existing.map((r) => r.name));
+
+      let imported = 0;
+      let skipped = 0;
+      for (const entry of entries) {
+        const name = protocolNameOf(entry);
+        if (existingNames.has(name)) {
+          skipped += 1;
+          continue;
+        }
+        await createProtocolFromEntry(db, ctx.user.id, entry, chapter.title);
+        existingNames.add(name);
+        imported += 1;
+      }
+      return { imported, skipped, total: entries.length };
     }),
 });
