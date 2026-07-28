@@ -1,0 +1,24 @@
+<svg width="480" height="360" viewBox="0 0 480 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g stroke="#D8D4CA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- stack of record sheets, back sheets offset -->
+    <rect x="158" y="98" width="176" height="200" rx="4" transform="rotate(4 246 198)"/>
+    <rect x="150" y="92" width="176" height="200" rx="4" transform="rotate(-3 238 192)"/>
+    <!-- top sheet -->
+    <rect x="146" y="84" width="176" height="200" rx="4"/>
+    <!-- checked checkbox row -->
+    <rect x="164" y="108" width="14" height="14" rx="2"/>
+    <path d="M 167 115 L 170.5 118.5 L 176 111.5"/>
+    <path d="M 188 115 L 296 115"/>
+    <!-- unchecked checkbox row -->
+    <rect x="164" y="136" width="14" height="14" rx="2"/>
+    <path d="M 188 143 L 284 143"/>
+    <!-- text lines -->
+    <path d="M 164 172 L 296 172"/>
+    <path d="M 164 186 L 282 186"/>
+    <!-- scribbled curve hinting at WB band peaks -->
+    <path d="M 164 244 C 178 244, 182 214, 194 214 C 204 214, 206 238, 218 238 C 230 238, 232 204, 246 204 C 258 204, 260 232, 272 232 C 282 232, 286 222, 296 222"/>
+    <path d="M 164 260 L 296 260" stroke-dasharray="2 5"/>
+    <!-- corner fold on top sheet -->
+    <path d="M 322 84 L 322 108 L 298 84" opacity="0.7"/>
+  </g>
+</svg>

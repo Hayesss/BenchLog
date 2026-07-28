@@ -1,0 +1,11 @@
+<svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- BenchLog: minimalist petri dish, top view -->
+  <!-- inner ring of the dish -->
+  <circle cx="44" cy="48" r="22" stroke="#3E7C6B" stroke-width="2"/>
+  <!-- outer ring, opened at the right where the pen stroke exits -->
+  <path d="M 70.6 30 A 30 30 0 1 0 70.6 66" stroke="#3E7C6B" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <!-- pen-stroke horizontal line extending from the opening -->
+  <path d="M 68 47 C 76 45.5, 84 49.5, 90 48" stroke="#3E7C6B" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <!-- faint culture-medium highlight inside the dish -->
+  <path d="M 32 54 A 14 14 0 0 0 52 58" stroke="#3E7C6B" stroke-width="2" stroke-linecap="round" opacity="0.45" fill="none"/>
+</svg>

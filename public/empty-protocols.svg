@@ -1,0 +1,31 @@
+<svg width="480" height="360" viewBox="0 0 480 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g stroke="#D8D4CA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- open lab notebook -->
+    <path d="M 240 118 C 214 104, 176 100, 148 108 L 148 252 C 176 244, 214 248, 240 262"/>
+    <path d="M 240 118 C 266 104, 304 100, 332 108 L 332 252 C 304 244, 266 248, 240 262"/>
+    <path d="M 240 118 L 240 262"/>
+    <!-- left page ruled lines -->
+    <path d="M 164 132 C 186 126, 206 128, 224 136"/>
+    <path d="M 164 152 C 186 146, 206 148, 224 156"/>
+    <path d="M 164 172 C 186 166, 206 168, 224 176"/>
+    <path d="M 164 192 C 182 187, 198 188, 214 195"/>
+    <!-- right page ruled lines -->
+    <path d="M 256 136 C 274 128, 294 126, 316 132"/>
+    <path d="M 256 156 C 274 148, 294 146, 316 152"/>
+    <path d="M 256 176 C 274 168, 294 166, 316 172"/>
+    <!-- small sketch on right page: a petri dish -->
+    <circle cx="286" cy="216" r="18"/>
+    <circle cx="286" cy="216" r="11" opacity="0.6"/>
+    <!-- fountain pen resting beside the notebook -->
+    <path d="M 354 236 L 398 176"/>
+    <path d="M 398 176 L 408 164 C 411 160, 416 162, 414 167 L 406 180 Z"/>
+    <path d="M 354 236 L 346 250 L 360 244 Z"/>
+    <!-- tiny petri dish accent, top right -->
+    <circle cx="392" cy="96" r="14"/>
+    <circle cx="392" cy="96" r="8" opacity="0.6"/>
+    <!-- tiny accent dots -->
+    <circle cx="116" cy="150" r="2" fill="#D8D4CA" stroke="none"/>
+    <circle cx="104" cy="190" r="2" fill="#D8D4CA" stroke="none"/>
+    <circle cx="120" cy="228" r="2" fill="#D8D4CA" stroke="none"/>
+  </g>
+</svg>

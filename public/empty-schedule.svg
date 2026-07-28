@@ -1,0 +1,33 @@
+<svg width="480" height="360" viewBox="0 0 480 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g stroke="#D8D4CA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- small calendar page -->
+    <rect x="128" y="104" width="160" height="156" rx="8"/>
+    <path d="M 128 136 L 288 136"/>
+    <!-- binding rings -->
+    <path d="M 160 92 L 160 116"/>
+    <path d="M 208 92 L 208 116"/>
+    <path d="M 256 92 L 256 116"/>
+    <!-- date grid -->
+    <circle cx="156" cy="158" r="2.5" fill="#D8D4CA" stroke="none"/>
+    <circle cx="188" cy="158" r="2.5" fill="#D8D4CA" stroke="none"/>
+    <circle cx="220" cy="158" r="2.5" fill="#D8D4CA" stroke="none"/>
+    <circle cx="252" cy="158" r="2.5" fill="#D8D4CA" stroke="none"/>
+    <circle cx="156" cy="186" r="2.5" fill="#D8D4CA" stroke="none"/>
+    <circle cx="188" cy="186" r="2.5" fill="#D8D4CA" stroke="none"/>
+    <circle cx="220" cy="186" r="6"/>
+    <circle cx="252" cy="186" r="2.5" fill="#D8D4CA" stroke="none"/>
+    <circle cx="156" cy="214" r="2.5" fill="#D8D4CA" stroke="none"/>
+    <circle cx="188" cy="214" r="2.5" fill="#D8D4CA" stroke="none"/>
+    <circle cx="220" cy="214" r="2.5" fill="#D8D4CA" stroke="none"/>
+    <circle cx="252" cy="214" r="2.5" fill="#D8D4CA" stroke="none"/>
+    <path d="M 148 240 L 268 240" stroke-dasharray="2 5"/>
+    <!-- hourglass -->
+    <path d="M 332 128 C 332 158, 356 168, 356 186 C 356 204, 332 214, 332 244"/>
+    <path d="M 380 128 C 380 158, 356 168, 356 186 C 356 204, 380 214, 380 244"/>
+    <path d="M 324 128 L 388 128"/>
+    <path d="M 324 244 L 388 244"/>
+    <!-- sand -->
+    <path d="M 348 226 C 350 216, 362 216, 364 226 Z" fill="#D8D4CA" stroke="none" opacity="0.6"/>
+    <path d="M 356 190 L 356 208" stroke-dasharray="1.5 4"/>
+  </g>
+</svg>
