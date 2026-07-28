@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router'
 import { Bell, ChevronRight, LogOut, Plus, Search } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { LOGIN_PATH } from '@/const'
+import { openCommandPalette } from '@/components/CommandPalette'
 
 const ROUTE_LABELS: Array<[RegExp, string[]]> = [
   [/^\/$/, ['工作台']],
@@ -47,6 +48,7 @@ export default function Navbar() {
       <div className="flex flex-1 justify-center">
         <button
           type="button"
+          onClick={openCommandPalette}
           className="flex h-9 w-[380px] max-w-full items-center gap-2 rounded-lg border border-line bg-surface px-3 text-left text-[12.5px] text-ink-mute shadow-card transition-colors duration-150 hover:border-line-strong"
           aria-label="全局搜索"
         >

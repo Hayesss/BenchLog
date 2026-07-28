@@ -18,6 +18,7 @@ import Navbar from '@/components/Navbar'
 import { useAuth } from '@/hooks/useAuth'
 import { trpc } from '@/providers/trpc'
 import { LOGIN_PATH } from '@/const'
+import CommandPalette, { openCommandPalette } from '@/components/CommandPalette'
 
 const NAV_ITEMS = [
   { to: '/', label: '工作台', en: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -192,7 +193,12 @@ function MobileChrome() {
           <span className="font-display text-[15px] font-bold text-ink">BenchLog</span>
         </Link>
         <div className="flex-1" />
-        <button type="button" aria-label="搜索" className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft">
+        <button
+          type="button"
+          aria-label="搜索"
+          onClick={openCommandPalette}
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft"
+        >
           <Search className="h-5 w-5" strokeWidth={1.8} />
         </button>
         {isLoading ? (
@@ -295,6 +301,7 @@ export default function Layout() {
           </motion.div>
         </main>
       </div>
+      <CommandPalette />
     </div>
   )
 }
