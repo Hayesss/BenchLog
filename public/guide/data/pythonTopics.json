@@ -1,0 +1,350 @@
+{
+  "categories": [
+    {
+      "id": "basics",
+      "name": "基础语法",
+      "description": "Python编程的基石——从环境搭建到核心数据结构，覆盖变量、列表、条件判断和字典",
+      "difficulty": "入门",
+      "chapters": [
+        {
+          "key": "python-ch1",
+          "chapter": 1,
+          "name": "起步：编程环境与第一个程序",
+          "difficulty": "入门",
+          "sections": [
+            {
+              "type": "concept",
+              "title": "本章核心",
+              "content": "<p>搭建Python编程环境，运行第一个程序 <code>hello_world.py</code>。本章是编程之旅的起点——不涉及复杂语法，只关注让代码跑起来。</p><p>三个关键动作：安装Python → 安装VS Code → 运行打印语句。</p>"
+            },
+            {
+              "type": "code",
+              "title": "你的第一个Python程序",
+              "code": "# 安装Python后，在VS Code中创建 hello_world.py\n# 输入以下代码并运行（F5 或终端 python hello_world.py）\n\nprint(\"Hello Python world!\")\n\n# 尝试修改消息\nmessage = \"Hello Bioinformatics world!\"\nprint(message)"
+            },
+            {
+              "type": "bio",
+              "title": "生信连接",
+              "content": "<p>生物信息学的日常工作就是写Python脚本处理数据。你现在写的 <code>print()</code> 和 <code>变量赋值</code> 是所有生信分析脚本的起点。</p><p>比如后续你会写：<code>print(f'共检测到 {len(genes)} 个差异表达基因')</code></p>"
+            }
+          ]
+        },
+        {
+          "key": "python-ch2",
+          "chapter": 2,
+          "name": "变量与简单数据类型",
+          "difficulty": "入门",
+          "sections": [
+            {
+              "type": "concept",
+              "title": "本章核心",
+              "content": "<p>掌握Python的基本数据类型：<strong>字符串(str)、整数(int)、浮点数(float)</strong>。理解变量命名规则、字符串方法和注释写法。</p><p>这是所有数据处理的基础——基因名是字符串，表达值是浮点数，样本数是整数。</p>"
+            },
+            {
+              "type": "code",
+              "title": "生信场景：基因表达数据",
+              "code": "gene_name = \"TP53\"                  # 字符串：基因名\np_value = 0.00032                     # 浮点数：显著性\nfold_change = -2.5                    # 浮点数：表达变化倍数\nsample_count = 12                      # 整数：样本数\n\n# 字符串方法\ngene_upper = gene_name.upper()        # 'TP53'\nprint(f\"基因 {gene_name} 的p值={p_value:.2e}, FC={fold_change}\")\n# → 基因 TP53 的p值=3.20e-04, FC=-2.5\n\n# 注释：下面的代码筛选显著基因\nis_significant = p_value < 0.05       # True"
+            },
+            {
+              "type": "bio",
+              "title": "生信连接",
+              "content": "<p>基因名、蛋白质ID都是字符串；表达值、p值、fold change都是数值。理解数据类型是后续用pandas处理表达矩阵、用numpy做数值计算的前提。</p>"
+            }
+          ]
+        },
+        {
+          "key": "python-ch3",
+          "chapter": 3,
+          "name": "列表简介",
+          "difficulty": "入门",
+          "sections": [
+            {
+              "type": "concept",
+              "title": "本章核心",
+              "content": "<p><strong>列表(list)</strong>是Python最核心的容器类型——有序、可修改的元素集合。通过索引访问元素、使用 <code>append()/insert()/remove()</code> 增删元素、<code>sort()</code> 排序。</p>"
+            },
+            {
+              "type": "code",
+              "title": "生信场景：基因列表操作",
+              "code": "# 差异表达基因列表\noncogenes = [\"MYC\", \"EGFR\", \"KRAS\", \"BRAF\"]\ntumor_suppressors = [\"TP53\", \"BRCA1\", \"PTEN\"]\n\n# 列表操作\nall_genes = oncogenes + tumor_suppressors\nprint(f\"候选基因数: {len(all_genes)}\")    # 7\n\n# 添加新发现基因\noncogenes.append(\"AKT1\")\n\n# 排序\noncogenes.sort()\nprint(oncogenes)  # ['AKT1', 'BRAF', 'EGFR', 'KRAS', 'MYC']\n\n# 索引访问\nfirst_gene = all_genes[0]              # 'MYC'\nlast_gene = all_genes[-1]              # 'PTEN'\nfirst_three = all_genes[:3]            # ['MYC', 'EGFR', 'KRAS']"
+            },
+            {
+              "type": "bio",
+              "title": "生信连接",
+              "content": "<p>基因列表是生信中最常见的数据结构——差异基因列表、通路基因集、TF靶基因列表。掌握列表操作后才能处理真实的基因集数据。</p>"
+            }
+          ]
+        },
+        {
+          "key": "python-ch4",
+          "chapter": 4,
+          "name": "操作列表与循环",
+          "difficulty": "入门",
+          "sections": [
+            {
+              "type": "concept",
+              "title": "本章核心",
+              "content": "<p><strong>for循环</strong>遍历列表中的每个元素，是自动化处理的核心。配合 <code>range()</code> 生成数值序列、<strong>列表推导式</strong>高效创建列表、<strong>切片</strong>取子集、<strong>元组(tuple)</strong>不可变序列。</p>"
+            },
+            {
+              "type": "code",
+              "title": "生信场景：批量处理基因",
+              "code": "genes = [\"TP53\", \"EGFR\", \"MYC\", \"BRCA1\", \"PTEN\"]\n\n# for循环：打印每个基因的表达状态\nfor gene in genes:\n    print(f\"正在分析基因: {gene}\")\n\n# range() + 列表推导式\nexpression_values = [2.1, -1.5, 3.8, -0.5, -2.3]\nup_regulated = [genes[i] for i in range(len(genes)) \n               if expression_values[i] > 1.0]\nprint(f\"上调基因: {up_regulated}\")      # ['TP53', 'MYC']\n\n# 元组：基因坐标（不可变）\ngene_position = (\"chr17\", 7668402, 7687550)  # TP53位置\nchromosome, start, end = gene_position       # 元组解包\nprint(f\"{chromosome}:{start}-{end}\")"
+            },
+            {
+              "type": "bio",
+              "title": "生信连接",
+              "content": "<p>生信分析中批量处理是常态——遍历20000个基因做差异检验、对每个染色体做统计。for循环和列表推导式是生信脚本中最高频使用的语法结构。</p>"
+            }
+          ]
+        },
+        {
+          "key": "python-ch5",
+          "chapter": 5,
+          "name": "if 语句与条件判断",
+          "difficulty": "入门",
+          "sections": [
+            {
+              "type": "concept",
+              "title": "本章核心",
+              "content": "<p><strong>if/elif/else</strong>条件分支，根据条件执行不同代码。配合<strong>条件测试</strong>（==, !=, >, <, in, not in）和<strong>布尔表达式</strong>组合多个条件（and/or）。</p>"
+            },
+            {
+              "type": "code",
+              "title": "生信场景：筛选差异基因",
+              "code": "p_value = 0.003\nfold_change = -2.5\ngene_name = \"TP53\"\n\n# 差异基因筛选逻辑\nif p_value < 0.05 and abs(fold_change) > 2.0:\n    if fold_change > 0:\n        direction = \"上调\"\n    else:\n        direction = \"下调\"\n    print(f\"{gene_name} 显著{direction} (p={p_value}, FC={fold_change})\")\nelse:\n    print(f\"{gene_name} 未达到差异阈值\")\n\n# 检查基因是否在通路中\ndna_repair_genes = [\"TP53\", \"BRCA1\", \"BRCA2\", \"ATM\"]\nif gene_name in dna_repair_genes:\n    print(f\"{gene_name} 属于DNA修复通路\")"
+            },
+            {
+              "type": "bio",
+              "title": "生信连接",
+              "content": "<p>生信中的决策逻辑无处不在：p值判断显著性、fold change判断方向、基因是否属于某通路、突变是否为致病性。if语句是将生物逻辑转化为代码逻辑的关键。</p>"
+            }
+          ]
+        },
+        {
+          "key": "python-ch6",
+          "chapter": 6,
+          "name": "字典与键值映射",
+          "difficulty": "入门",
+          "sections": [
+            {
+              "type": "concept",
+              "title": "本章核心",
+              "content": "<p><strong>字典(dict)</strong>是键值对容器——通过键快速查找值。支持嵌套（字典列表、字典中存字典）、遍历（keys/values/items）。</p>"
+            },
+            {
+              "type": "code",
+              "title": "生信场景：基因注释字典",
+              "code": "# 基因名 → 表达值的映射\nexpression = {\"TP53\": 12.5, \"EGFR\": 45.2, \"MYC\": 8.3, \"BRCA1\": 5.1}\n\n# 访问\nprint(f\"TP53表达量: {expression['TP53']}\")\n\n# 安全访问（避免KeyError）\ntarget_gene = expression.get(\"CDKN1A\", \"未检测到\")\n\n# 遍历所有基因\nfor gene, expr in expression.items():\n    if expr > 10:\n        print(f\"{gene}: 高表达 ({expr})\")\n\n# 嵌套字典：基因注释信息\ngene_info = {\n    \"TP53\": {\"chr\": \"chr17\", \"type\": \"tumor_suppressor\", \"pathway\": \"apoptosis\"},\n    \"EGFR\": {\"chr\": \"chr7\", \"type\": \"oncogene\", \"pathway\": \"cell_growth\"},\n}\nprint(gene_info[\"TP53\"][\"pathway\"])  # apoptosis"
+            },
+            {
+              "type": "bio",
+              "title": "生信连接",
+              "content": "<p>字典在生信中极其重要：基因-表达映射、样本-元数据映射、基因-注释映射、密码子-氨基酸翻译表。AnnData的 <code>.obs</code> 本质上就是字典结构。</p>"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "intermediate",
+      "name": "进阶编程",
+      "description": "从脚本到程序——函数封装、面向对象、文件处理与代码测试",
+      "difficulty": "中级",
+      "chapters": [
+        {
+          "key": "python-ch7",
+          "chapter": 7,
+          "name": "用户输入与while循环",
+          "difficulty": "中级",
+          "sections": [
+            {
+              "type": "concept",
+              "title": "本章核心",
+              "content": "<p><strong>input()</strong>获取用户输入、<strong>while循环</strong>在条件满足时持续运行、<strong>break/continue</strong>控制循环流程。</p>"
+            },
+            {
+              "type": "code",
+              "title": "生信场景：交互式基因查询",
+              "code": "# 基因查询循环\ngene_db = {\"TP53\": \"tumor suppressor\", \"EGFR\": \"oncogene\", \"MYC\": \"oncogene\"}\n\nprint(\"基因功能查询系统（输入 quit 退出）\")\nwhile True:\n    gene = input(\"请输入基因名: \").strip().upper()\n    if gene == \"QUIT\":\n        break\n    function = gene_db.get(gene)\n    if function:\n        print(f\"  {gene}: {function}\")\n    else:\n        print(f\"  {gene}: 数据库中未收录\")\n    \n# 实际生信中更多用 argparse 而非 input()\n# 但 while 循环常用于迭代收敛算法（如 k-means 聚类）"
+            },
+            {
+              "type": "bio",
+              "title": "生信连接",
+              "content": "<p>生信脚本通常用argparse/click处理命令行参数而非input()，但while循环在迭代算法中至关重要——k-means收敛、梯度下降训练、序列比对动态规划都依赖while循环。</p>"
+            }
+          ]
+        },
+        {
+          "key": "python-ch8",
+          "chapter": 8,
+          "name": "函数：代码复用的基石",
+          "difficulty": "中级",
+          "sections": [
+            {
+              "type": "concept",
+              "title": "本章核心",
+              "content": "<p><strong>函数(def)</strong>封装可复用的代码块。理解形参与实参、位置/关键字/默认值参数、返回值、任意数量参数(*args/**kwargs)、模块导入。</p>"
+            },
+            {
+              "type": "code",
+              "title": "生信场景：可复用的分析函数",
+              "code": "def calc_fold_change(treatment, control, pseudocount=1.0):\n    \"\"\"计算基因表达fold change\n    Args:\n        treatment: 处理组表达值（列表或单个值）\n        control: 对照组表达值\n        pseudocount: 防止除零的伪计数\n    Returns:\n        log2 fold change\n    \"\"\"\n    import math\n    fc = (treatment + pseudocount) / (control + pseudocount)\n    return math.log2(fc)\n\n# 使用\nfc = calc_fold_change(treatment=150, control=30)\nprint(f\"log2FC = {fc:.2f}\")  # log2FC = 2.28\n\n# 批量处理\nimport numpy as np\ntreated = np.array([150, 80, 200])\ncontrol = np.array([30, 60, 250])\nfcs = calc_fold_change(treated, control)\nprint(f\"Fold changes: {fcs}\")"
+            },
+            {
+              "type": "bio",
+              "title": "生信连接",
+              "content": "<p>函数是生信分析管线的核心——将QC、归一化、差异分析、可视化各自封装为函数。这让你从「写脚本」升级到「建管线」——正如OmicVerse的每个API都是一个封装好的函数。</p><p>相关专题：<a href='/learn/stage-1-dl-pytorch-tensorflow'>PyTorch/TensorFlow入门</a></p>"
+            }
+          ]
+        },
+        {
+          "key": "python-ch9",
+          "chapter": 9,
+          "name": "类：面向对象编程",
+          "difficulty": "中级",
+          "sections": [
+            {
+              "type": "concept",
+              "title": "本章核心",
+              "content": "<p><strong>类(class)</strong>是面向对象编程的核心——将数据和行为封装在一起。理解 <code>__init__()</code> 构造方法、实例属性、继承、方法重写、实例作为属性。</p>"
+            },
+            {
+              "type": "code",
+              "title": "生信场景：基因类设计",
+              "code": "class Gene:\n    \"\"\"表示一个基因及其表达信息\"\"\"\n    def __init__(self, name, chromosome, expression=0.0):\n        self.name = name\n        self.chromosome = chromosome\n        self.expression = expression\n        self.is_expressed = expression > 1.0\n    \n    def describe(self):\n        status = \"表达\" if self.is_expressed else \"不表达\"\n        return f\"{self.name} ({self.chromosome}): {status} ({self.expression})\"\n\nclass Oncogene(Gene):  # 继承\n    \"\"\"致癌基因，继承Gene并添加突变信息\"\"\"\n    def __init__(self, name, chromosome, expression, mutation_type):\n        super().__init__(name, chromosome, expression)\n        self.mutation_type = mutation_type\n    \n    def describe(self):\n        base = super().describe()\n        return f\"{base} | 突变: {self.mutation_type}\"\n\n# 使用\ntp53 = Gene(\"TP53\", \"chr17\", 12.5)\negfr = Oncogene(\"EGFR\", \"chr7\", 45.2, \"amplification\")\nprint(tp53.describe())\nprint(egfr.describe())"
+            },
+            {
+              "type": "bio",
+              "content": "<p>OOP在生信工具开发中至关重要。AnnData对象就是类的典型应用——它将表达矩阵(.X)、细胞注释(.obs)、基因注释(.var)封装在一起。理解类才能读懂和扩展生信工具源码。</p>",
+              "title": "生信连接"
+            }
+          ]
+        },
+        {
+          "key": "python-ch10",
+          "chapter": 10,
+          "name": "文件读写与异常处理",
+          "difficulty": "中级",
+          "sections": [
+            {
+              "type": "concept",
+              "title": "本章核心",
+              "content": "<p>从磁盘<strong>读取文件</strong>(open/read/readlines)、<strong>写入文件</strong>(write/writelines)、使用<strong>try-except</strong>处理异常避免程序崩溃、使用<strong>json</strong>模块存储结构化数据。</p>"
+            },
+            {
+              "type": "code",
+              "title": "生信场景：FASTA解析与异常处理",
+              "code": "def parse_fasta(filepath):\n    \"\"\"解析FASTA文件，返回 {序列ID: 序列} 字典\"\"\"\n    sequences = {}\n    try:\n        with open(filepath) as f:\n            current_id = None\n            for line in f:\n                line = line.strip()\n                if line.startswith('>'):\n                    current_id = line[1:].split()[0]\n                    sequences[current_id] = ''\n                else:\n                    sequences[current_id] += line\n    except FileNotFoundError:\n        print(f\"错误: 文件 {filepath} 不存在\")\n        return None\n    except Exception as e:\n        print(f\"解析出错: {e}\")\n        return None\n    else:\n        print(f\"成功加载 {len(sequences)} 条序列\")\n        return sequences\n\n# 使用\nseqs = parse_fasta(\"genome.fa\")\nif seqs:\n    for seq_id, seq in list(seqs.items())[:3]:\n        print(f\"{seq_id}: {seq[:50]}... ({len(seq)} bp)\")"
+            },
+            {
+              "type": "bio",
+              "content": "<p>生信分析80%的时间在处理文件I/O：读取FASTQ/FASTA/BAM/VCF、写出表达矩阵/差异基因表/注释结果。try-except确保你的分析管线不会因为一个坏文件而全部崩溃。</p>",
+              "title": "生信连接"
+            }
+          ]
+        },
+        {
+          "key": "python-ch11",
+          "chapter": 11,
+          "name": "测试代码：pytest入门",
+          "difficulty": "中级",
+          "sections": [
+            {
+              "type": "concept",
+              "title": "本章核心",
+              "content": "<p>使用<strong>pytest</strong>编写单元测试，确保代码正确性。<code>assert</code>断言、测试函数命名规范(test_xxx)、测试夹具(fixture)、覆盖率概念。</p>"
+            },
+            {
+              "type": "code",
+              "title": "生信场景：测试分析函数",
+              "code": "# test_bioinfo.py\nimport pytest\n\ndef calc_log2fc(treatment, control):\n    \"\"\"计算log2 fold change\"\"\"\n    import math\n    return math.log2((treatment + 1) / (control + 1))\n\ndef test_calc_log2fc_upregulated():\n    \"\"\"测试上调基因\"\"\"\n    assert calc_log2fc(100, 10) > 2.0\n\ndef test_calc_log2fc_no_change():\n    \"\"\"测试无变化\"\"\"\n    assert abs(calc_log2fc(50, 50)) < 0.1\n\ndef test_calc_log2fc_downregulated():\n    \"\"\"测试下调基因\"\"\"\n    assert calc_log2fc(10, 100) < -2.0\n\n# 运行: pytest test_bioinfo.py -v\n# 通过: 3 passed\n# 失败示例（故意写错）:\n# assert calc_log2fc(10, 10) > 1.0  # FAILED"
+            },
+            {
+              "type": "bio",
+              "content": "<p>生信分析的可复现性危机——你三个月前跑的分析，现在还能复现吗？测试让你确信：你的差异分析函数在给定输入时返回预期输出。这是从「一次性脚本」到「可维护管线」的跨越。</p>",
+              "title": "生信连接"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "visualization",
+      "name": "数据可视化",
+      "description": "用Matplotlib和Plotly将生信数据转化为可解释的图表——火山图、热图、散点图",
+      "difficulty": "中级",
+      "chapters": [
+        {
+          "key": "python-ch15",
+          "chapter": 15,
+          "name": "Matplotlib：生成数据与基础绘图",
+          "difficulty": "中级",
+          "sections": [
+            {
+              "type": "concept",
+              "title": "本章核心",
+              "content": "<p><strong>Matplotlib</strong>是Python最基础的绘图库。掌握折线图(plot)、散点图(scatter)、颜色映射(colormap)、样式定制、自动保存图表。</p>"
+            },
+            {
+              "type": "code",
+              "title": "生信场景：基因表达散点图",
+              "code": "import matplotlib.pyplot as plt\nimport numpy as np\n\n# 模拟差异表达数据\nnp.random.seed(42)\nn_genes = 1000\nlog2fc = np.random.normal(0, 1.5, n_genes)\nneg_log10_pval = -np.log10(np.random.beta(0.5, 5, n_genes) + 1e-10)\n\n# 火山图\ncolors = ['red' if (abs(fc) > 1 and p > 2) else 'gray' \n          for fc, p in zip(log2fc, neg_log10_pval)]\n\nplt.figure(figsize=(8, 6))\nplt.scatter(log2fc, neg_log10_pval, c=colors, alpha=0.5, s=10)\nplt.axhline(y=2, color='blue', linestyle='--', alpha=0.3, label='p=0.01')\nplt.axvline(x=-1, color='gray', linestyle='--', alpha=0.2)\nplt.axvline(x=1, color='gray', linestyle='--', alpha=0.2)\nplt.xlabel('log2 Fold Change')\nplt.ylabel('-log10(p-value)')\nplt.title('差异表达基因火山图')\nplt.legend()\nplt.tight_layout()\n# plt.savefig('volcano.png', dpi=150)"
+            },
+            {
+              "type": "bio",
+              "content": "<p>火山图是差异表达分析的标准可视化——x轴log2FC表示变化幅度，y轴-log10(p)表示统计显著性。红点是显著差异基因，灰点是不显著基因。每个生信论文都少不了火山图。</p>",
+              "title": "生信连接"
+            }
+          ]
+        },
+        {
+          "key": "python-ch16",
+          "chapter": 16,
+          "name": "下载与解析CSV数据",
+          "difficulty": "中级",
+          "sections": [
+            {
+              "type": "concept",
+              "title": "本章核心",
+              "content": "<p>读取<strong>CSV</strong>文件、使用 <code>csv</code> 模块和 <code>pandas</code> 解析数据、<code>datetime</code> 处理时间序列、绘制多系列折线图、错误检查。</p>"
+            },
+            {
+              "type": "code",
+              "title": "生信场景：TCGA表达数据加载与可视化",
+              "code": "import pandas as pd\nimport matplotlib.pyplot as plt\n\n# 读取TCGA BRCA表达数据\ndf = pd.read_csv(\"TCGA_BRCA_expr.csv\", index_col=0)\nprint(f\"基因数: {df.shape[0]}, 样本数: {df.shape[1]}\")\n\n# 提取TP53在肿瘤 vs 正常中的表达\ntp53_expr = df.loc['TP53']\ntumor_samples = [c for c in df.columns if c.endswith('-01A')]\nnormal_samples = [c for c in df.columns if c.endswith('-11A')]\n\n# 箱线图\nfig, ax = plt.subplots(figsize=(6, 4))\nax.boxplot([tp53_expr[tumor_samples], tp53_expr[normal_samples]],\n           labels=['Tumor', 'Normal'])\nax.set_ylabel('TP53 Expression (log2 TPM)')\nax.set_title('TP53 肿瘤 vs 正常表达')\n\n# 统计\nfrom scipy import stats\nt_stat, p_val = stats.ttest_ind(\n    tp53_expr[tumor_samples], tp53_expr[normal_samples]\n)\nprint(f\"TP53: t={t_stat:.2f}, p={p_val:.2e}\")"
+            },
+            {
+              "type": "bio",
+              "content": "<p>TCGA等公共数据库的数据通常是CSV或TSV格式的基因表达矩阵。pandas的read_csv()是生信分析中最常用的数据加载函数之一。结合Matplotlib即可快速出图。</p>",
+              "title": "生信连接"
+            }
+          ]
+        },
+        {
+          "key": "python-ch17",
+          "chapter": 17,
+          "name": "使用API与Plotly交互式可视化",
+          "difficulty": "中级",
+          "sections": [
+            {
+              "type": "concept",
+              "title": "本章核心",
+              "content": "<p>使用<strong>requests</strong>库访问REST API获取在线数据、<strong>Plotly</strong>创建交互式图表（可缩放/悬停/点击）、处理JSON响应格式。</p>"
+            },
+            {
+              "type": "code",
+              "title": "生信场景：Plotly交互式UMAP",
+              "code": "import plotly.express as px\nimport pandas as pd\n\n# 单细胞UMAP坐标 + 细胞类型\numap_data = pd.DataFrame({\n    'UMAP1': [-5.2, -4.8, 3.1, 3.5, -0.2, 0.1, -1.0],\n    'UMAP2': [2.1, 1.8, -3.2, -2.9, 5.0, 4.7, -0.5],\n    'cell_type': ['T cell', 'T cell', 'B cell', 'B cell', \n                  'Monocyte', 'Monocyte', 'NK cell'],\n    'n_genes': [2500, 2800, 2100, 1950, 3200, 3050, 1800],\n})\n\nfig = px.scatter(\n    umap_data, x='UMAP1', y='UMAP2',\n    color='cell_type',\n    hover_data=['n_genes'],\n    title='PBMC 单细胞 UMAP',\n    color_discrete_map={\n        'T cell': '#1E3A5F', 'B cell': '#2D5A3D',\n        'Monocyte': '#C53030', 'NK cell': '#5B3A7B'\n    }\n)\nfig.update_layout(width=700, height=500)\n# fig.write_html('umap_interactive.html')"
+            },
+            {
+              "type": "bio",
+              "content": "<p>交互式图表让单细胞分析结果更具可探索性——悬停查看细胞元数据、缩放观察稀有细胞群。OmicVerse的绘图模块内置了Plotly支持，生成的图表可以直接嵌入HTML报告中。</p>",
+              "title": "生信连接"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

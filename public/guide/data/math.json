@@ -1,0 +1,571 @@
+{
+  "mathTopics": [
+    {
+      "id": "linear-algebra",
+      "name": "线性代数",
+      "nameEn": "Linear Algebra",
+      "description": "机器学习的数学语言，用于表示和操作数据。",
+      "bioAnalogy": "基因调控网络",
+      "bioAnalogyDetail": "想象基因调控网络: 每个基因是一个节点，调控关系是边。线性代数中的矩阵正是描述这种网络的最佳工具——邻接矩阵A的元素A_ij表示基因i对基因j的调控强度。PCA用于降维寻找主要调控模式，就像WGCNA发现基因模块。",
+      "keyConcepts": [
+        {
+          "name": "向量",
+          "formula": "v = [v1, v2, ..., vn] ∈ R^n",
+          "description": "数据的数值表示。在生物信息学中，一个基因表达向量可以表示一个样本中数千个基因的表达量，如v = [TP53表达值, BRCA1表达值, EGFR表达值, ...]，是机器学习模型的基本输入单元。",
+          "relatedLinks": [
+            {
+              "label": "基因表达向量 (学习路径 阶段1)",
+              "path": "/roadmap"
+            }
+          ],
+          "codeImpl": "import numpy as np\n# 基因表达向量: 一个样本中所有基因的表达值\nv = np.array([2.3, 1.5, 0.8, 4.1, 3.0])  # 5个基因的表达量\nprint(f\"维度: {v.shape}, 均值: {v.mean():.2f}\")"
+        },
+        {
+          "name": "矩阵乘法",
+          "formula": "(AB)_ij = Σ_k A_ik B_kj",
+          "description": "神经网络前向传播的核心运算。在生物信息学中，矩阵乘法用于将基因表达矩阵(样本×基因)与权重矩阵相乘实现线性变换，例如在全连接层中将2048维基因特征映射到128维隐层表示。",
+          "relatedLinks": [
+            {
+              "label": "神经网络前向传播 (学习路径 阶段1)",
+              "path": "/roadmap"
+            },
+            {
+              "label": "全连接层实现 (工具)",
+              "path": "/tools"
+            }
+          ],
+          "codeImpl": "import numpy as np\n# 神经网络全连接层: Y = X @ W\nX = np.random.randn(32, 2048)  # 32个样本, 2048个基因特征\nW = np.random.randn(2048, 128) * 0.01  # 权重矩阵\nY = X @ W  # (32, 128) — 隐藏层输出"
+        },
+        {
+          "name": "点积",
+          "formula": "a · b = Σ_i a_i b_i = ||a|| ||b|| cos(θ)",
+          "description": "衡量两个向量的相似度，是注意力机制的基础。在生物信息学中，点积用于计算蛋白质序列中两个位置嵌入的相似度(Transformer中的Q·K)，以及评估基因表达谱之间的相关性进行样本聚类。",
+          "relatedLinks": [
+            {
+              "label": "注意力机制核心运算 (学习路径 阶段3)",
+              "path": "/roadmap"
+            },
+            {
+              "label": "基因共表达相似度 (应用方向)",
+              "path": "/applications"
+            }
+          ],
+          "codeImpl": "import numpy as np\n# 注意力机制: 计算Query和Key的相似度\nQ = np.random.randn(10, 64)  # 10个位置, 64维查询\nK = np.random.randn(10, 64)  # 10个位置, 64维键\nattention_scores = Q @ K.T  # (10, 10) — 每个位置对其他位置的注意力\n# 基因表达相关性: 两个样本的Pearson相关\ncorr = np.corrcoef(sample_a, sample_b)[0, 1]"
+        },
+        {
+          "name": "特征分解",
+          "formula": "Av = λv",
+          "description": "找到矩阵的主要方向(特征向量)和对应的缩放因子(特征值)，是PCA的核心数学操作。在生物信息学中，对基因表达矩阵的协方差矩阵进行特征分解，可以找到主导表达变化的主要基因模块(如细胞周期模块)。",
+          "relatedLinks": [
+            {
+              "label": "PCA降维 (学习路径 阶段2)",
+              "path": "/roadmap"
+            },
+            {
+              "label": "基因表达模块 (应用方向)",
+              "path": "/applications"
+            }
+          ],
+          "codeImpl": "import numpy as np\n# 协方差矩阵特征分解 (PCA第一步)\nX_centered = X - X.mean(axis=0)\ncov = X_centered.T @ X_centered / (n - 1)\neigenvalues, eigenvectors = np.linalg.eigh(cov)\n# 按特征值降序排列\nidx = np.argsort(eigenvalues)[::-1]\ntop_eigenvectors = eigenvectors[:, idx[:50]]  # 前50个主成分"
+        },
+        {
+          "name": "SVD",
+          "formula": "A = UΣV^T",
+          "description": "任意矩阵的分解方法，将数据分解为正交基底和奇异值。在生物信息学中，SVD用于基因表达数据的降噪(去除小的奇异值对应噪声)和缺失值插补，以及推荐系统中药物-靶标相互作用的矩阵补全。",
+          "relatedLinks": [
+            {
+              "label": "基因表达降噪 (学习路径 阶段2)",
+              "path": "/roadmap"
+            },
+            {
+              "label": "药物-靶标矩阵补全 (应用方向)",
+              "path": "/applications"
+            }
+          ],
+          "codeImpl": "import numpy as np\n# SVD基因表达降噪\nU, S, Vt = np.linalg.svd(X, full_matrices=False)\n# 保留前k个奇异值, 去除噪声\nk = 20\nX_denoised = U[:, :k] @ np.diag(S[:k]) @ Vt[:k, :]\nexplained_var = (S[:k]**2).sum() / (S**2).sum()\nprint(f\"解释方差: {explained_var:.1%}\")"
+        }
+      ],
+      "resources": [
+        {
+          "name": "3Blue1Brown线性代数",
+          "type": "视频",
+          "url": "https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab"
+        },
+        {
+          "name": "MIT 18.06 Gilbert Strang",
+          "type": "课程",
+          "url": "https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/"
+        },
+        {
+          "name": "MML Book Chapter 2-4",
+          "type": "书籍",
+          "url": "https://mml-book.github.io/"
+        }
+      ],
+      "mlUsage": [
+        "PCA降维: 对高维基因表达数据进行降维",
+        "特征提取: 从原始数据中提取主要特征",
+        "核方法: SVM的核技巧依赖于内积空间",
+        "推荐系统: 矩阵分解用于药物-靶标预测"
+      ],
+      "dlUsage": [
+        "前向传播: 矩阵乘法构成神经网络的基本运算",
+        "嵌入层: 将离散符号映射为连续向量",
+        "注意力机制: Query-Key-Value的核心是点积",
+        "Batch Normalization: 基于协方差矩阵的标准化"
+      ],
+      "difficulty": "入门"
+    },
+    {
+      "id": "calculus",
+      "name": "微积分",
+      "nameEn": "Calculus",
+      "description": "优化和学习的数学基础，理解梯度下降的核心。",
+      "bioAnalogy": "酶动力学",
+      "bioAnalogyDetail": "酶促反应的米氏方程 v = Vmax[S]/(Km+[S]) 就是微积分的完美应用。导数告诉我们反应速率随底物浓度的变化率——这正是梯度下降寻找最优解的方式。在神经网络的训练中，我们通过反向传播计算损失函数对每个参数的偏导数，就像研究每个调控因子对反应速率的影响。",
+      "keyConcepts": [
+        {
+          "name": "导数",
+          "formula": "f'(x) = lim(h→0) [f(x+h) - f(x)] / h",
+          "description": "函数在某点的瞬时变化率。在生物信息学中，导数用于计算基因表达量随时间变化的速率（如药物处理后的表达动力学），以及神经网络中损失函数对权重的敏感度。",
+          "relatedLinks": [
+            {
+              "label": "梯度下降基础 (学习路径 阶段1)",
+              "path": "/roadmap"
+            }
+          ],
+          "codeImpl": "import torch\n# 自动微分: PyTorch计算导数\nx = torch.tensor([2.0], requires_grad=True)\nf = x**3 - 3*x**2 + 2*x  # f(x) = x³ - 3x² + 2x\nf.backward()\nprint(f\"f'(2) = {x.grad.item()}\")  # f'(2) = 3*4 - 6*2 + 2 = 2"
+        },
+        {
+          "name": "偏导数",
+          "formula": "∂f/∂x_i",
+          "description": "多变量函数对某一变量的变化率。在生物信息学中，偏导数用于计算损失函数对每个模型参数(如某一连接权重)的独立影响，是反向传播算法中逐层梯度计算的基础。",
+          "relatedLinks": [
+            {
+              "label": "反向传播梯度计算 (学习路径 阶段2)",
+              "path": "/roadmap"
+            }
+          ],
+          "codeImpl": "import torch\n# 多变量函数偏导数\nx = torch.tensor([1.0, 2.0], requires_grad=True)\nf = x[0]**2 + 3*x[0]*x[1] + x[1]**3\nf.backward()\nprint(f\"∂f/∂x1 = {x.grad[0]:.1f}\")  # 2*1 + 3*2 = 8\nprint(f\"∂f/∂x2 = {x.grad[1]:.1f}\")  # 3*1 + 3*4 = 15"
+        },
+        {
+          "name": "链式法则",
+          "formula": "∂z/∂x = ∂z/∂y · ∂y/∂x",
+          "description": "复合函数的求导法则，反向传播算法的数学基础。在生物信息学中，链式法则使得可以高效计算深层蛋白质结构预测网络中数百万参数的梯度，从输出层的损失一直传播到输入层的嵌入。",
+          "relatedLinks": [
+            {
+              "label": "反向传播算法 (学习路径 阶段2)",
+              "path": "/roadmap"
+            },
+            {
+              "label": "PyTorch自动微分 (工具)",
+              "path": "/tools"
+            }
+          ],
+          "codeImpl": "import torch\n# 链式法则 = 反向传播\nx = torch.tensor([1.0], requires_grad=True)\nh = torch.tanh(x)      # h = tanh(x)\ny = h**2               # y = h²\ny.backward()           # dy/dx = dy/dh * dh/dx = 2h * (1-tanh²(x))\nprint(f\"dy/dx = {x.grad.item():.4f}\")"
+        },
+        {
+          "name": "梯度",
+          "formula": "∇f = [∂f/∂x1, ∂f/∂x2, ..., ∂f/∂xn]",
+          "description": "函数增长最快的方向向量，梯度的反方向用于参数优化。在生物信息学中，梯度指导基因调控网络推断中参数的调整方向，使模型预测的基因表达值逐步接近实验观测值。",
+          "relatedLinks": [
+            {
+              "label": "参数优化方向 (学习路径 阶段1)",
+              "path": "/roadmap"
+            }
+          ],
+          "codeImpl": "import torch\n# 梯度向量指向函数增长最快的方向\nx = torch.tensor([1.0, -2.0], requires_grad=True)\nf = x[0]**2 + x[1]**2  # f(x,y) = x² + y²\nf.backward()\nprint(f\"∇f = [{x.grad[0]:.1f}, {x.grad[1]:.1f}]\")  # [2.0, -4.0]"
+        },
+        {
+          "name": "梯度下降",
+          "formula": "θ_{t+1} = θ_t - α ∇f(θ_t)",
+          "description": "沿梯度反方向迭代更新参数以最小化损失函数。在生物信息学中，梯度下降用于训练所有神经网络模型，如优化AlphaFold的结构预测参数使预测结构与实验结构的RMSD最小。",
+          "relatedLinks": [
+            {
+              "label": "模型训练基础 (学习路径 阶段1-2)",
+              "path": "/roadmap"
+            },
+            {
+              "label": "PyTorch优化器 (工具)",
+              "path": "/tools"
+            }
+          ],
+          "codeImpl": "import torch\n# 一步梯度下降\nw = torch.tensor([2.0], requires_grad=True)\nlr = 0.1\nloss = (w - 1.0)**2  # 目标: w=1\nloss.backward()\nwith torch.no_grad():\n    w -= lr * w.grad  # w = 2 - 0.1*2 = 1.8\n    print(f\"w更新: {w.item():.2f}\")"
+        }
+      ],
+      "resources": [
+        {
+          "name": "3Blue1Brown微积分",
+          "type": "视频",
+          "url": "https://www.youtube.com/playlist?list=PLZHQObOWTQDMsr9K-rj53DwVRMYO3t5Yr"
+        },
+        {
+          "name": "MML Book Chapter 5",
+          "type": "书籍",
+          "url": "https://mml-book.github.io/"
+        },
+        {
+          "name": "MIT 18.01/18.02",
+          "type": "课程",
+          "url": "https://ocw.mit.edu/"
+        }
+      ],
+      "mlUsage": [
+        "梯度下降: 所有参数模型的优化基础",
+        "正则化: L1/L2正则项的梯度计算",
+        "牛顿法: 使用二阶导数加速收敛",
+        "概率模型: 似然函数的最大化"
+      ],
+      "dlUsage": [
+        "反向传播: 链式法则在多层网络中的应用",
+        "学习率: 控制梯度下降的步长",
+        "动量: 利用梯度的累积加速收敛",
+        "自动微分: PyTorch/TensorFlow自动计算梯度"
+      ],
+      "difficulty": "入门"
+    },
+    {
+      "id": "probability",
+      "name": "概率与统计",
+      "nameEn": "Probability & Statistics",
+      "description": "不确定性建模和数据推断的数学基础。",
+      "bioAnalogy": "遗传变异与表型",
+      "bioAnalogyDetail": "全基因组关联分析(GWAS)中，我们寻找SNP与疾病的关联。由于遗传和环境因素的复杂性，这种关联本质上是概率性的。贝叶斯定理让我们可以从先验知识(已知致病基因)和观测数据(患者测序)更新对致病性的信念，就像医生结合病史和新检查结果做诊断。",
+      "keyConcepts": [
+        {
+          "name": "条件概率",
+          "formula": "P(A|B) = P(A∩B) / P(B)",
+          "description": "在已知B发生的情况下A发生的概率。在生物信息学中，条件概率用于计算在观察到某基因突变的情况下患病的概率，以及从测序数据中推断给定读段条件下各基因型的后验概率。",
+          "relatedLinks": [
+            {
+              "label": "基因型推断 (应用方向)",
+              "path": "/applications"
+            },
+            {
+              "label": "贝叶斯分类器 (学习路径 阶段2)",
+              "path": "/roadmap"
+            }
+          ],
+          "codeImpl": "import numpy as np\n# P(患病|突变) = P(突变|患病)P(患病) / P(突变)\n# 模拟数据\nn_patients = 1000\nhas_mutation = np.random.binomial(1, 0.1, n_patients)\nhas_disease = np.random.binomial(1, 0.05, n_patients)\n# 条件概率估计\np_d_given_m = (has_disease[has_mutation==1].sum() /\n               (has_mutation==1).sum())\nprint(f\"P(患病|突变) ≈ {p_d_given_m:.3f}\")"
+        },
+        {
+          "name": "贝叶斯定理",
+          "formula": "P(A|B) = P(B|A)P(A) / P(B)",
+          "description": "从先验概率和似然推导后验概率的数学框架。在生物信息学中，贝叶斯定理是基因组变异检测(GATK HaplotypeCaller)和蛋白质结构预测(Rosetta)的核心，将先验生物学知识与观测数据融合。",
+          "relatedLinks": [
+            {
+              "label": "变异检测 (基因组学应用)",
+              "path": "/applications"
+            },
+            {
+              "label": "朴素贝叶斯 (学习路径 阶段2)",
+              "path": "/roadmap"
+            }
+          ],
+          "codeImpl": "import numpy as np\n# P(致病|阳性) = P(阳性|致病)*P(致病) / P(阳性)\nprior = 0.001      # 人群中致病率 0.1%\nsensitivity = 0.95  # 检测灵敏度\nspecificity = 0.99  # 检测特异性\n# 计算后验概率\np_pos = sensitivity*prior + (1-specificity)*(1-prior)\nposterior = sensitivity * prior / p_pos\nprint(f\"阳性检测后患病概率: {posterior:.1%}\")"
+        },
+        {
+          "name": "正态分布",
+          "formula": "N(x|μ,σ) = 1/(σ√2π) exp(-(x-μ)²/(2σ²))",
+          "description": "最广泛使用的连续概率分布，描述许多自然现象的随机波动。在生物信息学中，正态分布用于建模基因表达数据的对数转换后的分布、蛋白质质谱数据的噪声和微阵列数据的背景信号。",
+          "relatedLinks": [
+            {
+              "label": "基因表达噪声建模 (应用方向)",
+              "path": "/applications"
+            }
+          ],
+          "codeImpl": "import numpy as np\nimport scipy.stats as stats\n# 基因表达数据通常经log变换后近似正态\nlog_expr = np.random.normal(loc=5.0, scale=1.5, size=1000)\n# Z-score标准化\nz_scores = (log_expr - log_expr.mean()) / log_expr.std()\n# 95%置信区间\nci = stats.norm.interval(0.95, loc=log_expr.mean(),\n                          scale=log_expr.std()/np.sqrt(len(log_expr)))\nprint(f\"95% CI: [{ci[0]:.2f}, {ci[1]:.2f}]\")"
+        },
+        {
+          "name": "最大似然估计",
+          "formula": "θ̂ = argmax_θ Σ log P(x_i|θ)",
+          "description": "找到使观测数据出现概率最大的模型参数。在生物信息学中，最大似然估计用于训练隐马尔可夫模型进行基因结构注释(Augustus)、估计系统发育树的枝长和进化模型参数(IQ-TREE)。",
+          "relatedLinks": [
+            {
+              "label": "进化模型参数 (学习路径 阶段2)",
+              "path": "/roadmap"
+            },
+            {
+              "label": "基因结构注释 (基因组学应用)",
+              "path": "/applications"
+            }
+          ],
+          "codeImpl": "import numpy as np\nfrom scipy.optimize import minimize\n# 最大化正态分布的似然 → 等价于min负对数似然\ndef neg_log_likelihood(params, data):\n    mu, sigma = params[0], np.exp(params[1])\n    return -np.sum(np.log(stats.norm.pdf(data, mu, sigma)))\ndata = np.random.randn(100) * 2 + 5\nresult = minimize(neg_log_likelihood, [0, 1], args=(data,))\nprint(f\"MLE: μ={result.x[0]:.2f}, σ={np.exp(result.x[1]):.2f}\")"
+        },
+        {
+          "name": "期望与方差",
+          "formula": "E[X] = Σ x P(x), Var(X) = E[(X-E[X])²]",
+          "description": "描述随机变量的中心趋势和离散程度的基本统计量。在生物信息学中，期望和方差用于差异基因表达分析(edgeR/DEseq2中的归一化因子估计)、评估突变频率的群体间差异和量化表达数据的批次效应。",
+          "relatedLinks": [
+            {
+              "label": "差异基因表达分析 (转录组学应用)",
+              "path": "/applications"
+            },
+            {
+              "label": "批次效应量化 (应用方向)",
+              "path": "/applications"
+            }
+          ],
+          "codeImpl": "import numpy as np\n# 基因表达数据的期望和方差\nexpr = np.array([2.3, 1.5, 0.8, 4.1, 3.0, 2.7, 1.9, 3.5])\nmean = expr.mean()          # 期望 (均值)\nvar = expr.var(ddof=1)      # 样本方差 (无偏估计)\nsd = expr.std(ddof=1)       # 标准差\nprint(f\"均值={mean:.2f}, 方差={var:.2f}, 标准差={sd:.2f}\")"
+        }
+      ],
+      "resources": [
+        {
+          "name": "3Blue1Brown概率",
+          "type": "视频",
+          "url": "https://www.youtube.com/playlist?list=PLZHQObOWTQDMsr9K-rj53DwVRMYO3t5Yr"
+        },
+        {
+          "name": "MML Book Chapter 6-7",
+          "type": "书籍",
+          "url": "https://mml-book.github.io/"
+        },
+        {
+          "name": "Statistical Learning (ISLR)",
+          "type": "书籍",
+          "url": "https://www.statlearning.com/"
+        }
+      ],
+      "mlUsage": [
+        "朴素贝叶斯: 基于条件概率的分类器",
+        "高斯过程: 贝叶斯非参数回归",
+        "隐马尔可夫模型: 序列标注",
+        "Bootstrap: 统计推断和置信区间"
+      ],
+      "dlUsage": [
+        "变分自编码器: 概率生成模型",
+        "Dropout: 贝叶斯近似的随机正则化",
+        "损失函数: 交叉熵来自信息论",
+        "概率输出: Softmax给出类别概率"
+      ],
+      "difficulty": "入门"
+    },
+    {
+      "id": "optimization",
+      "name": "优化",
+      "nameEn": "Optimization",
+      "description": "寻找最优解的方法论，是模型训练的核心。",
+      "bioAnalogy": "蛋白质折叠",
+      "bioAnalogyDetail": "蛋白质折叠可以看作一个能量景观上的优化问题。氨基酸序列在寻找最低自由能的构象，就像梯度下降在寻找损失函数的最小值。局部最优对应局部折叠状态，全局最优对应天然构象。AlphaFold的成功部分归功于它学会了如何在这个复杂的能量景观中导航。",
+      "keyConcepts": [
+        {
+          "name": "凸函数",
+          "formula": "f(λx + (1-λ)y) ≤ λf(x) + (1-λ)f(y)",
+          "description": "任意局部最小值都是全局最小值的函数，优化理论中最理想的性质。在生物信息学中，逻辑回归的损失函数是凸函数，保证能找到全局最优解；而蛋白质折叠的能量函数和深层神经网络损失通常是非凸的。",
+          "relatedLinks": [
+            {
+              "label": "逻辑回归优化 (学习路径 阶段2)",
+              "path": "/roadmap"
+            }
+          ],
+          "codeImpl": "import torch\n# 验证逻辑回归损失是凸函数\ndef logistic_loss(w, X, y):\n    return torch.log(1 + torch.exp(-y * (X @ w))).mean()\n# 凸函数: 连接曲线上任意两点的线段在曲线上方\n# f(λx + (1-λ)y) ≤ λf(x) + (1-λ)f(y)"
+        },
+        {
+          "name": "SGD",
+          "formula": "θ_{t+1} = θ_t - α ∇f_i(θ_t)",
+          "description": "使用单个或小批量样本估计梯度的随机优化算法。在生物信息学中，SGD是训练大规模生物数据模型的基础，如使用小批量基因表达样本更新蛋白质功能预测网络的权重，比全批量梯度下降更高效。",
+          "relatedLinks": [
+            {
+              "label": "小批量训练 (学习路径 阶段2)",
+              "path": "/roadmap"
+            },
+            {
+              "label": "PyTorch DataLoader (工具)",
+              "path": "/tools"
+            }
+          ],
+          "codeImpl": "import torch\nfrom torch.utils.data import DataLoader, TensorDataset\n# 小批量随机梯度下降\ndataset = TensorDataset(X_tensor, y_tensor)\nloader = DataLoader(dataset, batch_size=32, shuffle=True)\noptimizer = torch.optim.SGD(model.parameters(), lr=0.01)\nfor X_batch, y_batch in loader:\n    optimizer.zero_grad()\n    loss = loss_fn(model(X_batch), y_batch)\n    loss.backward()\n    optimizer.step()"
+        },
+        {
+          "name": "Adam",
+          "formula": "m_t = β1·m_{t-1} + (1-β1)·g_t; v_t = β2·v_{t-1} + (1-β2)·g_t²",
+          "description": "自适应学习率优化算法，结合动量(一阶矩)和RMSprop(二阶矩)为每个参数独立调整学习步长。在生物信息学中，Adam是训练蛋白质语言模型(ESM)和基因组Transformer(Nucleotide Transformer)的默认优化器，因其对稀疏梯度和不同参数尺度的鲁棒性。",
+          "relatedLinks": [
+            {
+              "label": "默认优化器选择 (学习路径 阶段2)",
+              "path": "/roadmap"
+            },
+            {
+              "label": "蛋白质语言模型训练 (应用方向)",
+              "path": "/applications"
+            }
+          ],
+          "codeImpl": "import torch\n# Adam优化器 (自适应学习率)\nmodel = torch.nn.Linear(1000, 10)\noptimizer = torch.optim.Adam(model.parameters(),\n                              lr=0.001,\n                              betas=(0.9, 0.999))\n# Adam = Momentum + RMSprop, 逐参数自适应学习率\n# 是训练蛋白质语言模型和Transformer的默认选择"
+        },
+        {
+          "name": "学习率调度",
+          "formula": "α_t = α_0 / (1 + γt)",
+          "description": "随训练时间动态调整学习率的策略，如阶梯衰减、余弦退火和预热。在生物信息学中，训练大型基因组语言模型时使用学习率预热(warmup)可以避免早期训练不稳定，配合余弦退火有助于找到更优的模型参数。",
+          "relatedLinks": [
+            {
+              "label": "学习率预热与衰减 (学习路径 阶段2)",
+              "path": "/roadmap"
+            },
+            {
+              "label": "WandB实验跟踪 (工具)",
+              "path": "/tools"
+            }
+          ],
+          "codeImpl": "import torch\nmodel = torch.nn.Linear(100, 1)\noptimizer = torch.optim.Adam(model.parameters(), lr=0.1)\n# 余弦退火学习率调度\nscheduler = torch.optim.lr_scheduler.CosineAnnealingLR(\n    optimizer, T_max=100)\nfor epoch in range(100):\n    train_one_epoch()\n    scheduler.step()\n    print(f\"Epoch {epoch}: lr={scheduler.get_last_lr()[0]:.6f}\")"
+        },
+        {
+          "name": "正则化",
+          "formula": "L(θ) + λ||θ||²",
+          "description": "在目标函数中添加惩罚项以防止模型过拟合的技术。在生物信息学中，L2正则化(权重衰减)用于控制基因表达分类模型的复杂度，L1正则化(LASSO)用于从高维基因组数据中自动选择少量重要的生物标志物基因。",
+          "relatedLinks": [
+            {
+              "label": "LASSO基因选择 (转录组学应用)",
+              "path": "/applications"
+            },
+            {
+              "label": "过拟合防止 (学习路径 阶段2)",
+              "path": "/roadmap"
+            }
+          ],
+          "codeImpl": "import torch\n# L2正则化 = weight_decay\noptimizer = torch.optim.Adam(model.parameters(),\n                              lr=1e-3, weight_decay=1e-4)\n# 等价于: loss + λ*||w||²\n\n# L1正则化 (LASSO) — 手动实现\nl1_lambda = 0.01\nl1_penalty = sum(p.abs().sum() for p in model.parameters())\nloss = loss_fn(output, target) + l1_lambda * l1_penalty"
+        }
+      ],
+      "resources": [
+        {
+          "name": "MML Book Chapter 7",
+          "type": "书籍",
+          "url": "https://mml-book.github.io/"
+        },
+        {
+          "name": "An Overview of Gradient Descent",
+          "type": "文章",
+          "url": "https://ruder.io/optimizing-gradient-descent/"
+        }
+      ],
+      "mlUsage": [
+        "损失最小化: 所有ML模型的训练目标",
+        "超参数调优: 贝叶斯优化、网格搜索",
+        "稀疏解: LASSO的L1正则化",
+        "约束优化: SVM的对偶问题"
+      ],
+      "dlUsage": [
+        "反向传播: 计算梯度的算法",
+        "BatchNorm: 稳定优化的归一化",
+        "学习率: 最重要的超参数之一",
+        "二阶方法: L-BFGS, 自然梯度"
+      ],
+      "difficulty": "中级"
+    },
+    {
+      "id": "information-theory",
+      "name": "信息论",
+      "nameEn": "Information Theory",
+      "description": "量化信息、不确定性和通信效率的数学理论。",
+      "bioAnalogy": "DNA编码效率",
+      "bioAnalogyDetail": "DNA使用4种核苷酸编码遗传信息，密码子(3个核苷酸)编码20种氨基酸。信息论帮助我们理解这种编码的效率——为什么不是2个核苷酸足够(只能编码16种)? 为什么有64个密码子却只编码20种氨基酸(冗余用于错误校正)? 熵衡量DNA序列的不确定性，互信息揭示碱基间的依赖关系。",
+      "keyConcepts": [
+        {
+          "name": "熵",
+          "formula": "H(X) = -Σ P(x) log P(x)",
+          "description": "随机变量的平均信息量或不确定性。在生物信息学中，熵用于量化DNA序列的保守性（保守位点熵低，可变位点熵高），指导多序列比对的评分和蛋白质功能位点的识别。",
+          "relatedLinks": [
+            {
+              "label": "DNA序列保守性 (应用方向)",
+              "path": "/applications"
+            }
+          ],
+          "codeImpl": "import numpy as np\nfrom scipy.stats import entropy\n# DNA序列保守性: 高保守位点熵低\nbases = np.array([0.95, 0.01, 0.03, 0.01])  # 高度保守(A为主)\nh = entropy(bases, base=2)  # 以bit为单位的熵\nprint(f\"Shannon熵: {h:.3f} bits\")  # 接近0 = 高度保守"
+        },
+        {
+          "name": "交叉熵",
+          "formula": "H(p,q) = -Σ p(x) log q(x)",
+          "description": "用近似分布q描述真实分布p时的信息损失，是分类任务的标准损失函数。在生物信息学中，交叉熵损失用于训练DeepVariant进行变异基因型分类、ESM进行蛋白质家族分类和Enformer进行基因表达预测。",
+          "relatedLinks": [
+            {
+              "label": "分类损失函数 (学习路径 阶段2)",
+              "path": "/roadmap"
+            },
+            {
+              "label": "DeepVariant训练 (基因组学应用)",
+              "path": "/applications"
+            }
+          ],
+          "codeImpl": "import torch\n# 交叉熵 = 标准分类损失函数\nloss_fn = torch.nn.CrossEntropyLoss()\n# logits: 模型原始输出, target: 真实类别索引\nlogits = torch.tensor([[2.0, 1.0, 0.1]])  # 预测: 类别0最可能\ntarget = torch.tensor([0])                   # 真实: 类别0\nloss = loss_fn(logits, target)\nprint(f\"交叉熵损失: {loss.item():.4f}\")  # 越低越好"
+        },
+        {
+          "name": "KL散度",
+          "formula": "D_KL(p||q) = Σ p(x) log(p(x)/q(x))",
+          "description": "衡量两个概率分布之间差异的不对称度量。在生物信息学中，KL散度用于变分自编码器(scVI)约束隐空间的先验分布、比较不同物种的密码子使用偏好和评估基因表达分布的批次间差异。",
+          "relatedLinks": [
+            {
+              "label": "scVI隐空间约束 (单细胞应用)",
+              "path": "/applications"
+            },
+            {
+              "label": "变分自编码器 (学习路径 阶段3)",
+              "path": "/roadmap"
+            }
+          ],
+          "codeImpl": "import torch\n# KL(P||Q): 用Q近似P的信息损失\np = torch.tensor([0.7, 0.2, 0.1])\nq = torch.tensor([0.3, 0.4, 0.3])\nkl = torch.nn.functional.kl_div(\n    q.log(), p, reduction='sum')  # KL(P||Q)\n# VAE中用KL散度约束隐空间接近标准正态分布\n# KL(N(μ,σ²) || N(0,1)) = -0.5*Σ(1+log(σ²)-μ²-σ²)"
+        },
+        {
+          "name": "互信息",
+          "formula": "I(X;Y) = H(X) - H(X|Y) = D_KL(P(X,Y)||P(X)P(Y))",
+          "description": "衡量两个变量之间共享信息量或统计依赖性的对称度量。在生物信息学中，互信息是推断基因调控网络(ARACNE)的核心方法，通过计算基因表达之间的互信息识别直接调控关系，排除间接相互作用。",
+          "relatedLinks": [
+            {
+              "label": "基因调控网络推断 (转录组学应用)",
+              "path": "/applications"
+            },
+            {
+              "label": "特征选择 (学习路径 阶段2)",
+              "path": "/roadmap"
+            }
+          ],
+          "codeImpl": "import numpy as np\nfrom sklearn.feature_selection import mutual_info_regression\n# 互信息推断基因调控网络\nexpr = np.random.randn(100, 50)  # 100细胞 x 50基因\nmi_matrix = np.zeros((50, 50))\nfor i in range(50):\n    mi_matrix[i] = mutual_info_regression(\n        expr, expr[:, i])\n# MI高的基因对可能存在直接调控关系"
+        },
+        {
+          "name": "信息增益",
+          "formula": "IG(S,A) = H(S) - Σ |S_v|/|S| · H(S_v)",
+          "description": "特征A对数据集S的不确定性的减少量。在生物信息学中，信息增益用于决策树算法(如随机森林)选择最佳的基因特征进行分裂，识别对癌症亚型分类信息量最大的基因标志物。",
+          "relatedLinks": [
+            {
+              "label": "随机森林特征选择 (基因组学应用)",
+              "path": "/applications"
+            },
+            {
+              "label": "决策树分裂准则 (学习路径 阶段2)",
+              "path": "/roadmap"
+            }
+          ],
+          "codeImpl": "from sklearn.tree import DecisionTreeClassifier\n# 信息增益 = 决策树特征选择准则\n# 选择使分类不确定性减少最多的基因\ntree = DecisionTreeClassifier(criterion='entropy',\n                               max_depth=3)\ntree.fit(X_gene_expr, y_cancer_type)\n# 查看各基因特征的信息增益\nfor i, importance in enumerate(tree.feature_importances_):\n    if importance > 0:\n        print(f\"基因{i}: 信息增益={importance:.3f}\")"
+        }
+      ],
+      "resources": [
+        {
+          "name": "信息论入门 (MacKay)",
+          "type": "书籍",
+          "url": "https://www.inference.org.uk/itprnn/book.html"
+        },
+        {
+          "name": "MML Book Chapter 6",
+          "type": "书籍",
+          "url": "https://mml-book.github.io/"
+        },
+        {
+          "name": "3Blue1Brown信息论",
+          "type": "视频",
+          "url": "https://www.youtube.com/watch?v=ErfnhcEV9O8"
+        }
+      ],
+      "mlUsage": [
+        "决策树: 信息增益用于特征选择",
+        "特征选择: 互信息筛选重要特征",
+        "聚类: 信息论准则确定聚类数",
+        "模型比较: AIC/BIC基于信息论"
+      ],
+      "dlUsage": [
+        "交叉熵损失: 分类任务的标准损失函数",
+        "VAE: KL散度约束隐空间分布",
+        "注意力: 可解释为信息选择",
+        "知识蒸馏: 最小化师生输出的KL散度"
+      ],
+      "difficulty": "中级"
+    }
+  ]
+}

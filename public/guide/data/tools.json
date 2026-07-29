@@ -1,0 +1,962 @@
+{
+  "toolCategories": [
+    "全部",
+    "ML框架",
+    "DL框架",
+    "蛋白质",
+    "基因组",
+    "单细胞",
+    "分子",
+    "数据",
+    "平台",
+    "R语言",
+    "NGS流程",
+    "环境管理"
+  ],
+  "tools": [
+    {
+      "id": "scikit-learn",
+      "name": "scikit-learn",
+      "description": "Python最广泛使用的传统机器学习库，提供分类、回归、聚类、降维和模型选择等算法的统一接口和完整实现。当需要快速构建基线模型进行基因表达分类、蛋白质功能预测或变异致病性评估时，scikit-learn是首选工具，因为它API简洁且文档完善。典型生物信息学用例：使用随机森林基于基因表达特征预测癌症亚型，并通过内置的交叉验证和网格搜索进行模型调优。",
+      "category": "ML框架",
+      "installCommand": "pip install scikit-learn",
+      "difficulty": "入门",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://scikit-learn.org/",
+      "tags": [
+        "分类",
+        "回归",
+        "聚类",
+        "降维"
+      ],
+      "quickExample": "from sklearn.ensemble import RandomForestClassifier\nfrom sklearn.model_selection import cross_val_score\n\n# 用基因表达特征预测癌症亚型\nmodel = RandomForestClassifier(n_estimators=100)\nscores = cross_val_score(model, X_gene_expr, y_cancer_type, cv=5)"
+    },
+    {
+      "id": "xgboost",
+      "name": "XGBoost",
+      "description": "高效的梯度提升决策树实现，通过正则化、并行处理和缓存优化在速度和精度上均表现出色。在处理基因突变特征、蛋白质描述符等表格型生物数据时，XGBoost通常是性能最优的选择之一，在多个生物信息学Kaggle竞赛中获胜。典型生物信息学用例：利用多维度基因组特征（保守性、等位基因频率、功能注释）训练梯度提升模型预测SNP的致病性，如CADD分数的改进版本。",
+      "category": "ML框架",
+      "installCommand": "pip install xgboost",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://xgboost.readthedocs.io/",
+      "tags": [
+        "梯度提升",
+        "决策树",
+        "Kaggle"
+      ],
+      "quickExample": "import xgboost as xgb\n\n# 用基因组特征预测SNP致病性\ndtrain = xgb.DMatrix(X_genomic_features, label=y_pathogenicity)\nmodel = xgb.train({\"max_depth\": 6, \"eta\": 0.1}, dtrain, num_boost_round=100)\npreds = model.predict(xgb.DMatrix(X_test))"
+    },
+    {
+      "id": "lightgbm",
+      "name": "LightGBM",
+      "description": "微软开发的轻量级梯度提升框架，采用基于直方图的决策树算法和叶子优先(leaf-wise)的树生长策略，训练速度比传统实现快数倍且内存占用更低。适合处理大规模生物数据集（如百万级基因组变异或数十万单细胞样本）。典型生物信息学用例：在大规模GWAS数据上快速训练梯度提升模型进行多基因风险评分(polygenic risk score)计算。",
+      "category": "ML框架",
+      "installCommand": "pip install lightgbm",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://lightgbm.readthedocs.io/",
+      "tags": [
+        "梯度提升",
+        "高效",
+        "微软"
+      ],
+      "quickExample": "import lightgbm as lgb\n\n# 大规模GWAS数据上快速训练PRS模型\ntrain_data = lgb.Dataset(X_gwas, label=y_phenotype)\nmodel = lgb.train({\"objective\": \"regression\", \"num_leaves\": 31},\n                  train_data, num_boost_round=200)"
+    },
+    {
+      "id": "pytorch",
+      "name": "PyTorch",
+      "description": "由Meta开发的动态深度学习框架，提供直观的张量运算、自动微分和GPU加速功能，是学术界最广泛使用的深度学习平台。几乎所有的现代生物信息学深度学习模型（AlphaFold、ESM、scVI、Enformer）都基于PyTorch实现。典型生物信息学用例：使用PyTorch搭建卷积神经网络对DNA序列进行转录因子结合位点预测，利用自动微分自动计算梯度并通过GPU加速训练。",
+      "category": "DL框架",
+      "installCommand": "pip install torch torchvision torchaudio",
+      "difficulty": "中级",
+      "mlRelevant": false,
+      "dlRelevant": true,
+      "url": "https://pytorch.org/",
+      "tags": [
+        "动态图",
+        "研究",
+        "GPU"
+      ],
+      "quickExample": "import torch, torch.nn as nn\n\n# CNN对DNA序列进行转录因子结合位点预测\nclass DNACNN(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.conv = nn.Conv1d(4, 64, kernel_size=12)  # 4=A,T,C,G\n        self.fc = nn.Linear(64, 1)"
+    },
+    {
+      "id": "tensorflow",
+      "name": "TensorFlow",
+      "description": "Google开发的工业级深度学习框架，Keras高阶API使其模型构建简洁直观，TensorBoard提供强大的训练可视化，SavedModel格式便于生产部署。在生物信息学中，DeepVariant和Enformer等早期重要模型使用TensorFlow实现。典型生物信息学用例：使用TensorFlow/Keras构建深度学习模型对基因组序列进行功能元件注释，并导出为TensorFlow Serving格式部署为在线预测服务。",
+      "category": "DL框架",
+      "installCommand": "pip install tensorflow",
+      "difficulty": "中级",
+      "mlRelevant": false,
+      "dlRelevant": true,
+      "url": "https://www.tensorflow.org/",
+      "tags": [
+        "Keras",
+        "生产部署",
+        "Google"
+      ],
+      "quickExample": "import tensorflow as tf\n\n# Keras构建基因组序列功能注释模型\nmodel = tf.keras.Sequential([\n    tf.keras.layers.Conv1D(64, 12, activation=\"relu\", input_shape=(1000, 4)),\n    tf.keras.layers.GlobalMaxPooling1D(),\n    tf.keras.layers.Dense(1, activation=\"sigmoid\")\n])"
+    },
+    {
+      "id": "huggingface",
+      "name": "Hugging Face Transformers",
+      "description": "预训练Transformer模型的统一接口库，提供BERT、GPT、T5、ESM等数千种模型的即插即用实现，支持自动模型下载、Tokenization、微调和推理流水线。在生物信息学中，所有蛋白质语言模型(ESM)和基因组语言模型(Nucleotide Transformer)都通过该库分发。典型生物信息学用例：加载预训练的ESM-2模型提取蛋白质序列嵌入，用于下游的蛋白质功能预测和突变效应评估。",
+      "category": "DL框架",
+      "installCommand": "pip install transformers",
+      "difficulty": "中级",
+      "mlRelevant": false,
+      "dlRelevant": true,
+      "url": "https://huggingface.co/docs/transformers/",
+      "tags": [
+        "BERT",
+        "GPT",
+        "预训练模型"
+      ],
+      "quickExample": "from transformers import AutoTokenizer, AutoModel\n\n# 加载ESM-2蛋白质语言模型\ntokenizer = AutoTokenizer.from_pretrained(\"facebook/esm2_t33_650M_UR50D\")\nmodel = AutoModel.from_pretrained(\"facebook/esm2_t33_650M_UR50D\")\n\n# 提取蛋白质序列嵌入\ninputs = tokenizer(\"MPYTVVFTFPNR\", return_tensors=\"pt\")\noutputs = model(**inputs)  # last_hidden_state: (1, seq_len, 1280)"
+    },
+    {
+      "id": "esm2",
+      "name": "ESM-2",
+      "description": "Meta开发的15亿参数蛋白质语言模型，基于Transformer架构在UniRef数据库上训练，能够生成高质量的蛋白质上下文相关表示。提供从8M到15B多种参数规模的模型，适合不同计算资源的场景。典型生物信息学用例：对目标蛋白质序列进行零样本突变效应预测，无需任何标记数据即可评估单个氨基酸替换对蛋白质功能的潜在影响。",
+      "category": "蛋白质",
+      "installCommand": "pip install fair-esm",
+      "difficulty": "中级",
+      "mlRelevant": false,
+      "dlRelevant": true,
+      "url": "https://github.com/facebookresearch/esm",
+      "tags": [
+        "蛋白质语言模型",
+        "表示学习",
+        "Meta"
+      ],
+      "quickExample": "import torch\nimport esm\n\n# 零样本突变效应预测\nmodel, alphabet = esm.pretrained.esm2_t33_650M_UR50D()\nbatch_converter = alphabet.get_batch_converter()\n\ndata = [(\"WT\", \"MKTVRQER\"), (\"Mutant\", \"MKTVRQPR\")]\n_, _, batch_tokens = batch_converter(data)\nwith torch.no_grad():\n    results = model(batch_tokens, repr_layers=[33])"
+    },
+    {
+      "id": "alphafold2",
+      "name": "AlphaFold2",
+      "description": "DeepMind开发的端到端蛋白质结构预测系统，通过Evoformer处理多序列比对和配对表示，输出原子级精度的3D结构，在CASP14竞赛中达到近实验精度。需要GPU加速和较大的内存资源，适合对少量重要蛋白质进行高精度结构预测。典型生物信息学用例：预测新测序物种的蛋白质组三维结构，为后续的功能注释和药物靶点筛选提供结构基础。",
+      "category": "蛋白质",
+      "installCommand": "git clone https://github.com/deepmind/alphafold",
+      "difficulty": "高级",
+      "mlRelevant": false,
+      "dlRelevant": true,
+      "url": "https://github.com/deepmind/alphafold",
+      "tags": [
+        "结构预测",
+        "DeepMind",
+        "诺贝尔奖"
+      ],
+      "quickExample": "# AlphaFold2 单体蛋白质结构预测\n# 需要：序列FASTA + 遗传数据库\npython run_alphafold.py \\\n  --fasta_paths=protein.fasta \\\n  --output_dir=./output \\\n  --model_preset=monomer \\\n  --db_preset=full_dbs"
+    },
+    {
+      "id": "colabfold",
+      "name": "ColabFold",
+      "description": "AlphaFold的优化实现版本，集成MMseqs2快速生成多序列比对，可在Google Colab免费GPU上运行，大幅降低蛋白质结构预测的计算门槛和时间成本。适合没有高性能计算资源的实验室快速进行蛋白质结构预测。典型生物信息学用例：研究者上传目标蛋白质序列到ColabFold笔记本，在几分钟内获得与AlphaFold2相当质量的3D结构预测结果。",
+      "category": "蛋白质",
+      "installCommand": "pip install colabfold",
+      "difficulty": "入门",
+      "mlRelevant": false,
+      "dlRelevant": true,
+      "url": "https://github.com/sokrypton/ColabFold",
+      "tags": [
+        "AlphaFold",
+        "Colab",
+        "免费"
+      ],
+      "quickExample": "# ColabFold 快速蛋白质结构预测\n# 可在 Google Colab 免费GPU上运行\nimport colabfold\ncolabfold.run(\"protein.fasta\", \"./output\")\n\n# 或使用命令行：\n# colabfold_batch protein.fasta ./output"
+    },
+    {
+      "id": "deepvariant",
+      "name": "DeepVariant",
+      "description": "Google开发的基于深度学习的变异检测工具，将测序读段比对信息编码为RGB图像后通过Inception CNN进行分类，能够精确检测SNP和短Indel。支持人类和多种非人物种的变异检测，已通过PrecisionFDA验证。典型生物信息学用例：对全基因组测序数据(BAM文件)进行变异检测，输出符合VCF标准的高质量变异调用结果用于后续的关联分析。",
+      "category": "基因组",
+      "installCommand": "docker pull google/deepvariant",
+      "difficulty": "中级",
+      "mlRelevant": false,
+      "dlRelevant": true,
+      "url": "https://github.com/google/deepvariant",
+      "tags": [
+        "变异检测",
+        "CNN",
+        "Google"
+      ],
+      "quickExample": "# DeepVariant 变异检测 (Docker)\nBIN_VERSION=\"1.6.1\"\ndocker run \\\n  -v \"${PWD}/input\":\"/input\" \\\n  -v \"${PWD}/output\":\"/output\" \\\n  google/deepvariant:\"${BIN_VERSION}\" \\\n  /opt/deepvariant/bin/run_deepvariant \\\n  --ref=/input/ref.fasta --reads=/input/sample.bam \\\n  --output_vcf=/output/output.vcf.gz"
+    },
+    {
+      "id": "enformer",
+      "name": "Enformer",
+      "description": "DeepMind开发的基于Transformer架构的基因表达预测模型，从基因组DNA序列直接预测基因表达水平和多种染色质特征，能够捕捉长达100kb以上的远距离调控相互作用。适用于理解非编码区变异的功能影响和调控机制研究。典型生物信息学用例：预测某启动子区域突变对邻近基因表达水平的影响，评估非编码变异的致病潜力。",
+      "category": "基因组",
+      "installCommand": "pip install enformer-pytorch",
+      "difficulty": "高级",
+      "mlRelevant": false,
+      "dlRelevant": true,
+      "url": "https://github.com/lucidrains/enformer-pytorch",
+      "tags": [
+        "Transformer",
+        "基因表达",
+        "DeepMind"
+      ],
+      "quickExample": "import torch\nfrom enformer_pytorch import Enformer\n\n# 从DNA序列预测基因表达\nmodel = Enformer.from_pretrained(\"EleutherAI/enformer-official-rough\")\n\n# 输入: one-hot编码的DNA序列 (1, 196608, 4)\nseq = torch.randint(0, 2, (1, 196608, 4)).float()\noutput = model(seq)  # 预测表达和表观基因组轨迹"
+    },
+    {
+      "id": "scvi",
+      "name": "scVI",
+      "description": "基于变分自编码器的单细胞数据分析工具，通过深度生成模型学习细胞的概率低维表示，能够同时进行批次校正、降维、差异表达分析和缺失值插补。是单细胞RNA测序数据分析的核心工具之一。典型生物信息学用例：整合来自不同实验批次和测序平台的单细胞数据，去除批次效应后进行统一的细胞类型注释和差异表达分析。",
+      "category": "单细胞",
+      "installCommand": "pip install scvi-tools",
+      "difficulty": "中级",
+      "mlRelevant": false,
+      "dlRelevant": true,
+      "url": "https://scvi-tools.org/",
+      "tags": [
+        "VAE",
+        "批次校正",
+        "单细胞"
+      ],
+      "quickExample": "import scvi\nimport scanpy as sc\n\n# 单细胞批次校正与降维\nadata = sc.read(\"pbmc3k.h5ad\")\nscvi.model.SCVI.setup_anndata(adata, batch_key=\"batch\")\nmodel = scvi.model.SCVI(adata)\nmodel.train()\nadata.obsm[\"X_scVI\"] = model.get_latent_representation()"
+    },
+    {
+      "id": "scanpy",
+      "name": "Scanpy",
+      "description": "单细胞数据分析的核心Python库，提供从数据预处理、质量控制、降维、聚类到差异表达分析和可视化的完整分析流程。与AnnData数据格式紧密集成，是单细胞生物信息学的事实标准工具。典型生物信息学用例：对10x Genomics平台产生的单细胞RNA测序数据进行质控过滤、归一化、PCA降维、UMAP可视化和Louvain聚类分析。",
+      "category": "单细胞",
+      "installCommand": "pip install scanpy",
+      "difficulty": "入门",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://scanpy.readthedocs.io/",
+      "tags": [
+        "分析流程",
+        "可视化",
+        "单细胞"
+      ],
+      "quickExample": "import scanpy as sc\n\n# 标准单细胞RNA-seq预处理流程\nadata = sc.read_10x_h5(\"pbmc3k_filtered_gene_bc_matrices.h5\")\nsc.pp.filter_cells(adata, min_genes=200)\nsc.pp.normalize_total(adata, target_sum=1e4)\nsc.pp.log1p(adata)\nsc.pp.highly_variable_genes(adata, n_top_genes=2000)\nsc.tl.pca(adata, n_comps=50)\nsc.pp.neighbors(adata)\nsc.tl.umap(adata)\nsc.tl.leiden(adata, resolution=0.5)"
+    },
+    {
+      "id": "deepchem",
+      "name": "DeepChem",
+      "description": "面向化学信息学和药物发现的深度学习库，提供分子图神经网络(MPNN、GAT)、分子指纹、SMILES表示学习和Moleculenet基准数据集。将RDKit的分子操作与PyTorch/TensorFlow的深度学习 seamlessly 结合。典型生物信息学用例：使用图卷积网络(GCN)对ChEMBL数据集中的分子进行毒性预测，评估候选药物的安全性。",
+      "category": "分子",
+      "installCommand": "pip install deepchem",
+      "difficulty": "中级",
+      "mlRelevant": false,
+      "dlRelevant": true,
+      "url": "https://deepchem.io/",
+      "tags": [
+        "分子",
+        "药物发现",
+        "图神经网络"
+      ],
+      "quickExample": "import deepchem as dc\n\n# 图卷积网络预测分子毒性\ntasks, datasets, transformers = dc.molnet.load_tox21()\ntrain, valid, test = datasets\n\nmodel = dc.models.GraphConvModel(n_tasks=len(tasks), mode=\"classification\")\nmodel.fit(train, nb_epoch=50)\nscores = model.evaluate(test, [dc.metrics.roc_auc_score])"
+    },
+    {
+      "id": "rdkit",
+      "name": "RDKit",
+      "description": "化学信息学领域最广泛使用的开源Python库，提供分子结构解析、SMILES转换、分子指纹生成(Morgan、MACCS)、描述符计算、子结构搜索和2D/3D分子可视化功能。几乎所有分子深度学习工具都依赖RDKit进行数据预处理。典型生物信息学用例：从ChEMBL数据库下载化合物SMILES，使用RDKit计算Morgan指纹作为分子描述符输入到机器学习模型进行活性预测。",
+      "category": "分子",
+      "installCommand": "pip install rdkit",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://www.rdkit.org/",
+      "tags": [
+        "化学信息学",
+        "分子指纹",
+        "SMILES"
+      ],
+      "quickExample": "from rdkit import Chem\nfrom rdkit.Chem import AllChem\n\n# 从SMILES计算Morgan分子指纹\nmol = Chem.MolFromSmiles(\"CC(=O)OC1=CC=CC=C1C(=O)O\")  # 阿司匹林\nfp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=2048)\nprint(f\"指纹长度: {len(fp)}\")  # 2048位二进制向量"
+    },
+    {
+      "id": "biopython",
+      "name": "Biopython",
+      "description": "生物信息学Python工具集，提供序列文件解析(FASTA、GenBank、PDB)、序列操作、BLAST接口、NCBI数据库访问、进化树处理和蛋白质结构分析等丰富的生物计算功能。是Python生物信息学编程的基础库。典型生物信息学用例：使用Biopython解析基因组FASTA文件，提取特定区域的DNA序列并进行转录翻译，为后续的深度学习模型准备输入数据。",
+      "category": "数据",
+      "installCommand": "pip install biopython",
+      "difficulty": "入门",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://biopython.org/",
+      "tags": [
+        "序列",
+        "BLAST",
+        "生物信息学"
+      ],
+      "quickExample": "from Bio import SeqIO\n\n# 解析FASTA并翻译DNA序列\nfor record in SeqIO.parse(\"genome.fasta\", \"fasta\"):\n    print(f\">{record.id} 长度:{len(record.seq)}\")\n    # 转录+翻译前100个碱基\n    protein = record.seq[:100].translate()\n    print(f\"  -> 蛋白质片段: {protein[:30]}...\")"
+    },
+    {
+      "id": "numpy",
+      "name": "NumPy",
+      "description": "Python科学计算的基础库，提供高效的多维数组(NdArray)对象和丰富的数学运算函数，是所有Python数据科学和机器学习库的底层基础。在生物信息学中用于基因表达矩阵存储、序列编码和数值计算。典型生物信息学用例：将DNA序列的ATCG碱基转换为One-hot编码的NumPy数组(4 x seq_length)，作为卷积神经网络的输入张量。",
+      "category": "数据",
+      "installCommand": "pip install numpy",
+      "difficulty": "入门",
+      "mlRelevant": true,
+      "dlRelevant": true,
+      "url": "https://numpy.org/",
+      "tags": [
+        "数组",
+        "数学",
+        "基础"
+      ],
+      "quickExample": "import numpy as np\n\n# DNA序列One-hot编码 (A,T,C,G -> 4通道)\nseq = \"ATCGATCGAAAA\"\nmapping = {\"A\": 0, \"T\": 1, \"C\": 2, \"G\": 3}\none_hot = np.zeros((4, len(seq)), dtype=np.float32)\nfor i, base in enumerate(seq):\n    one_hot[mapping[base], i] = 1.0\nprint(f\"Shape: {one_hot.shape}\")  # (4, 12)"
+    },
+    {
+      "id": "pandas",
+      "name": "Pandas",
+      "description": "Python数据处理和分析库，提供DataFrame和Series数据结构，支持数据清洗、转换、合并、分组和统计分析。在生物信息学中广泛用于处理基因表达矩阵、变异注释表格和临床元数据。典型生物信息学用例：读取TCGA基因表达矩阵(CSV格式)，根据临床信息表进行样本筛选和分组，计算差异表达基因的统计量。",
+      "category": "数据",
+      "installCommand": "pip install pandas",
+      "difficulty": "入门",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://pandas.pydata.org/",
+      "tags": [
+        "数据处理",
+        "CSV",
+        "分析"
+      ],
+      "quickExample": "import pandas as pd\n\n# 加载TCGA基因表达矩阵并按癌症类型分组\nexpr = pd.read_csv(\"TCGA_BRCA_expr.csv\", index_col=0)\nclinical = pd.read_csv(\"TCGA_BRCA_clinical.csv\")\n\n# 筛选HER2阳性样本\nher2_pos = clinical[clinical[\"HER2_status\"] == \"Positive\"][\"sample_id\"]\nher2_expr = expr[her2_pos]\nprint(f\"HER2+样本数: {her2_expr.shape[1]}\")"
+    },
+    {
+      "id": "google-colab",
+      "name": "Google Colab",
+      "description": "Google提供的免费云端Jupyter Notebook环境，配备免费的GPU(T4)和TPU资源，无需本地配置即可运行深度学习代码。预装TensorFlow、PyTorch和大多数常用的Python库。典型生物信息学用例：在Colab中运行ColabFold进行蛋白质结构预测，或使用免费GPU训练基因组序列分类的深度学习模型，无需购置昂贵的GPU硬件。",
+      "category": "平台",
+      "installCommand": "# 无需安装，访问 colab.research.google.com",
+      "difficulty": "入门",
+      "mlRelevant": true,
+      "dlRelevant": true,
+      "url": "https://colab.research.google.com/",
+      "tags": [
+        "GPU",
+        "免费",
+        "云端"
+      ],
+      "quickExample": "# Google Colab 免费GPU快速启动\n# 1. 访问 colab.research.google.com\n# 2. 运行时 -> 更改运行时类型 -> T4 GPU\n\n!pip install torch transformers\nimport torch\nprint(f\"GPU可用: {torch.cuda.is_available()}\")\nprint(f\"GPU型号: {torch.cuda.get_device_name(0)}\")"
+    },
+    {
+      "id": "kaggle",
+      "name": "Kaggle",
+      "description": "全球最大的数据科学竞赛平台，提供免费GPU环境和丰富的公开数据集，支持Notebook形式的代码分享和协作。举办过多项生物信息学相关的竞赛（如蛋白质结构预测、药物分子性质预测）。典型生物信息学用例：参加Kaggle上的药物分子活性预测竞赛，使用平台提供的免费GPU训练图神经网络模型，并与其他参赛者交流优化策略。",
+      "category": "平台",
+      "installCommand": "pip install kaggle",
+      "difficulty": "入门",
+      "mlRelevant": true,
+      "dlRelevant": true,
+      "url": "https://www.kaggle.com/",
+      "tags": [
+        "竞赛",
+        "数据集",
+        "GPU"
+      ],
+      "quickExample": "# Kaggle API下载数据集\npip install kaggle\n\n# 下载蛋白质结构预测竞赛数据\nkaggle competitions download -c cafa-5-protein-function-prediction\n\nimport pandas as pd\ndf = pd.read_csv(\"train_sequences.csv\")\nprint(f\"训练集蛋白质数: {len(df)}\")"
+    },
+    {
+      "id": "optuna",
+      "name": "Optuna",
+      "description": "基于贝叶斯优化的超参数优化框架，支持剪枝策略加速搜索和分布式优化，提供直观的可视化工具分析超参数重要性。在生物信息学中用于优化基因分类模型、蛋白质性质预测网络和单细胞分析管道的超参数。典型生物信息学用例：使用TPE算法自动搜索蛋白质二级结构预测CNN的最优学习率、卷积核大小和网络深度组合。",
+      "category": "ML框架",
+      "installCommand": "pip install optuna",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": true,
+      "url": "https://optuna.org/",
+      "tags": [
+        "超参数优化",
+        "贝叶斯",
+        "自动化"
+      ],
+      "quickExample": "import optuna\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.model_selection import cross_val_score\n\n# 贝叶斯优化搜索蛋白质分类器的最优超参数\ndef objective(trial):\n    n_estimators = trial.suggest_int(\"n_estimators\", 50, 500)\n    max_depth = trial.suggest_int(\"max_depth\", 3, 20)\n    model = RandomForestClassifier(n_estimators=n_estimators,\n                                    max_depth=max_depth)\n    return cross_val_score(model, X, y, cv=3).mean()\n\nstudy = optuna.create_study(direction=\"maximize\")\nstudy.optimize(objective, n_trials=50)"
+    },
+    {
+      "id": "shap",
+      "name": "SHAP",
+      "description": "基于博弈论Shapley值的模型可解释性库，提供特征重要性的一致性和可加性度量，支持树模型、深度学习和任何Python模型的解释。在生物信息学中用于解释突变致病性预测和基因表达分类模型的决策依据。典型生物信息学用例：对训练好的随机森林变异预测模型计算SHAP值，识别驱动致病性判断的关键突变特征和位点。",
+      "category": "ML框架",
+      "installCommand": "pip install shap",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": true,
+      "url": "https://shap.readthedocs.io/",
+      "tags": [
+        "可解释性",
+        "特征重要性",
+        "XAI"
+      ],
+      "quickExample": "import shap\nimport xgboost as xgb\n\n# SHAP解释SNP致病性预测模型的决策依据\nmodel = xgb.XGBClassifier().fit(X_train, y_train)\nexplainer = shap.TreeExplainer(model)\nshap_values = explainer.shap_values(X_test)\n\n# 瀑布图展示单个变异的特征贡献\nshap.waterfall_plot(explainer.expected_value, shap_values[0],\n                    feature_names=feature_names)"
+    },
+    {
+      "id": "pyg",
+      "name": "PyTorch Geometric",
+      "description": "基于PyTorch的图神经网络库，提供GCN、GAT、GraphSAGE、MPNN等多种图模型的高效实现，支持批次处理和稀疏矩阵运算。在生物信息学中用于蛋白质相互作用网络分析、分子图表示学习和基因调控网络建模。典型生物信息学用例：将蛋白质复合物表示为原子图（节点为原子，边为化学键），使用MPNN预测蛋白质-配体结合亲和力。",
+      "category": "DL框架",
+      "installCommand": "pip install torch-geometric",
+      "difficulty": "高级",
+      "mlRelevant": false,
+      "dlRelevant": true,
+      "url": "https://pytorch-geometric.readthedocs.io/",
+      "tags": [
+        "GNN",
+        "图神经网络",
+        "PyTorch"
+      ],
+      "quickExample": "import torch\nfrom torch_geometric.nn import GCNConv\n\n# 图卷积网络预测蛋白质-配体结合亲和力\nclass ProteinGCN(torch.nn.Module):\n    def __init__(self, in_channels, hidden_channels):\n        super().__init__()\n        self.conv1 = GCNConv(in_channels, hidden_channels)\n        self.conv2 = GCNConv(hidden_channels, hidden_channels)\n        self.fc = torch.nn.Linear(hidden_channels, 1)  # 输出: 亲和力"
+    },
+    {
+      "id": "wandb",
+      "name": "Weights & Biases",
+      "description": "实验跟踪和可视化平台，自动记录训练指标、超参数、模型检查点和系统资源使用情况，支持团队协作和实验对比。在生物信息学深度学习研究中帮助管理大量模型训练实验，避免结果丢失。典型生物信息学用例：在训练蛋白质序列分类模型时自动记录每轮的训练损失、验证准确率和学习率变化，方便后续实验对比和最优模型选择。",
+      "category": "平台",
+      "installCommand": "pip install wandb",
+      "difficulty": "入门",
+      "mlRelevant": true,
+      "dlRelevant": true,
+      "url": "https://wandb.ai/",
+      "tags": [
+        "实验跟踪",
+        "可视化",
+        "协作"
+      ],
+      "quickExample": "import wandb\n\n# 实验跟踪：记录蛋白质序列分类模型训练\nwandb.init(project=\"protein-classification\", config={\n    \"learning_rate\": 1e-4,\n    \"batch_size\": 32,\n    \"architecture\": \"ESM-2-finetune\",\n    \"epochs\": 10,\n})\n\n# 训练循环中记录指标\nwandb.log({\"loss\": train_loss, \"accuracy\": val_acc, \"epoch\": epoch})"
+    },
+    {
+      "id": "jupyter",
+      "name": "Jupyter Notebook",
+      "description": "交互式编程环境，允许在网页中混合编写代码、文档和可视化，支持逐步执行和即时查看结果。是生物信息学数据分析、模型探索和结果展示的标准工具，几乎所有教程都以Notebook形式分发。典型生物信息学用例：在Jupyter Notebook中逐步执行单细胞RNA测序数据分析流程，每一步都可视化中间结果（如QC指标、UMAP图和差异表达热图）。",
+      "category": "平台",
+      "installCommand": "pip install jupyterlab",
+      "difficulty": "入门",
+      "mlRelevant": true,
+      "dlRelevant": true,
+      "url": "https://jupyter.org/",
+      "tags": [
+        "交互式",
+        "笔记本",
+        "探索"
+      ],
+      "quickExample": "# JupyterLab 交互式单细胞分析\n# 安装: pip install jupyterlab\n# 启动: jupyter lab\n\n# 在Notebook中逐步分析并可视化：\nimport scanpy as sc\nadata = sc.datasets.pbmc3k()\nsc.pp.filter_cells(adata, min_genes=200)\nsc.pp.normalize_total(adata)\n# 每步都可即时查看结果和可视化"
+    },
+    {
+      "id": "jax",
+      "name": "JAX",
+      "description": "Google开发的高性能数值计算和机器学习框架，结合了NumPy风格的API、自动微分和XLA编译器加速。支持JIT编译和向量化，在生物信息学大模型（如AlphaFold变体、蛋白质设计模型）中日益流行。相比PyTorch，JAX的函数式编程风格更适合复杂的科学计算和算法研究。典型生物信息学用例：使用JAX实现蛋白质结构的等变神经网络，利用JIT编译加速大规模序列比对的计算。",
+      "category": "DL框架",
+      "installCommand": "pip install jax jaxlib",
+      "difficulty": "高级",
+      "mlRelevant": false,
+      "dlRelevant": true,
+      "url": "https://jax.readthedocs.io/",
+      "tags": [
+        "JIT编译",
+        "自动微分",
+        "Google",
+        "高性能"
+      ],
+      "quickExample": "import jax\nimport jax.numpy as jnp\n\n# JAX函数式编程 + JIT编译加速\n@jax.jit\ndef gelu(x):\n    return 0.5 * x * (1 + jnp.tanh(jnp.sqrt(2/jnp.pi) * (x + 0.044715 * x**3)))\n\nx = jnp.array([1.0, 2.0, 3.0])\nresult = gelu(x)  # 首次调用编译，后续调用极速"
+    },
+    {
+      "id": "einops",
+      "name": "einops",
+      "description": "深度学习张量操作库，提供直观的张量重塑、转置和规约API，支持PyTorch/TensorFlow/JAX等多个后端。通过爱因斯坦标记法风格的字符串表达式，将复杂的维度变换变得可读且不易出错。在生物信息学DL代码库（如AlphaFold、ESM）中广泛使用。典型生物信息学用例：将蛋白质序列的注意力矩阵从(batch, heads, seq, seq)重塑为(batch, seq, seq, heads)用于后续分析。",
+      "category": "DL框架",
+      "installCommand": "pip install einops",
+      "difficulty": "入门",
+      "mlRelevant": false,
+      "dlRelevant": true,
+      "url": "https://einops.rocks/",
+      "tags": [
+        "张量操作",
+        "PyTorch",
+        "TensorFlow"
+      ],
+      "quickExample": "import torch\nfrom einops import rearrange, reduce\n\n# 直观的张量重塑（爱因斯坦标记法风格）\nattn = torch.randn(2, 8, 100, 100)  # (batch, heads, seq, seq)\n# reshape to (batch, seq, seq, heads)\nattn_t = rearrange(attn, 'b h i j -> b i j h')\n# 对头求均值\nattn_mean = reduce(attn, 'b h i j -> b i j', 'mean')"
+    },
+    {
+      "id": "catboost",
+      "name": "CatBoost",
+      "description": "Yandex开发的梯度提升库，对类别特征有原生支持，无需手动编码即可直接处理分类变量。在许多生物信息学表格数据任务（如基因功能分类、药物响应预测）中表现优异，特别是在处理大量类别特征时。典型生物信息学用例：使用CatBoost对蛋白质家族信息（类别特征）和理化性质（数值特征）进行混合特征建模，预测蛋白质的热稳定性。",
+      "category": "ML框架",
+      "installCommand": "pip install catboost",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://catboost.ai/",
+      "tags": [
+        "梯度提升",
+        "类别特征",
+        "Yandex"
+      ],
+      "quickExample": "from catboost import CatBoostClassifier\n\n# 原生支持类别特征，无需one-hot编码\nmodel = CatBoostClassifier(\n    iterations=200,\n    cat_features=['protein_family', 'organism'],  # 直接指定类别列\n    verbose=False\n)\nmodel.fit(X_train, y_train)\npreds = model.predict(X_test)"
+    },
+    {
+      "id": "imbalanced-learn",
+      "name": "imbalanced-learn",
+      "description": "专门处理不平衡数据的Python库，提供过采样（SMOTE及其变体）、欠采样、组合采样和集成方法，与scikit-learn API完全兼容。在生物信息学中至关重要，因为致病突变、稀有细胞类型和药物靶标往往是少数类。典型生物信息学用例：使用SMOTE对致病SNP样本（仅占1%）进行合成过采样，改善随机森林模型的精确率-召回率性能。",
+      "category": "ML框架",
+      "installCommand": "pip install imbalanced-learn",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://imbalanced-learn.org/",
+      "tags": [
+        "不平衡数据",
+        "SMOTE",
+        "采样"
+      ],
+      "quickExample": "from imblearn.over_sampling import SMOTE\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.pipeline import Pipeline\n\n# SMOTE过采样处理致病SNP数据不平衡\npipeline = Pipeline([\n    ('smote', SMOTE(random_state=42)),\n    ('rf', RandomForestClassifier(n_estimators=100))\n])\npipeline.fit(X_snp_features, y_pathogenicity)"
+    },
+    {
+      "id": "lifelines",
+      "name": "lifelines",
+      "description": "Python生存分析库，实现了Kaplan-Meier估计、Cox比例风险模型、Aalen加性模型和时间依赖性协变量处理，是临床生物信息学中进行预后分析的核心工具。支持生存曲线绘制和统计检验。典型生物信息学用例：基于基因表达特征构建Cox比例风险模型，预测癌症患者的总生存期(OS)和无进展生存期(PFS)，识别预后基因标志物。",
+      "category": "ML框架",
+      "installCommand": "pip install lifelines",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://lifelines.readthedocs.io/",
+      "tags": [
+        "生存分析",
+        "临床",
+        "预后"
+      ],
+      "quickExample": "from lifelines import CoxPHFitter\nimport pandas as pd\n\n# TCGA癌症生存分析：基因表达预测患者预后\ndata = pd.DataFrame({\n    'TP53_expr': [2.1, 3.5, 1.8],  # 基因表达\n    'survival_months': [45, 23, 67],\n    'event': [1, 1, 0]  # 1=死亡, 0=删失\n})\ncph = CoxPHFitter()\ncph.fit(data, duration_col='survival_months', event_col='event')\ncph.print_summary()"
+    },
+    {
+      "id": "mlflow",
+      "name": "MLflow",
+      "description": "开源的ML生命周期管理平台，涵盖实验跟踪、模型注册、部署和协作四大功能模块。自动记录每次训练的代码版本、参数、指标和环境信息，支持模型版本管理和一键部署。在生物信息学研究中用于管理大量对比实验和模型的选择与回溯。典型生物信息学用例：使用MLflow跟踪不同蛋白质分类模型（RF vs XGBoost vs Transformer）的数百次超参数搜索实验，自动生成对比报告。",
+      "category": "平台",
+      "installCommand": "pip install mlflow",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": true,
+      "url": "https://mlflow.org/",
+      "tags": [
+        "MLOps",
+        "实验管理",
+        "模型注册"
+      ],
+      "quickExample": "import mlflow\n\n# MLflow跟踪蛋白质分类模型实验\nmlflow.set_experiment(\"protein-function-prediction\")\nwith mlflow.start_run():\n    # 记录参数\n    mlflow.log_params({\"model\": \"RandomForest\", \"n_estimators\": 100})\n    # 记录指标\n    mlflow.log_metrics({\"accuracy\": 0.85, \"f1\": 0.82})\n    # 保存模型\n    mlflow.sklearn.log_model(model, \"model\")"
+    },
+    {
+      "id": "streamlit",
+      "name": "Streamlit",
+      "description": "将Python脚本快速转化为Web应用的工具，无需前端知识即可创建交互式ML Demo界面，支持滑块、文件上传、图表展示和布局组件。在生物信息学中用于构建基因分析结果的可视化交互界面和模型演示应用。典型生物信息学用例：用户上传蛋白质序列，Streamlit应用调用ESM-2模型计算嵌入向量并以交互式散点图展示序列间的相似性关系。",
+      "category": "平台",
+      "installCommand": "pip install streamlit",
+      "difficulty": "入门",
+      "mlRelevant": true,
+      "dlRelevant": true,
+      "url": "https://streamlit.io/",
+      "tags": [
+        "Web应用",
+        "交互式",
+        "演示"
+      ],
+      "quickExample": "# 运行: streamlit run app.py\nimport streamlit as st\n\nst.title(\"蛋白质功能预测\")\nsequence = st.text_area(\"输入蛋白质序列:\", \"MKTVRQER\")\nif st.button(\"预测\"):\n    # 调用模型预测\n    st.success(f\"预测功能: 激酶活性 (置信度: 0.92)\")\n    st.line_chart({\"位置1-10\": 0.5, \"位置11-20\": 0.8})"
+    },
+    {
+      "id": "scikit-image",
+      "name": "scikit-image",
+      "description": "Python图像处理库，提供图像分割、滤波、特征提取和形态学操作等功能，与NumPy/SciPy生态系统无缝集成。在生物信息学中用于处理组织病理切片图像、显微镜细胞图像和蛋白质结构可视化图。典型生物信息学用例：对H&E染色的组织切片图像进行预处理，提取纹理特征用于后续的深度学习癌症分类模型。",
+      "category": "数据",
+      "installCommand": "pip install scikit-image",
+      "difficulty": "入门",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://scikit-image.org/",
+      "tags": [
+        "图像处理",
+        "显微镜",
+        "病理"
+      ],
+      "quickExample": "from skimage import io, filters, measure\nimport numpy as np\n\n# 处理组织病理切片图像\nimage = io.imread('histology_slide.tif')\ngray = np.mean(image, axis=2)  # 灰度化\nedges = filters.sobel(gray)  # 边缘检测\nlabeled = measure.label(edges > 0.1)  # 连通域标记\nprint(f\"检测到 {labeled.max()} 个细胞区域\")"
+    },
+    {
+      "id": "dask",
+      "name": "Dask",
+      "description": "并行计算库，通过懒执行和任务调度支持超出内存容量的数据处理和并行化ML工作流。Dask DataFrame/Array与Pandas/NumPy API兼容，可无缝扩展现有代码。在生物信息学中用于处理大规模基因组矩阵和并行化基因表达分析的模型训练。典型生物信息学用例：对百万级单细胞数据集使用Dask DataFrame进行并行质控和归一化，突破单机内存限制。",
+      "category": "数据",
+      "installCommand": "pip install dask[complete]",
+      "difficulty": "高级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://www.dask.org/",
+      "tags": [
+        "并行计算",
+        "大规模数据",
+        "分布式"
+      ],
+      "quickExample": "import dask.dataframe as dd\nfrom dask.distributed import Client\n\n# 启动分布式计算集群\nclient = Client(n_workers=4)\n\n# 加载超出内存的大规模基因表达矩阵\nexpr = dd.read_csv('TCGA_all_samples.csv')\ngene_means = expr.groupby('gene_id')['expression'].mean().compute()  # 延迟计算\nprint(f\"处理了 {len(gene_means)} 个基因\")"
+    },
+    {
+      "id": "r-caret",
+      "name": "caret (R)",
+      "description": "R语言最广泛使用的机器学习统一接口包，提供分类、回归、聚类的统一训练/预测API，集成200+种模型，自动处理数据预处理、特征选择和超参数调优。是生信R用户进入ML领域的首选工具，与Bioconductor生态无缝集成。典型生物信息学用例：对基因表达矩阵使用caret进行模型训练和10折交叉验证，自动比较随机森林、SVM和GBM的性能。",
+      "category": "R语言",
+      "installCommand": "install.packages(\"caret\")",
+      "difficulty": "入门",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://topepo.github.io/caret/",
+      "tags": [
+        "统一接口",
+        "分类",
+        "回归",
+        "R"
+      ],
+      "quickExample": "library(caret)\n# 基因表达分类：自动交叉验证 + 多模型比较\ntrain_control <- trainControl(method=\"cv\", number=10)\nmodel <- train(x=gene_expr, y=cancer_type,\n              method=\"rf\", trControl=train_control)\nconfusionMatrix(model)"
+    },
+    {
+      "id": "r-tidymodels",
+      "name": "tidymodels (R)",
+      "description": "R语言的现代ML框架集合（parsnip + recipes + rsample + tune），提供tidyverse风格的ML工作流。parsnip提供统一模型接口，recipes处理特征工程管道，tune实现超参数搜索。近年来逐渐取代caret成为R ML的首选框架。典型生物信息学用例：使用tidymodels构建从基因选择、归一化到随机森林训练的完整分析管道，代码可读且易于复现。",
+      "category": "R语言",
+      "installCommand": "install.packages(\"tidymodels\")",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://www.tidymodels.org/",
+      "tags": [
+        "tidyverse",
+        "管道",
+        "R"
+      ],
+      "quickExample": "library(tidymodels)\n# tidy风格ML管道：基因选择 -> 归一化 -> RF\nrecipe <- recipe(cancer_type ~ ., data=gene_data) %>%\n  step_nzv(all_predictors()) %>%\n  step_normalize(all_predictors())\nmodel <- rand_forest() %>% set_engine(\"ranger\") %>%\n  set_mode(\"classification\")\nwf <- workflow() %>% add_recipe(recipe) %>% add_model(model)"
+    },
+    {
+      "id": "r-deseq2",
+      "name": "DESeq2 (R/Bioconductor)",
+      "description": "RNA-seq差异表达分析的金标准R包，基于负二项分布模型进行基因水平的统计检验，支持复杂的多因素实验设计和批次校正。是转录组学生物信息学中引用率最高的工具之一。典型生物信息学用例：对TCGA肿瘤vs正常组织的RNA-seq count数据进行差异表达分析，筛选log2FC>2且padj<0.05的显著差异基因进行后续通路富集。",
+      "category": "R语言",
+      "installCommand": "BiocManager::install(\"DESeq2\")",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://bioconductor.org/packages/DESeq2/",
+      "tags": [
+        "差异表达",
+        "负二项分布",
+        "Bioconductor"
+      ],
+      "quickExample": "library(DESeq2)\n# RNA-seq差异表达分析\ndds <- DESeqDataSetFromMatrix(countData=counts,\n                              colData=coldata, design=~condition)\ndds <- DESeq(dds)\nres <- results(dds, contrast=c(\"condition\",\"tumor\",\"normal\"))\ndegs <- subset(res, padj < 0.05 & abs(log2FoldChange) > 2)"
+    },
+    {
+      "id": "r-seurat",
+      "name": "Seurat (R)",
+      "description": "单细胞RNA-seq数据分析的标准R包，提供从QC、归一化、降维、聚类到差异表达和可视化的全流程分析。支持多数据集整合和数据可视化（UMAP、t-SNE、热图、小提琴图等），是单细胞领域引用最广的工具。典型生物信息学用例：整合不同供体的PBMC单细胞数据，通过CCA方法去除批次效应后进行细胞聚类和标记基因鉴定。",
+      "category": "R语言",
+      "installCommand": "install.packages(\"Seurat\")",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://satijalab.org/seurat/",
+      "tags": [
+        "单细胞",
+        "聚类",
+        "可视化",
+        "R"
+      ],
+      "quickExample": "library(Seurat)\n# 标准单细胞分析流程\npbmc <- CreateSeuratObject(counts=pbmc_counts)\npbmc <- NormalizeData(pbmc)\npbmc <- FindVariableFeatures(pbmc, nfeatures=2000)\npbmc <- ScaleData(pbmc) %>% RunPCA() %>%\n  FindNeighbors() %>% FindClusters(res=0.5) %>% RunUMAP(dims=1:30)\nDimPlot(pbmc, label=TRUE)"
+    },
+    {
+      "id": "r-glmnet",
+      "name": "glmnet (R)",
+      "description": "实现Lasso(L1)和Elastic Net(L1+L2)正则化广义线性模型的高效R包，通过坐标下降法快速求解正则化路径。在生物信息学中广泛用于高维小样本场景（p>>n）的特征选择和预测建模，如从数万基因中筛选少量疾病标志物。典型生物信息学用例：对p=20000个基因、n=200个样本的癌症数据使用Lasso回归筛选关键预后基因，通过交叉验证选择最优lambda。",
+      "category": "R语言",
+      "installCommand": "install.packages(\"glmnet\")",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://glmnet.stanford.edu/",
+      "tags": [
+        "正则化",
+        "特征选择",
+        "Lasso",
+        "R"
+      ],
+      "quickExample": "library(glmnet)\n# Lasso回归从20000个基因中筛选癌症预后标志物\nX <- t(expr_matrix)  # 样本 x 基因\nfit <- cv.glmnet(X, survival_time, alpha=1, nfolds=10)\nselected_genes <- coef(fit, s=\"lambda.1se\")[,1]\ncat(\"选出了\", sum(selected_genes != 0), \"个关键基因\")"
+    },
+    {
+      "id": "r-survival",
+      "name": "survival (R)",
+      "description": "R语言生存分析的基础包，提供Surv对象、Kaplan-Meier估计、Cox回归和log-rank检验等核心功能。几乎所有R语言的临床生物信息学分析都依赖此包。比Python的lifelines生态更成熟，临床统计领域的事实标准。典型生物信息学用例：对TCGA数据构建Surv(生存时间, 死亡事件)对象，使用survfit进行Kaplan-Meier生存曲线估计并用survdiff检验基因高低表达组的预后差异。",
+      "category": "R语言",
+      "installCommand": "install.packages(\"survival\")",
+      "difficulty": "入门",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://cran.r-project.org/package=survival",
+      "tags": [
+        "生存分析",
+        "Kaplan-Meier",
+        "Cox",
+        "R"
+      ],
+      "quickExample": "library(survival)\n# Kaplan-Meier生存曲线 + log-rank检验\nfit <- survfit(Surv(time, event) ~ gene_group, data=clinical)\nplot(fit, col=c(\"red\",\"blue\"), lwd=2)\nlegend(\"topright\", c(\"高表达\",\"低表达\"), col=c(\"red\",\"blue\"), lwd=2)\n# log-rank检验\nsurvdiff(Surv(time, event) ~ gene_group, data=clinical)"
+    },
+    {
+      "id": "r-limma",
+      "name": "limma (R/Bioconductor)",
+      "description": "基于经验贝叶斯线性模型的差异表达分析R包，通过borrowing strength跨基因估计方差提高小样本场景的统计功效。支持微阵列和RNA-seq数据，计算速度远快于基于负二项分布的方法，适合快速筛选差异基因。典型生物信息学用例：对仅有3个生物学重复的小样本RNA-seq实验使用limma-voom进行差异表达分析，利用经验贝叶斯方法稳定基因水平的方差估计。",
+      "category": "R语言",
+      "installCommand": "BiocManager::install(\"limma\")",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://bioconductor.org/packages/limma/",
+      "tags": [
+        "差异表达",
+        "经验贝叶斯",
+        "小样本"
+      ],
+      "quickExample": "library(limma)\n# 小样本RNA-seq差异表达分析 (3 vs 3)\ndesign <- model.matrix(~ 0 + group)\nfit <- lmFit(voom_data, design)\ncontrast <- makeContrasts(group_treat - group_ctrl, levels=design)\nfit2 <- contrasts.fit(fit, contrast)\nfit2 <- eBayes(fit2)  # 经验贝叶斯方差收缩\ntopTable(fit2, n=10)"
+    },
+    {
+      "id": "r-randomforest",
+      "name": "randomForest (R)",
+      "description": "R语言中随机森林算法的经典实现，提供分类和回归的随机森林模型，内置变量重要性评估和OOB(out-of-bag)误差估计。在生物信息学中被广泛引用，尤其通过Boruta包进行特征选择和通过RFpermute评估特征显著性的惯用流程。典型生物信息学用例：对微生物组OTU丰度数据构建随机森林分类器鉴定与疾病相关的关键菌属，利用MeanDecreaseGini排序菌群重要性。",
+      "category": "R语言",
+      "installCommand": "install.packages(\"randomForest\")",
+      "difficulty": "入门",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://cran.r-project.org/package=randomForest",
+      "tags": [
+        "随机森林",
+        "特征重要性",
+        "分类",
+        "R"
+      ],
+      "quickExample": "library(randomForest)\n# 微生物组随机森林：鉴定关键疾病相关菌属\nrf <- randomForest(otu_table, as.factor(disease_status),\n                   ntree=500, importance=TRUE)\nvarImpPlot(rf, n.var=15)  # 可视化Top15最重要的菌属\nprint(rf$confusion)  # OOB混淆矩阵"
+    },
+    {
+      "id": "fastqc",
+      "name": "FastQC",
+      "description": "高通量测序原始数据质量控制工具，输出 per-base quality、adapter、GC、duplication 等模块化 HTML 报告。CUT&Tag 中要结合 assay 特性解释 read 开头 sequence content warning。",
+      "category": "NGS流程",
+      "installCommand": "conda install -c bioconda fastqc",
+      "difficulty": "入门",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://www.bioinformatics.babraham.ac.uk/projects/fastqc/",
+      "tags": [
+        "FASTQ",
+        "QC",
+        "NGS"
+      ],
+      "quickExample": "fastqc -t 8 -o qc/fastqc fastq/*.fastq.gz"
+    },
+    {
+      "id": "multiqc",
+      "name": "MultiQC",
+      "description": "汇总多个样本和多个生信工具输出的报告，适合 pipeline 末端生成项目级 QC，并把 alignment、duplication、FRiP 等指标统一检查。",
+      "category": "NGS流程",
+      "installCommand": "conda install -c bioconda multiqc",
+      "difficulty": "入门",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://docs.seqera.io/multiqc/",
+      "tags": [
+        "QC",
+        "report",
+        "pipeline"
+      ],
+      "quickExample": "multiqc . -o qc/multiqc"
+    },
+    {
+      "id": "bowtie2",
+      "name": "Bowtie2",
+      "description": "快速、敏感的 short-read aligner，CUT&Tag/CUT&RUN 常用于 host genome 和 E. coli spike-in genome 比对。",
+      "category": "NGS流程",
+      "installCommand": "conda install -c bioconda bowtie2",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://bowtie-bio.sourceforge.net/bowtie2/manual.shtml",
+      "tags": [
+        "alignment",
+        "FASTQ",
+        "BAM"
+      ],
+      "quickExample": "bowtie2 --end-to-end --very-sensitive --no-mixed --no-discordant -I 10 -X 700 -x hg38 -1 R1.fq.gz -2 R2.fq.gz -S sample.sam"
+    },
+    {
+      "id": "samtools",
+      "name": "samtools",
+      "description": "处理 SAM/BAM/CRAM 的核心工具，用于 view、sort、index、flagstat、idxstats、coverage 等步骤，是 NGS pipeline 的基础工具。",
+      "category": "NGS流程",
+      "installCommand": "conda install -c bioconda samtools",
+      "difficulty": "入门",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://www.htslib.org/doc/samtools.html",
+      "tags": [
+        "SAM",
+        "BAM",
+        "CRAM"
+      ],
+      "quickExample": "samtools view -bS sample.sam | samtools sort -o sample.sorted.bam\nsamtools index sample.sorted.bam\nsamtools flagstat sample.sorted.bam"
+    },
+    {
+      "id": "bedtools",
+      "name": "bedtools",
+      "description": "genome interval arithmetic 工具集，可对 BED/BAM/GFF/VCF 做 intersect、merge、coverage、genomecov、closest 等操作，是 peak、fragment 和 annotation 连接的核心工具。",
+      "category": "NGS流程",
+      "installCommand": "conda install -c bioconda bedtools",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://bedtools.readthedocs.io/en/latest/",
+      "tags": [
+        "BED",
+        "interval",
+        "coverage"
+      ],
+      "quickExample": "bedtools genomecov -bg -i sample.fragments.bed -g hg38.chrom.sizes > sample.bedgraph\nbedtools closest -a peaks.bed -b genes.bed > peak_gene.tsv"
+    },
+    {
+      "id": "cutadapt",
+      "name": "Cutadapt",
+      "description": "去除 adapter 和低质量读段的 FASTQ trimming 工具；CUT&Tag 长读长出现 read-through adapter 时使用，短读长项目需先看 QC 决策。",
+      "category": "NGS流程",
+      "installCommand": "conda install -c bioconda cutadapt",
+      "difficulty": "入门",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://cutadapt.readthedocs.io/",
+      "tags": [
+        "adapter",
+        "trimming",
+        "FASTQ"
+      ],
+      "quickExample": "cutadapt -a ADAPTER_FWD -A ADAPTER_REV -m 20 -o R1.trim.fq.gz -p R2.trim.fq.gz R1.fq.gz R2.fq.gz"
+    },
+    {
+      "id": "seacr",
+      "name": "SEACR",
+      "description": "面向低背景 CUT&RUN/CUT&Tag chromatin profiling 的 peak/enriched region caller，输入 paired-end fragment bedGraph，可选择 norm/non 和 stringent/relaxed。",
+      "category": "NGS流程",
+      "installCommand": "git clone https://github.com/FredHutch/SEACR",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://github.com/FredHutch/SEACR",
+      "tags": [
+        "CUT&Tag",
+        "CUT&RUN",
+        "peak calling"
+      ],
+      "quickExample": "bash SEACR_1.3.sh target.bedgraph IgG.bedgraph norm stringent peaks/sample"
+    },
+    {
+      "id": "deeptools",
+      "name": "deepTools",
+      "description": "用于高通量测序数据 coverage、BigWig、matrix、heatmap 和 profile plot 的 Python 工具套件，常用于 peak-centered heatmap 和 metaplot。",
+      "category": "NGS流程",
+      "installCommand": "conda install -c bioconda deeptools",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://deeptools.readthedocs.io/",
+      "tags": [
+        "BigWig",
+        "heatmap",
+        "visualization"
+      ],
+      "quickExample": "bamCoverage -b sample.sorted.bam -o sample.bw --binSize 10\ncomputeMatrix reference-point -S sample.bw -R peaks.bed -o matrix.gz -a 3000 -b 3000\nplotHeatmap -m matrix.gz -out heatmap.png"
+    },
+    {
+      "id": "deseq2",
+      "name": "DESeq2",
+      "description": "Bioconductor 差异分析工具，基于负二项分布建模 count data，并估计 size factor、dispersion 和 fold-change shrinkage。RNA-seq 和 differential peak count matrix 都可用。",
+      "category": "R语言",
+      "installCommand": "R -e \"BiocManager::install('DESeq2')\"",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://bioconductor.org/packages/release/bioc/html/DESeq2.html",
+      "tags": [
+        "RNA-seq",
+        "differential analysis",
+        "count matrix"
+      ],
+      "quickExample": "dds <- DESeqDataSetFromMatrix(countData=cts, colData=meta, design=~condition)\ndds <- DESeq(dds)\nres <- results(dds, contrast=c(\"condition\",\"treated\",\"control\"))"
+    },
+    {
+      "id": "chipseeker",
+      "name": "ChIPseeker",
+      "description": "R/Bioconductor peak annotation、peak comparison 和 visualization 工具，可连接 peak 与最近基因、TSS 距离和 genomic annotation。",
+      "category": "R语言",
+      "installCommand": "R -e \"BiocManager::install('ChIPseeker')\"",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://bioconductor.org/packages/release/bioc/html/ChIPseeker.html",
+      "tags": [
+        "peak annotation",
+        "ChIP-seq",
+        "CUT&Tag"
+      ],
+      "quickExample": "library(ChIPseeker)\npeak <- readPeakFile(\"peaks.bed\")\nanno <- annotatePeak(peak, TxDb=txdb, tssRegion=c(-3000, 3000))"
+    },
+    {
+      "id": "macs2",
+      "name": "MACS2",
+      "description": "经典 ChIP-seq/ATAC-seq peak caller；ATAC-seq pipeline 常用 BAMPE 模式调用 narrow peaks，ChIP-seq 根据 assay 选择 narrow/broad。",
+      "category": "NGS流程",
+      "installCommand": "conda install -c bioconda macs2",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "https://github.com/macs3-project/MACS",
+      "tags": [
+        "peak calling",
+        "ChIP-seq",
+        "ATAC-seq"
+      ],
+      "quickExample": "macs2 callpeak -t sample.bam -c control.bam -f BAMPE -g hs -n sample -q 0.01"
+    },
+    {
+      "id": "homer",
+      "name": "HOMER",
+      "description": "motif discovery、motif enrichment、peak annotation 和 regulatory element 分析工具，适合从 differential peaks 推断 TF motif 富集。",
+      "category": "NGS流程",
+      "installCommand": "conda install -c bioconda homer",
+      "difficulty": "中级",
+      "mlRelevant": true,
+      "dlRelevant": false,
+      "url": "http://homer.ucsd.edu/homer/",
+      "tags": [
+        "motif",
+        "enrichment",
+        "annotation"
+      ],
+      "quickExample": "findMotifsGenome.pl peaks.bed hg38 homer_out -size 200"
+    },
+    {
+      "id": "pixi",
+      "name": "pixi",
+      "description": "基于conda生态的跨平台包管理器(Rust/mamba团队)。自动生成pixi.lock锁文件精确复现环境。支持Python+R+C++混合项目，pixi-pack离线分发，Docker/CI集成。生信环境管理首选工具。",
+      "category": "环境管理",
+      "installCommand": "curl -fsSL https://pixi.sh/install.sh | bash",
+      "difficulty": "中级",
+      "mlRelevant": false,
+      "dlRelevant": false,
+      "url": "https://prefix.dev/tools/pixi",
+      "tags": [
+        "环境管理",
+        "锁文件",
+        "跨平台",
+        "Python+R",
+        "Docker",
+        "conda生态"
+      ]
+    }
+  ]
+}

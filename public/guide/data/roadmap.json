@@ -1,0 +1,803 @@
+{
+  "stages": [
+    {
+      "id": 1,
+      "name": "基础入门",
+      "nameEn": "Foundations",
+      "duration": "4-6 周",
+      "description": "建立编程、数学和生物信息学基础，理解ML/DL基本概念和术语。",
+      "mlTopics": [
+        {
+          "name": "监督学习 vs 无监督学习",
+          "description": "监督学习使用带标签的数据训练模型进行预测，无监督学习从无标签数据中发现隐藏结构。在生物信息学中，监督学习用于基因分类和突变致病性预测，无监督学习用于发现新的细胞亚型和基因模块。"
+        },
+        {
+          "name": "分类与回归问题",
+          "description": "分类预测离散类别标签（如疾病类型），回归预测连续数值（如基因表达量）。生物信息学中典型的分类任务包括癌症亚型识别，回归任务包括蛋白质结合亲和力预测。"
+        },
+        {
+          "name": "k近邻算法 (k-NN)",
+          "description": "通过计算样本与训练集中最近k个邻居的距离进行分类或回归。在生物信息学中常用于基因表达谱的分类和蛋白质功能推断，原理直观且无需显式训练过程。"
+        },
+        {
+          "name": "k-means聚类",
+          "description": "将数据划分为k个簇，使得簇内样本距离最小化。广泛应用于单细胞RNA测序数据的细胞分群和共表达基因模块发现，是探索性分析的核心工具。"
+        },
+        {
+          "name": "决策树基础",
+          "description": "通过递归划分特征空间构建树形结构的预测模型。在生物信息学中用于识别关键的生物标志物和构建可解释的疾病风险分层模型。"
+        },
+        {
+          "name": "模型评估: 准确率、精确率、召回率、F1",
+          "description": "一系列评估分类模型性能的指标，准确率衡量整体正确率，精确率和召回率关注正类预测的可靠性，F1是二者的调和平均。在基因组变异检测中，高召回率确保不遗漏致病突变。"
+        },
+        {
+          "name": "交叉验证",
+          "description": "将数据集划分为多个子集轮流作为验证集，以获得更稳健的模型性能估计。在生物信息学中尤为重要，因为样本量通常有限且批次效应可能导致性能高估。"
+        },
+        {
+          "name": "过拟合与欠拟合",
+          "description": "过拟合指模型过度学习训练数据的噪声而泛化能力差，欠拟合指模型过于简单而未能捕捉数据规律。在高维基因数据中，过拟合是常见问题，需要正则化和特征选择来缓解。"
+        }
+      ],
+      "dlTopics": [
+        {
+          "name": "神经网络基础结构",
+          "description": "由输入层、隐藏层和输出层组成的计算图，每层包含可学习的权重和偏置参数。神经网络可以学习从原始DNA序列或蛋白质序列到功能标签的复杂非线性映射。"
+        },
+        {
+          "name": "前馈神经网络 (FNN)",
+          "description": "信息单向从输入层流向输出层的全连接神经网络。在生物信息学中可用于从基因表达特征预测患者预后或药物响应，是深度学习在生物数据上应用的基础架构。"
+        },
+        {
+          "name": "激活函数: ReLU, Sigmoid, Tanh",
+          "description": "为神经网络引入非线性的函数，使网络能够学习复杂模式。ReLU因其计算高效和缓解梯度消失问题，成为现代深度学习模型的默认选择，广泛应用于各类生物序列分析网络。"
+        },
+        {
+          "name": "反向传播算法",
+          "description": "通过链式法则从输出层向输入层逐层计算梯度，高效更新网络参数。这是训练所有深度神经网络的核心算法，使得构建多层蛋白质结构预测网络成为可能。"
+        },
+        {
+          "name": "损失函数基础",
+          "description": "衡量模型预测与真实标签之间差异的函数，指导模型优化方向。均方误差用于基因表达量预测，交叉熵用于序列分类任务，选择合适的损失函数对模型性能至关重要。"
+        },
+        {
+          "name": "梯度下降概念",
+          "description": "沿损失函数梯度反方向迭代更新参数，逐步降低预测误差。这是所有神经网络训练的基石，理解其原理有助于调试模型收敛问题和设计针对生物数据特性的优化策略。"
+        },
+        {
+          "name": "向量化编程 (Vectorization)",
+          "description": "利用矩阵运算替代for循环的高效编程范式，NumPy广播机制和PyTorch张量操作都基于向量化思想。在生物信息学中，向量化可以高效处理全基因组变异矩阵和蛋白质序列批量编码，大幅减少训练时间和内存占用。是DL框架底层优化的核心思想。"
+        },
+        {
+          "name": "Mini-batch梯度下降",
+          "description": "将训练数据分成小批次(batch)逐批更新参数的方法，在随机梯度下降(SGD)和全量梯度下降之间取得平衡。Mini-batch训练是现代深度学习的标准实践，影响收敛速度、内存占用和模型泛化能力。在生物大数据场景（如百万级单细胞数据）中合理选择batch size对训练效率至关重要。"
+        },
+        {
+          "name": "PyTorch/TensorFlow入门",
+          "description": "两大主流深度学习框架，提供自动微分和GPU加速功能。PyTorch因其动态计算图和直观的调试体验，成为生物信息学研究中最常用的深度学习框架，广泛用于蛋白质语言和基因组模型开发。"
+        }
+      ],
+      "mathTopics": [
+        {
+          "name": "线性代数: 向量、矩阵、点积",
+          "description": "向量用于表示基因表达样本，矩阵用于存储整个数据集，点积衡量向量相似度。这些运算是所有机器学习算法的基础，例如计算基因间的相关性或蛋白质嵌入的相似度。",
+          "mathId": "linear-algebra"
+        },
+        {
+          "name": "微积分: 导数、偏导数、链式法则",
+          "description": "导数描述函数变化率，偏导数处理多变量函数，链式法则是复合函数求导规则。反向传播算法本质上就是链式法则的系统性应用，用于计算神经网络中数百万参数的梯度。",
+          "mathId": "calculus"
+        },
+        {
+          "name": "概率基础: 条件概率、贝叶斯定理",
+          "description": "条件概率描述在已知某些信息后的不确定性更新，贝叶斯定理提供从先验到后验的推断框架。在生物信息学中用于评估基因变异的致病概率和从测序数据中推断基因型。",
+          "mathId": "probability"
+        },
+        {
+          "name": "统计基础: 均值、方差、分布",
+          "description": "描述数据集中趋势和离散程度的基本统计量。在差异基因表达分析中，t检验和方差分析用于判断基因在不同条件下的表达变化是否具有统计学显著性。",
+          "mathId": "probability"
+        }
+      ],
+      "tools": [
+        "Python",
+        "NumPy",
+        "Pandas",
+        "Matplotlib",
+        "scikit-learn",
+        "PyTorch",
+        "FastQC",
+        "MultiQC",
+        "Bowtie2",
+        "samtools",
+        "bedtools",
+        "SEACR",
+        "deepTools",
+        "DESeq2"
+      ],
+      "projects": [
+        {
+          "name": "基因表达分类",
+          "description": "使用k-NN对TCGA基因表达数据进行癌症类型分类",
+          "starterCode": "from sklearn.neighbors import KNeighborsClassifier\nfrom sklearn.model_selection import train_test_split\nimport pandas as pd\n\n# 加载TCGA基因表达数据\nexpr = pd.read_csv(\"TCGA_BRCA_expr.csv\", index_col=0)\nX_train, X_test, y_train, y_test = train_test_split(\n    expr.values.T, cancer_labels, test_size=0.2)\nmodel = KNeighborsClassifier(n_neighbors=5)\nmodel.fit(X_train, y_train)\nprint(f\"Accuracy: {model.score(X_test, y_test):.3f}\")"
+        },
+        {
+          "name": "DNA序列k-mer聚类",
+          "description": "对不同物种的DNA序列进行k-mer频率聚类分析",
+          "starterCode": "from sklearn.cluster import KMeans\nfrom sklearn.feature_extraction.text import CountVectorizer\n\n# 对不同物种DNA序列进行k-mer频率聚类\nsequences = [\"ATCGGGCTA\", \"ATCGGGTTA\", \"GCTTAACCG\", ...]\nkmer_vectorizer = CountVectorizer(analyzer=\"char\", ngram_range=(3, 3))\nkmer_matrix = kmer_vectorizer.fit_transform(sequences)\n\nkmeans = KMeans(n_clusters=4)\nspecies_clusters = kmeans.fit_predict(kmer_matrix.toarray())"
+        },
+        {
+          "name": "基因表达热图与层次聚类",
+          "description": "对TCGA乳腺癌RNA-seq数据进行层次聚类，绘制带临床注释的表达热图，识别分子亚型特征基因",
+          "starterCode": "import pandas as pd\nimport seaborn as sns\nfrom scipy.cluster.hierarchy import dendrogram, linkage\nfrom scipy.spatial.distance import pdist\n\n# 加载TCGA BRCA表达数据\nexpr = pd.read_csv('TCGA_BRCA_expr.csv', index_col=0)\n# 选取方差最大的500个基因\ntop_genes = expr.var(axis=1).nlargest(500).index\nexpr_top = expr.loc[top_genes]\n\n# 层次聚类\nrow_linkage = linkage(pdist(expr_top), method='ward')\n# 绘制聚类热图\nsns.clustermap(expr_top, row_linkage=row_linkage,\n               cmap='RdBu_r', figsize=(12, 10))\n# → 热图中自然形成乳腺癌LumA/LumB/Basal等亚型"
+        },
+        {
+          "name": "蛋白质序列特征工程",
+          "description": "从蛋白质序列提取氨基酸组成、二肽频率、理化性质等特征，构建可用于ML分类的特征矩阵",
+          "starterCode": "import numpy as np\nfrom Bio import SeqIO\n\n# 氨基酸理化性质字典\nhydrophobicity = {'A':1.8,'C':2.5,'D':-3.5,'E':-3.5,'F':2.8,\n                  'G':-0.4,'H':-3.2,'I':4.5,'K':-3.9,'L':3.8,\n                  'M':1.9,'N':-3.5,'P':-1.6,'Q':-3.5,'R':-4.5,\n                  'S':-0.8,'T':-0.7,'V':4.2,'W':-0.9,'Y':-1.3}\n\ndef extract_features(sequence):\n    \"\"\"从蛋白质序列提取特征向量\"\"\"\n    seq = str(sequence)\n    aa_count = {aa: seq.count(aa)/len(seq) for aa in 'ACDEFGHIKLMNPQRSTVWY'}\n    dipep = {f'{a1}{a2}': seq.count(f'{a1}{a2}')/(len(seq)-1)\n             for a1 in 'ACDEFGHIKLMNPQRSTVWY' for a2 in 'ACDEFGHIKLMNPQRSTVWY'}\n    avg_hydro = np.mean([hydrophobicity.get(aa, 0) for aa in seq])\n    return {**aa_count, 'avg_hydrophobicity': avg_hydro}\n\n# 批量处理FASTA文件\nfeatures = [extract_features(rec.seq) for rec in SeqIO.parse('proteins.fasta', 'fasta')]\nX = pd.DataFrame(features)\nprint(f'特征矩阵: {X.shape[0]} 蛋白质 x {X.shape[1]} 特征')"
+        },
+        {
+          "name": "癌症分子亚型无监督发现",
+          "description": "对TCGA多癌种表达数据使用k-means和PCA发现未知分子亚型，与已知临床分型对比验证",
+          "starterCode": "import pandas as pd\nfrom sklearn.decomposition import PCA\nfrom sklearn.cluster import KMeans\nfrom sklearn.metrics import adjusted_rand_score\n\n# 加载TCGA泛癌数据\nadata = pd.read_csv('tcga_pancancer_expr.csv', index_col=0)\n\n# PCA降维\npca = PCA(n_components=50)\nX_pca = pca.fit_transform(adata.values.T)\n\n# k-means发现亚型\nkmeans = KMeans(n_clusters=5, random_state=42)\nclusters = kmeans.fit_predict(X_pca)\n\n# 与已知亚型对比\nknown_labels = adata.columns.str.extract(r'(BRCA|LUAD|COAD|GBM|KIRC)')[0]\nari = adjusted_rand_score(known_labels, clusters)\nprint(f'调整兰德指数(ARI): {ari:.3f} — 越接近1越一致')"
+        }
+      ],
+      "resources": [
+        {
+          "name": "Andrew Ng机器学习课程",
+          "type": "视频课程"
+        },
+        {
+          "name": "3Blue1Brown深度学习系列",
+          "type": "视频"
+        },
+        {
+          "name": "ISLR (统计学习导论)",
+          "type": "书籍"
+        },
+        {
+          "name": "PyTorch官方教程",
+          "type": "教程"
+        },
+        {
+          "name": "Andrew Ng 深度学习专项课程",
+          "type": "视频课程"
+        },
+        {
+          "name": "深度学习笔记（中文翻译版）",
+          "type": "中文笔记"
+        },
+        {
+          "name": "Ye Zheng CUT&Tag tutorial",
+          "type": "教程"
+        }
+      ],
+      "bioinfoTopics": [
+        {
+          "name": "NGS FASTQ 与质量控制",
+          "description": "理解 FASTQ、Phred quality、adapter、GC bias、duplication 和 MultiQC 汇总；能判断哪些 QC warning 是 assay-specific，哪些会影响后续比对。"
+        },
+        {
+          "name": "参考基因组与注释文件",
+          "description": "理解 genome build、FASTA、GTF/GFF、BED、chrom.sizes、gene ID 版本，避免 hg19/hg38 或 Ensembl/Entrez/Symbol 混用。"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "核心方法",
+      "nameEn": "Core Methods",
+      "duration": "6-8 周",
+      "description": "深入掌握经典ML算法和深度学习核心架构，学习特征工程和模型调优。",
+      "mlTopics": [
+        {
+          "name": "支持向量机 (SVM)",
+          "description": "通过寻找最优超平面将不同类别的数据分开的算法，核技巧使其能处理非线性边界。在生物信息学中广泛用于蛋白质亚细胞定位预测、基因表达分类和癌症类型判别，在高维小样本数据上表现优异。"
+        },
+        {
+          "name": "随机森林与集成学习",
+          "description": "通过构建多棵决策树并集成其预测结果来提高准确性和鲁棒性。在生物信息学中用于SNP致病性预测、蛋白质功能分类和基因选择，能够自动评估特征重要性并提供可靠的预测置信度。"
+        },
+        {
+          "name": "梯度提升树 (XGBoost, LightGBM)",
+          "description": "通过串行训练决策树，每棵树纠正前一棵树的错误，逐步提升整体性能。在生物信息学Kaggle竞赛和基因数据预测任务中表现卓越，常用于预测基因表达量和蛋白质性质。"
+        },
+        {
+          "name": "逻辑回归",
+          "description": "使用sigmoid函数将线性组合映射到概率输出的分类模型。在生物信息学中用于疾病风险评分构建、基因突变致病性评估和患者生存预测，因其可解释性强而备受临床青睐。"
+        },
+        {
+          "name": "朴素贝叶斯",
+          "description": "基于贝叶斯定理和特征条件独立性假设的概率分类器。在生物信息学中用于基因家族分类、蛋白质域识别和快速文本挖掘（如文献主题分类），计算高效且对高维数据友好。"
+        },
+        {
+          "name": "特征选择与降维 (PCA, t-SNE)",
+          "description": "PCA通过线性变换将高维数据投影到低维空间保留最大方差，t-SNE通过非线性映射保持局部邻域结构。在单细胞RNA测序分析中，PCA用于去除噪声和降维，t-SNE/UMAP用于可视化细胞群体。"
+        },
+        {
+          "name": "超参数调优 (Grid Search, Random Search)",
+          "description": "系统化寻找模型最优超参数配置的过程，网格搜索遍历所有组合，随机搜索在超参数空间中随机采样。在生物信息学模型开发中，合理的超参数调优可以显著提升蛋白质性质预测和基因分类的准确性。"
+        },
+        {
+          "name": "模型解释性 (SHAP, LIME)",
+          "description": "SHAP基于博弈论量化每个特征对模型预测的贡献，LIME通过在局部拟合简单模型解释复杂模型。在生物信息学中用于解释基因组变异预测模型的决策依据，帮助研究人员理解哪些突变位点驱动了致病性判断。"
+        },
+        {
+          "name": "不平衡数据处理",
+          "description": "针对类别分布不均的数据集（如罕见疾病样本远少于正常样本）的特殊处理技术，包括过采样、欠采样和代价敏感学习。在生物信息学中至关重要，因为致病突变和罕见细胞类型往往是少数类。"
+        },
+        {
+          "name": "生存分析 (Cox模型、Kaplan-Meier)",
+          "description": "分析事件发生时间数据的统计方法，Cox比例风险模型评估多变量对生存的影响，Kaplan-Meier估计器绘制生存曲线。在生物信息学中广泛用于癌症预后分析，基于基因表达或突变特征预测患者总生存期(OS)和无进展生存期(PFS)，是临床生物信息学的核心方法。"
+        },
+        {
+          "name": "R语言ML生态初探 (caret, tidymodels)",
+          "description": "R语言在生信ML中占有重要地位，caret提供统一模型接口(200+模型)，tidymodels提供tidyverse风格的现代ML工作流。与Bioconductor生态(limma、DESeq2、Seurat)无缝集成，是生物统计学家的首选工具。适合处理基因组统计建模、差异表达分析和临床预测模型。"
+        }
+      ],
+      "dlTopics": [
+        {
+          "name": "卷积神经网络 (CNN)",
+          "description": "使用卷积核在输入数据上滑动提取局部特征的神经网络架构。在生物信息学中广泛用于DNA序列基序发现、蛋白质二级结构预测和染色质可及性预测，能够有效捕捉生物序列中的局部模式。"
+        },
+        {
+          "name": "循环神经网络 (RNN)",
+          "description": "通过循环连接处理序列数据的神经网络，能够捕捉时间或位置上的依赖关系。在生物信息学中用于蛋白质序列建模、基因表达时间序列分析和DNA序列功能预测，天然适合处理变长生物序列。"
+        },
+        {
+          "name": "LSTM与GRU",
+          "description": "RNN的改进版本，通过门控机制解决长序列上的梯度消失问题。在生物信息学中用于建模长程基因组依赖关系（如增强子与启动子的远距离互作）和蛋白质长距离接触预测。"
+        },
+        {
+          "name": "Embedding层",
+          "description": "将离散符号（如核苷酸、氨基酸）映射为连续稠密向量的神经网络层。在生物信息学中， learned embeddings可以捕捉氨基酸的理化性质相似性和密码子的使用偏好，是生物序列深度学习的核心组件。"
+        },
+        {
+          "name": "Dropout与正则化",
+          "description": "训练过程中随机丢弃一部分神经元以防止过拟合的正则化技术。在生物信息学中尤为重要，因为生物数据通常维度高且样本量相对有限，模型容易记忆噪声而非学习普适规律。"
+        },
+        {
+          "name": "Batch Normalization",
+          "description": "对每一批数据的中间层输出进行标准化，加速训练收敛并提高模型稳定性。在深层生物信息学网络（如DeepVariant和Enformer）中，批归一化是实现稳定训练的关键技术。"
+        },
+        {
+          "name": "学习率调度",
+          "description": "在训练过程中动态调整学习率的策略，如衰减、循环和预热。合适的学习率调度可以帮助基因组大模型更快收敛，避免在最优解附近震荡或收敛到局部最优。"
+        },
+        {
+          "name": "数据增强",
+          "description": "通过对训练数据进行变换（如反转、补体、随机突变）来扩充数据集的技术。在生物信息学中，DNA序列的反向互补增强和蛋白质的随机扰动增强可以有效提升模型的泛化能力。"
+        },
+        {
+          "name": "迁移学习基础",
+          "description": "将在大数据集上预训练的模型参数迁移到相关小数据集任务上的技术。在生物信息学中，使用在大量基因组或蛋白质序列上预训练的模型进行下游任务微调，已成为标准范式。"
+        },
+        {
+          "name": "偏差-方差诊断与模型调试",
+          "description": "系统分析模型在训练集和验证集上的误差来源。高偏差意味着欠拟合(模型太简单)，高方差意味着过拟合(模型太复杂)。通过训练错误率、验证错误率和贝叶斯最优错误率的对比确定优化方向。在生物信息学中，了解如何诊断模型问题比盲目调参更重要。"
+        },
+        {
+          "name": "优化器详解 (SGD, Momentum, RMSprop, Adam)",
+          "description": "动量法积累历史梯度加速收敛并减少震荡，RMSprop自适应调节每个参数的学习率，Adam结合两者优点成为最常用的优化器。在生物信息学DL中，Adam是训练蛋白质语言模型和基因组Transformer的默认选择，但某些场景（如需要精细控制泛化）可能更适合带动量的SGD。"
+        },
+        {
+          "name": "梯度消失/爆炸与权重初始化",
+          "description": "深层网络中梯度在反向传播时指数级衰减（消失）或增长（爆炸），导致模型无法收敛。Xavier/He初始化根据网络输入输出维度自动缩放初始权重，有效缓解此问题。在训练深层蛋白质结构和基因调控网络时，正确的初始化策略是模型成功的第一道门槛。"
+        },
+        {
+          "name": "残差连接与ResNet",
+          "description": "通过跳跃连接(skip connection)让信息绕过某些层直接传递，解决了极深网络的退化问题。ResNet使训练100+层的网络成为可能，其残差设计思想已被Transformer(残差注意力)和AlphaFold(Evoformer残差连接)广泛采用。"
+        }
+      ],
+      "mathTopics": [
+        {
+          "name": "矩阵分解 (SVD, 特征分解)",
+          "description": "将矩阵分解为更简单矩阵的乘积，揭示数据的内在低维结构。在生物信息学中，SVD用于基因表达数据的降噪和缺失值插补，特征分解是PCA的核心步骤，用于发现主导基因表达模式。",
+          "mathId": "linear-algebra"
+        },
+        {
+          "name": "梯度下降变种 (SGD, Adam, RMSprop)",
+          "description": "改进的优化算法，通过自适应学习率或动量加速收敛。Adam优化器因其自适应性和鲁棒性，成为训练生物信息学深度网络（如蛋白质语言模型和基因组Transformer）的首选。",
+          "mathId": "optimization"
+        },
+        {
+          "name": "概率分布 (正态、伯努利、多项)",
+          "description": "描述随机变量取值规律的概率模型。正态分布用于建模基因表达噪声，伯努利分布描述二分类结果（如突变是否致病），多项分布刻画多类分类问题（如蛋白质亚细胞定位）。",
+          "mathId": "probability"
+        },
+        {
+          "name": "最大似然估计",
+          "description": "找到使观测数据出现概率最大的模型参数的方法。在生物信息学中用于估计进化模型参数、训练隐马尔可夫模型进行基因注释，是统计建模和深度学习训练的共同基础。",
+          "mathId": "probability"
+        },
+        {
+          "name": "信息论基础 (熵、交叉熵)",
+          "description": "熵量化随机变量的不确定性，交叉熵衡量两个概率分布之间的差异。交叉熵损失是生物序列分类任务（如DeepVariant的变异检测和ESM的蛋白质分类）的标准优化目标。",
+          "mathId": "information-theory"
+        }
+      ],
+      "tools": [
+        "scikit-learn",
+        "XGBoost",
+        "PyTorch",
+        "TensorFlow",
+        "SHAP",
+        "Optuna",
+        "CatBoost",
+        "imbalanced-learn",
+        "lifelines",
+        "caret (R)",
+        "tidymodels (R)",
+        "FastQC",
+        "MultiQC",
+        "Bowtie2",
+        "samtools",
+        "bedtools",
+        "SEACR",
+        "deepTools",
+        "DESeq2"
+      ],
+      "projects": [
+        {
+          "name": "蛋白质二级结构预测",
+          "description": "使用CNN对蛋白质序列进行二级结构分类",
+          "starterCode": "import torch, torch.nn as nn\n\n# CNN预测蛋白质二级结构 (H=α-helix, E=β-sheet, C=coil)\nclass ProteinSSPredictor(nn.Module):\n    def __init__(self, num_amino_acids=21, hidden=128, num_classes=3):\n        super().__init__()\n        self.conv = nn.Conv1d(num_amino_acids, hidden, kernel_size=7, padding=3)\n        self.fc = nn.Linear(hidden, num_classes)\n    def forward(self, x):\n        return self.fc(self.conv(x).mean(dim=-1))\n\nmodel = ProteinSSPredictor()"
+        },
+        {
+          "name": "基因表达降维可视化",
+          "description": "使用PCA和t-SNE对单细胞数据进行降维和可视化",
+          "starterCode": "import scanpy as sc\n\n# 对单细胞数据进行PCA降维和可视化\nadata = sc.datasets.pbmc3k()\nsc.pp.normalize_total(adata)\nsc.pp.log1p(adata)\nsc.pp.highly_variable_genes(adata, n_top_genes=2000)\n\n# PCA降维 + t-SNE可视化\nsc.tl.pca(adata, n_comps=50)\nsc.pp.neighbors(adata)\nsc.tl.tsne(adata)\nsc.pl.tsne(adata, color=[\"louvain\"])"
+        },
+        {
+          "name": "突变致病性预测",
+          "description": "使用随机森林预测SNP的致病性",
+          "starterCode": "import xgboost as xgb\nfrom sklearn.model_selection import cross_val_score\nimport pandas as pd\n\n# 用多维基因组特征预测SNP致病性\nfeatures = pd.read_csv(\"variant_features.csv\")\nX = features.drop(columns=[\"variant_id\", \"pathogenic\"])\ny = features[\"pathogenic\"]\n\nmodel = xgb.XGBClassifier(n_estimators=200, max_depth=6)\nscores = cross_val_score(model, X, y, cv=5, scoring=\"roc_auc\")\nprint(f\"AUC: {scores.mean():.3f} ± {scores.std():.3f}\")"
+        },
+        {
+          "name": "CUT&Tag histone mark 分析",
+          "description": "从 paired-end FASTQ 生成 host/spike-in 比对、fragment BED、BigWig、SEACR peaks、peak annotation 和 differential peak table。",
+          "starterCode": "fastqc -t 8 -o qc fastq/*.fastq.gz\nbowtie2 --end-to-end --very-sensitive --no-mixed --no-discordant -I 10 -X 700 -p 8 -x indexes/hg38 -1 sample_R1.fastq.gz -2 sample_R2.fastq.gz -S align/sample.sam\nsamtools view -bS -F 0x04 align/sample.sam | samtools sort -o align/sample.sorted.bam\nsamtools index align/sample.sorted.bam"
+        },
+        {
+          "name": "单细胞差异基因分析",
+          "description": "对PBMC单细胞数据使用经验贝叶斯方法识别各细胞类型的marker基因，并用火山图和热图可视化",
+          "starterCode": "import scanpy as sc\nimport omicverse as ov\n\nadata = ov.read('pbmc3k.h5ad')\nov.pp.preprocess(adata, n_top_genes=2000)\nov.pp.pca(adata)\nov.pp.neighbors(adata)\nov.pp.leiden(adata)\n\n# 差异分析：每个cluster vs 其他所有\nsc.tl.rank_genes_groups(adata, 'leiden', method='wilcoxon')\nsc.pl.rank_genes_groups(adata, n_genes=20, sharey=False)\n\n# 使用经验贝叶斯方法\nov.single.find_markers(adata, groupby='leiden', method='limma')\nprint('Top marker genes per cluster:\\\\n', adata.uns['rank_genes_groups']['names'][:5])"
+        },
+        {
+          "name": "药物敏感性预测",
+          "description": "使用XGBoost基于癌细胞基因表达和突变特征预测对100+种药物的IC50敏感性",
+          "starterCode": "import xgboost as xgb\nfrom sklearn.model_selection import cross_val_score\n\n# GDSC药物敏感性数据：基因表达 + 药物IC50\n# X: (1001 cell lines, 17737 genes)\n# y: IC50 for specific drug\n\nmodel = xgb.XGBRegressor(\n    n_estimators=200, max_depth=5,\n    learning_rate=0.05, subsample=0.8\n)\n\n# 5折交叉验证\nscores = cross_val_score(model, X, y, cv=5,\n                         scoring='neg_mean_squared_error')\nprint(f'CV RMSE: {(-scores)**0.5}')\n\n# 特征重要性 → 发现耐药关键基因\nmodel.fit(X, y)\nimportance = pd.Series(model.feature_importances_, index=genes)\ntop_drivers = importance.nlargest(20)\nprint('Top predictive genes for drug response:\\\\n', top_drivers)"
+        },
+        {
+          "name": "基因共表达网络构建",
+          "description": "使用WGCNA从Bulk RNA-seq数据构建共表达网络，识别与临床性状相关的基因模块",
+          "starterCode": "import omicverse as ov\nimport pandas as pd\n\n# 加载表达数据\nexpr = pd.read_csv('TCGA_BRCA_expr_log2.csv', index_col=0)\nmeta = pd.read_csv('TCGA_BRCA_meta.csv', index_col=0)\n\n# WGCNA分析\nwgcna = ov.bulk.pyWGCNA(expr.T, meta)\n\n# 软阈值选择\nwgcna.pick_soft_threshold(powers=range(1, 21))\n\n# 构建网络\nwgcna.build_network(soft_power=6)\n\n# 模块-性状关联\nmodule_trait = wgcna.module_trait_correlation()\nprint('Module-trait associations:\\\\n', module_trait)\n\n# 识别与肿瘤分期显著相关的模块\ntumor_modules = module_trait[module_trait['tumor_stage'] < 0.05]\nprint(f'显著模块: {tumor_modules.index.tolist()}')"
+        }
+      ],
+      "resources": [
+        {
+          "name": "Hands-On Machine Learning",
+          "type": "书籍"
+        },
+        {
+          "name": "Dive into Deep Learning (D2L)",
+          "type": "书籍+教程"
+        },
+        {
+          "name": "Fast.ai Part 1",
+          "type": "课程"
+        },
+        {
+          "name": "Stanford CS231n",
+          "type": "课程"
+        },
+        {
+          "name": "Ye Zheng CUT&Tag tutorial",
+          "type": "教程"
+        }
+      ],
+      "bioinfoTopics": [
+        {
+          "name": "基因组比对与文件格式转换",
+          "description": "掌握 Bowtie2、STAR、BWA 的使用边界，理解 SAM/BAM/CRAM、BED、bedGraph、BigWig 和 fragment BED 的转换关系。"
+        },
+        {
+          "name": "Count Matrix 与 Feature Matrix",
+          "description": "把 RNA-seq 的 gene count、ATAC/CUT&Tag 的 region count 统一成 feature_matrix，区分 raw counts、normalized counts 和浏览器信号。"
+        },
+        {
+          "name": "CUT&Tag 标准流程",
+          "description": "以 CUT&Tag 为示范专题，完成 QC、lane merge、trimming decision、host/spike-in alignment、fragment processing、SEACR peak calling、peak annotation 和 differential peak analysis。"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "进阶架构",
+      "nameEn": "Advanced Architectures",
+      "duration": "8-10 周",
+      "description": "掌握Transformer、自注意力机制等现代深度学习架构，学习大规模预训练模型。",
+      "mlTopics": [
+        {
+          "name": "集成策略进阶 (Stacking, Blending)",
+          "description": "Stacking使用元学习器整合多个基模型的预测，Blending在验证集上训练融合权重。在生物信息学中，这些方法可以整合多种模型（序列模型、结构模型、进化模型）的预测来更准确地评估变异致病性。"
+        },
+        {
+          "name": "主动学习",
+          "description": "模型主动选择对提升性能最有价值的样本请求标注，最小化标注成本。在生物信息学中用于高效筛选有实验价值的蛋白质变体或选择最具信息量的单细胞进行深度测序。"
+        },
+        {
+          "name": "半监督学习",
+          "description": "同时使用少量标注数据和大量未标注数据进行训练的方法。在生物信息学中极为实用，因为获取标注数据（如蛋白质功能注释）成本高昂，而未标注序列数据（如基因组测序数据） abundantly available。"
+        },
+        {
+          "name": "图神经网络基础 (GNN)",
+          "description": "在图结构数据上运行的神经网络，通过消息传递机制聚合邻居信息。在生物信息学中用于蛋白质相互作用网络分析、分子性质预测（将分子视为原子图）和基因调控网络建模。"
+        },
+        {
+          "name": "AutoML",
+          "description": "自动化机器学习流程的技术，包括自动特征工程、模型选择和超参数优化。在生物信息学中可以帮助生物学家快速构建基线模型，用于基因表达分类和突变效应预测，降低建模门槛。"
+        }
+      ],
+      "dlTopics": [
+        {
+          "name": "Seq2Seq与编码器-解码器架构",
+          "description": "将一个序列编码为固定长度的上下文向量，再解码为另一个序列的架构，是机器翻译、蛋白质序列生成和分子生成的基础框架。在生物信息学中，Seq2Seq用于从DNA序列预测RNA表达、从氨基酸序列生成蛋白质结构注释。理解Seq2Seq的局限性（信息瓶颈）是理解注意力机制和Transformer为什么必要的关键。"
+        },
+        {
+          "name": "注意力机制",
+          "description": "允许模型在处理序列时动态关注不同位置的信息，通过计算查询与键的相似度得到注意力权重。注意力机制最初被提出用于改进Seq2Seq的编码器-解码器架构，后来发展为Transformer的自注意力核心。在生物信息学中，注意力权重可以揭示蛋白质序列中哪些残基对功能预测最重要。"
+        },
+        {
+          "name": "Transformer架构 (Self-Attention, Multi-Head)",
+          "description": "完全基于注意力机制的序列处理架构，多头注意力从不同角度捕捉序列关系。在生物信息学中，Transformer已成为DNA序列建模（如Nucleotide Transformer）和蛋白质表示学习（如ESM）的核心架构。"
+        },
+        {
+          "name": "BERT与预训练语言模型",
+          "description": "通过掩码语言模型目标在大规模无标注文本上预训练的双向编码器。在生物信息学中，类似BERT的架构被用于学习DNA和蛋白质的上下文相关表示，下游微调用于调控区域预测和蛋白质功能注释。"
+        },
+        {
+          "name": "Vision Transformer (ViT)",
+          "description": "将图像分割为patch序列并使用Transformer处理的架构。在生物信息学中，ViT被改编用于处理基因组浏览器图像、组织病理切片分析和蛋白质结构可视化数据的分类任务。"
+        },
+        {
+          "name": "自编码器 (Autoencoder, VAE)",
+          "description": "自编码器通过学习编码-解码映射实现数据压缩和特征提取，变分自编码器(VAE)在隐空间引入概率分布实现生成建模。在生物信息学中，scVI使用VAE对单细胞RNA-seq数据进行批次校正和缺失值插补。"
+        },
+        {
+          "name": "生成对抗网络 (GAN)",
+          "description": "由生成器和判别器组成的对抗训练框架，生成器学习生成逼真假样本，判别器学习区分真假。在生物信息学中用于生成合成基因序列、蛋白质序列设计和分子结构生成，扩充训练数据或探索序列空间。"
+        },
+        {
+          "name": "多模态学习",
+          "description": "同时处理和整合来自多个模态（如序列、结构、表达谱）的信息的学习方法。在生物信息学中，多模态模型整合DNA序列、染色质状态和基因表达数据来全面预测基因调控机制。"
+        },
+        {
+          "name": "模型蒸馏",
+          "description": "将大模型的知识迁移到小模型的技术，通过让小模型模仿大模型的输出来保持性能。在生物信息学中用于将大型蛋白质语言模型（如ESM-2 15B）压缩为可在本地部署的轻量级模型。"
+        },
+        {
+          "name": "JAX与函数式深度学习",
+          "description": "Google开发的高性能数值计算框架，采用函数式编程范式，通过JIT编译和XLA加速大幅提升计算速度。在AlphaFold、蛋白质设计等生物信息学研究中日益流行，适合需要自定义梯度计算的高性能科学计算场景。"
+        },
+        {
+          "name": "端到端深度学习",
+          "description": "让模型直接从原始输入学到最终输出，无需手工设计中间步骤和特征提取器。相比传统的分步骤pipeline（先提取特征→再训练分类器），端到端方法让所有组件联合优化。在生物信息学中，DeepVariant直接从测序读段图像调用变异、Enformer从DNA序列预测基因表达，都是端到端学习的成功案例。理解其适用条件有助于设计更优的生物信息学DL系统。"
+        },
+        {
+          "name": "结构化ML项目策略",
+          "description": "如何系统性地诊断和优化深度学习项目的实用方法论：正交化策略(每次只调整一个因素)、单一数字评估指标、错误分析、数据分布不匹配的偏差方差分析。这些来自Andrew Ng的经验法则对生物信息学DL项目尤为重要。"
+        }
+      ],
+      "mathTopics": [
+        {
+          "name": "注意力机制数学推导",
+          "description": "注意力计算涉及查询-键-值(Q, K, V)矩阵的乘法、缩放和softmax归一化。理解这些数学操作有助于设计针对生物序列特性的改进注意力机制，如处理长基因组序列的线性注意力变体。",
+          "mathId": "calculus"
+        },
+        {
+          "name": "变分推断基础",
+          "description": "通过优化变分下界(ELBO)来近似难以直接计算的后验分布的方法。在变分自编码器(VAE)中用于单细胞数据建模，能够同时学习低维表示和估计数据的不确定性。",
+          "mathId": "probability"
+        },
+        {
+          "name": "图论与谱聚类",
+          "description": "图论研究节点和边的数学结构，谱聚类利用图的拉普拉斯矩阵特征向量进行聚类。在生物信息学中用于蛋白质相互作用网络模块发现和基因共表达网络的社区检测。",
+          "mathId": "linear-algebra"
+        },
+        {
+          "name": "优化理论进阶",
+          "description": "包括凸优化、约束优化和非凸优化的数学理论。生物信息学中的许多问题（如蛋白质结构优化和基因网络推断）本质上是非凸优化问题，理解优化理论有助于设计更有效的求解策略。",
+          "mathId": "optimization"
+        },
+        {
+          "name": "拉格朗日乘子法",
+          "description": "将有约束优化问题转化为无约束问题的数学方法。在支持向量机的对偶问题推导和带约束的蛋白质设计优化中发挥核心作用，是处理生物信息学中各种约束条件的强大工具。",
+          "mathId": "optimization"
+        }
+      ],
+      "tools": [
+        "PyTorch",
+        "Hugging Face Transformers",
+        "PyTorch Geometric",
+        "WandB",
+        "TensorBoard",
+        "JAX",
+        "einops",
+        "FastQC",
+        "MultiQC",
+        "Bowtie2",
+        "samtools",
+        "bedtools",
+        "SEACR",
+        "deepTools",
+        "DESeq2"
+      ],
+      "projects": [
+        {
+          "name": "DNA序列BERT预训练",
+          "description": "使用Transformer对DNA序列进行预训练和调控区域预测",
+          "starterCode": "from transformers import AutoTokenizer, AutoModelForMaskedLM\n\n# 加载预训练的DNA BERT模型进行微调\nmodel_name = \"InstaDeepAI/nucleotide-transformer-500m-human-ref\"\ntokenizer = AutoTokenizer.from_pretrained(model_name)\nmodel = AutoModelForMaskedLM.from_pretrained(model_name)\n\n# 对启动子序列进行调控活性预测\nsequences = [\"ATCG...promoter_sequence...GCTA\", ...]\ninputs = tokenizer(sequences, return_tensors=\"pt\", padding=True)\noutputs = model(**inputs)  # 用于下游调控区域预测"
+        },
+        {
+          "name": "蛋白质接触图预测",
+          "description": "使用注意力机制预测蛋白质残基间接触",
+          "starterCode": "import torch\nimport esm\n\n# 使用ESM-2注意力图预测残基接触\nmodel, alphabet = esm.pretrained.esm2_t33_650M_UR50D()\nbatch_converter = alphabet.get_batch_converter()\n\ndata = [(\"protein\", \"MKTVRQERLQ\")]\n_, _, batch_tokens = batch_converter(data)\nwith torch.no_grad():\n    results = model(batch_tokens, need_head_weights=True)\n    attentions = results[\"attentions\"]  # 用于接触图预测"
+        },
+        {
+          "name": "单细胞数据插补",
+          "description": "使用VAE对单细胞RNA-seq数据进行缺失值插补",
+          "starterCode": "import scvi\nimport scanpy as sc\n\n# 使用VAE对单细胞RNA-seq数据进行缺失值插补\nadata = sc.read(\"sc_data.h5ad\")\nscvi.model.SCVI.setup_anndata(adata, batch_key=\"batch\")\nmodel = scvi.model.SCVI(adata, n_latent=30)\nmodel.train(max_epochs=200)\n\n# 获取插补后的表达值\nimputed = model.get_normalized_expression()\nadata.layers[\"imputed\"] = imputed"
+        },
+        {
+          "name": "蛋白质结构域边界预测",
+          "description": "使用双向LSTM从蛋白质序列预测结构域边界，训练Pfam域注释数据，评估domain分割精度",
+          "starterCode": "import torch\nimport torch.nn as nn\n\nclass DomainBoundaryLSTM(nn.Module):\n    def __init__(self, input_dim=20, hidden_dim=128):\n        super().__init__()\n        self.lstm = nn.LSTM(input_dim, hidden_dim,\n                            bidirectional=True, batch_first=True)\n        self.classifier = nn.Linear(hidden_dim*2, 2)  # inside/outside domain\n    \n    def forward(self, x):\n        lstm_out, _ = self.lstm(x)  # (batch, seq_len, hidden*2)\n        logits = self.classifier(lstm_out)\n        return logits\n\nmodel = DomainBoundaryLSTM()\n# X: (N_proteins, max_len, 20) — one-hot编码的蛋白质序列\n# y: (N_proteins, max_len, 2) — 每个位置的domain标签\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-4)\nloss_fn = nn.CrossEntropyLoss()\n\nfor epoch in range(50):\n    logits = model(X_batch)\n    loss = loss_fn(logits.view(-1, 2), y_batch.view(-1))\n    loss.backward()\n    optimizer.step()\n    print(f'Epoch {epoch}: Loss={loss.item():.4f}')"
+        },
+        {
+          "name": "单细胞多组学整合",
+          "description": "使用MOFA和GLUE整合同一细胞的scRNA-seq和scATAC-seq数据，发现跨模态共享调控因子",
+          "starterCode": "import omicverse as ov\nimport scanpy as sc\n\n# 加载配对scRNA+scATAC数据\nrna = ov.read('multiome_rna.h5ad')\natac = ov.read('multiome_atac.h5ad')\n\n# MOFA多组学因子分析\nmofa = ov.single.pyMOFAART()\nmofa.add_data(rna, view_name='RNA')\nmofa.add_data(atac, view_name='ATAC')\nmofa.build_model(n_factors=15)\nmofa.train(max_iter=2000)\n\n# 查看因子-特征关联\nfactors = mofa.get_factors()\nprint(f'发现 {factors.shape[1]} 个跨模态因子')\n\n# GLUE: 知识引导的跨组学对齐\nglue = ov.single.GLUE_pair(rna, atac)\nglue.train()\n# 在共享空间可视化\naligned = glue.get_aligned_representation()\nsc.pp.neighbors(aligned)\nsc.tl.umap(aligned)\nsc.pl.umap(aligned, color=['cell_type', 'modality'])"
+        },
+        {
+          "name": "基因表达谱生成",
+          "description": "使用条件GAN生成特定细胞类型的逼真基因表达谱，评估生成数据与真实数据的分布一致性",
+          "starterCode": "import torch.nn as nn\n\nclass GeneExpressionGenerator(nn.Module):\n    def __init__(self, latent_dim=100, n_genes=5000):\n        super().__init__()\n        self.model = nn.Sequential(\n            nn.Linear(latent_dim + 10, 256),  # +10 for cell type condition\n            nn.BatchNorm1d(256), nn.ReLU(),\n            nn.Linear(256, 512), nn.BatchNorm1d(512), nn.ReLU(),\n            nn.Linear(512, n_genes), nn.ReLU()  # expression must be >= 0\n        )\n    \n    def forward(self, z, cell_type):\n        return self.model(torch.cat([z, cell_type], dim=1))\n\nclass GeneExpressionDiscriminator(nn.Module):\n    def __init__(self, n_genes=5000):\n        super().__init__()\n        self.model = nn.Sequential(\n            nn.Linear(n_genes + 10, 512), nn.LeakyReLU(0.2),\n            nn.Linear(512, 256), nn.LeakyReLU(0.2),\n            nn.Linear(256, 1), nn.Sigmoid()\n        )\n    \n    def forward(self, x, cell_type):\n        return self.model(torch.cat([x, cell_type], dim=1))\n\n# 训练后可用于数据增强 + 差异表达验证"
+        },
+        {
+          "name": "蛋白质语言模型微调",
+          "description": "使用HuggingFace对ESM-2进行荧光蛋白突变效应预测微调，对比零样本vs微调性能",
+          "starterCode": "from transformers import AutoModelForSequenceClassification, Trainer\n\n# 加载ESM-2模型\nmodel = AutoModelForSequenceClassification.from_pretrained(\n    'facebook/esm2_t6_8M_UR50D', num_labels=1\n)\n\n# 荧光蛋白突变数据: (sequence, fitness_score)\n# 示例: train_dataset = [(\\\"MKTVRQERL...\\\", 0.85), ...]\n\ndef tokenize_function(examples):\n    return tokenizer(examples['sequence'], truncation=True,\n                     max_length=256, padding='max_length')\n\ntrainer = Trainer(\n    model=model,\n    args=TrainingArguments(output_dir='./esm_finetuned',\n                           num_train_epochs=5,\n                           per_device_train_batch_size=16,\n                           evaluation_strategy='epoch'),\n    train_dataset=train_dataset,\n    eval_dataset=val_dataset,\n)\n\ntrainer.train()\n# 零样本: Spearman ρ ≈ 0.55\n# 微调后: Spearman ρ ≈ 0.72"
+        }
+      ],
+      "resources": [
+        {
+          "name": "Attention Is All You Need (论文)",
+          "type": "论文"
+        },
+        {
+          "name": "Hugging Face NLP Course",
+          "type": "课程"
+        },
+        {
+          "name": "Stanford CS224N",
+          "type": "课程"
+        },
+        {
+          "name": "Deep Graph Library教程",
+          "type": "教程"
+        },
+        {
+          "name": "Ye Zheng CUT&Tag tutorial",
+          "type": "教程"
+        }
+      ],
+      "bioinfoTopics": [
+        {
+          "name": "ATAC-seq 与 ChIP/CUT&Tag 对比",
+          "description": "比较开放染色质、抗体靶向富集和传统 ChIP-seq 的 peak 类型、背景模型、replicate reproducibility、motif enrichment 与 visualization。"
+        },
+        {
+          "name": "RNA-seq + 表观组联合解释",
+          "description": "把 differential expression、differential peak、peak-to-gene linking、motif enrichment 和 pathway enrichment 连接成调控解释链。"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "专业应用",
+      "nameEn": "Specialized Applications",
+      "duration": "持续学习",
+      "description": "深入特定生物信息学子领域，掌握前沿方法和大型预训练生物模型。",
+      "mlTopics": [
+        {
+          "name": "AlphaFold相关ML方法",
+          "description": "AlphaFold2中使用的进化特征(MAFFT多序列比对)、残基间距离和角度预测、以及结构优化等机器学习技术。理解这些方法有助于改进蛋白质结构预测和开发针对特定蛋白质家族的定制预测模型。"
+        },
+        {
+          "name": "蛋白质语言模型 (ESM系列)",
+          "description": "在大规模蛋白质序列上训练的Transformer模型，学习蛋白质的上下文相关表示。ESM-2可以零样本预测突变效应，为蛋白质工程提供高效的计算筛选工具，避免了昂贵的实验检测。"
+        },
+        {
+          "name": "基因组语言模型 (Enformer, Nucleotide Transformer)",
+          "description": "在DNA序列上预训练的大规模Transformer模型，能够预测基因表达、染色质状态和调控元件。Enformer可以从基因组序列预测基因表达水平，Nucleotide Transformer学习通用的DNA序列表示用于多种下游任务。"
+        },
+        {
+          "name": "因果推断基础",
+          "description": "从观测数据中推断变量之间因果关系的方法，超越相关性分析。在生物信息学中用于识别驱动疾病发生的因果基因变异（而非 mere 关联变异），为精准医疗提供更 robust 的靶点发现依据。"
+        },
+        {
+          "name": "强化学习在生物中的应用",
+          "description": "通过与环境交互学习最优策略的框架，包括奖励设计和策略优化。在生物信息学中用于蛋白质折叠模拟（如AlphaFold的结构优化）、药物分子生成和实验设计策略优化。"
+        },
+        {
+          "name": "神经架构搜索 (NAS)",
+          "description": "自动化设计最优神经网络架构的技术，通过搜索算法发现超越人工设计的架构。在生物信息学中用于为特定任务（如蛋白质接触预测或基因表达预测）自动发现最优的网络结构。"
+        },
+        {
+          "name": "联邦学习",
+          "description": "在不集中原始数据的情况下协作训练模型的分布式学习框架。在生物信息学中解决了医疗数据隐私和跨机构数据共享的挑战，使多家医院可以协作训练疾病预测模型而不泄露患者隐私。"
+        }
+      ],
+      "dlTopics": [
+        {
+          "name": "AlphaFold2架构详解",
+          "description": "AlphaFold2的Evoformer模块处理多序列比对和配对表示，结构模块通过等变注意力生成3D坐标。深入理解其架构有助于改进结构预测、设计针对膜蛋白或内在无序蛋白的专用预测方法。"
+        },
+        {
+          "name": "ESM-2蛋白质表示学习",
+          "description": "Meta开发的15亿参数蛋白质语言模型，通过掩码语言模型目标学习蛋白质序列的深层语义表示。其生成的蛋白质嵌入可用于零样本突变效应预测、蛋白质功能注释和结构相似性搜索。"
+        },
+        {
+          "name": "Enformer基因表达预测",
+          "description": "DeepMind开发的Transformer模型，从基因组DNA序列直接预测基因表达和染色质状态。能够捕捉远距离调控关系(超过100kb)，为理解非编码区变异的功能影响提供强大工具。"
+        },
+        {
+          "name": "扩散模型在分子生成中的应用",
+          "description": "通过逐步去噪过程生成分子结构的生成模型，如GeoDiff和DiffSBDD。在药物发现中可以生成具有特定性质的分子骨架和优化先导化合物的ADMET性质。"
+        },
+        {
+          "name": "大型生物多模态模型",
+          "description": "同时处理序列、结构、功能和文献等多种生物信息的统一模型。这些模型旨在成为生物学研究的通用AI助手，能够回答跨模态的复杂生物学问题并生成可验证的假设。"
+        },
+        {
+          "name": "单细胞基础模型 (scGPT, scFoundation)",
+          "description": "在大规模单细胞数据集上预训练的Transformer模型，学习细胞的通用表示。scGPT通过基因表达建模实现细胞类型注释、批次校正和扰动预测，为单细胞分析提供统一的基础框架。"
+        }
+      ],
+      "mathTopics": [
+        {
+          "name": "微分方程与动力系统",
+          "description": "描述变量随时间或空间变化的方程，动力系统研究系统的长期行为。在生物信息学中用于建模基因调控网络的动态行为、蛋白质相互作用动力学和细胞分化轨迹的推断。",
+          "mathId": "calculus"
+        },
+        {
+          "name": "随机过程与马尔可夫链",
+          "description": "描述随机变量随时间演变的数学模型，马尔可夫链假设未来状态仅依赖于当前状态。在生物信息学中用于序列比对（隐马尔可夫模型）、进化过程建模和单细胞轨迹推断。",
+          "mathId": "probability"
+        },
+        {
+          "name": "变分法",
+          "description": "研究泛函极值问题的数学分支，处理函数的函数。在生物信息学中用于推导最优控制问题（如最优实验设计）和连续极限下的优化问题，是统计力学方法的基础。",
+          "mathId": "optimization"
+        },
+        {
+          "name": "信息论进阶 (互信息、KL散度)",
+          "description": "互信息衡量两个变量之间的统计依赖性，KL散度衡量两个概率分布的差异。在生物信息学中，互信息用于推断基因调控网络中的直接相互作用，KL散度用于变分推断和生成模型训练。",
+          "mathId": "information-theory"
+        },
+        {
+          "name": "流形学习",
+          "description": "假设高维数据实际分布在一个低维流形上，通过非线性降维揭示数据的内在几何结构。在单细胞数据分析中，流形学习（如UMAP）用于可视化细胞状态连续体和发现分化轨迹。",
+          "mathId": "linear-algebra"
+        }
+      ],
+      "tools": [
+        "AlphaFold2 / ColabFold",
+        "ESM-2 (Hugging Face)",
+        "Enformer",
+        "DeepChem",
+        "Scanpy / scVI",
+        "RDKit",
+        "JAX",
+        "MLflow",
+        "Streamlit",
+        "DESeq2 (R)",
+        "Seurat (R)",
+        "FastQC",
+        "MultiQC",
+        "Bowtie2",
+        "samtools",
+        "bedtools",
+        "SEACR",
+        "deepTools",
+        "DESeq2"
+      ],
+      "projects": [
+        {
+          "name": "蛋白质功能预测",
+          "description": "使用ESM-2嵌入进行蛋白质GO注释预测",
+          "starterCode": "from transformers import AutoTokenizer, AutoModel\nfrom sklearn.linear_model import LogisticRegression\nimport torch\n\n# ESM-2嵌入 + 逻辑回归预测蛋白质GO注释\ntokenizer = AutoTokenizer.from_pretrained(\"facebook/esm2_t33_650M_UR50D\")\nmodel = AutoModel.from_pretrained(\"facebook/esm2_t33_650M_UR50D\")\n\ndef get_embedding(sequence):\n    inputs = tokenizer(sequence, return_tensors=\"pt\")\n    with torch.no_grad():\n        return model(**inputs).last_hidden_state.mean(dim=1).numpy()\n\nX_emb = get_embedding(\"MKTVRQERLQ\")\nclassifier = LogisticRegression().fit(X_train_emb, y_go_labels)"
+        },
+        {
+          "name": "基因调控序列设计",
+          "description": "使用扩散模型生成具有特定调控功能的DNA序列",
+          "starterCode": "import torch\nfrom denoising_diffusion_pytorch import Unet, GaussianDiffusion\n\n# 扩散模型生成具有特定调控功能的DNA序列\nmodel = Unet(dim=64, dim_mults=(1, 2, 4), channels=4)  # 4通道=ATCG\ndiffusion = GaussianDiffusion(model, timesteps=1000)\n\n# 训练: diffusion(one_hot_sequences)\n# 生成: sampled_sequences = diffusion.sample(batch_size=16)\n# 解码: argmax(sampled_sequences[:, :, i]) -> ATCG"
+        },
+        {
+          "name": "药物分子性质预测",
+          "description": "使用图神经网络预测分子ADMET性质",
+          "starterCode": "import torch\nfrom torch_geometric.nn import GCNConv, global_mean_pool\n\n# 图神经网络预测分子ADMET性质\nclass MoleculeGCN(torch.nn.Module):\n    def __init__(self, num_features, hidden=128):\n        super().__init__()\n        self.conv1 = GCNConv(num_features, hidden)\n        self.conv2 = GCNConv(hidden, hidden)\n        self.fc = torch.nn.Linear(hidden, 1)  # 输出: 毒性/活性预测\n    def forward(self, data):\n        x = self.conv1(data.x, data.edge_index).relu()\n        x = self.conv2(x, data.edge_index).relu()\n        return self.fc(global_mean_pool(x, data.batch))"
+        },
+        {
+          "name": "单细胞注释与批次校正",
+          "description": "使用scVI进行单细胞数据整合与细胞类型注释",
+          "starterCode": "import scvi\nimport scanpy as sc\n\n# scVI批次校正 + 细胞类型注释\nadata = sc.read(\"multi_batch_sc.h5ad\")\nscvi.model.SCVI.setup_anndata(adata, batch_key=\"batch\")\n\n# 训练scVI进行批次校正\nmodel = scvi.model.SCVI(adata, n_latent=30, n_hidden=128)\nmodel.train()\nadata.obsm[\"X_scVI\"] = model.get_latent_representation()\n\n# 基于校正后的表示进行聚类和注释\nsc.pp.neighbors(adata, use_rep=\"X_scVI\")\nsc.tl.umap(adata)\nsc.tl.leiden(adata, resolution=0.5)"
+        },
+        {
+          "name": "RNA-seq + CUT&Tag 多组学整合",
+          "description": "把 DE genes、differential peaks、peak-to-gene links 和 pathway enrichment 统一成可解释的多组学报告。",
+          "starterCode": "interface MultiOmicsFeatureMatrix {\n  assay: \"rnaseq\" | \"atacseq\" | \"cuttag\";\n  rowType: \"gene\" | \"region\" | \"pathway\";\n  samples: string[];\n  values: number[][];\n}"
+        },
+        {
+          "name": "空间转录组细胞类型反卷积",
+          "description": "使用cell2location从Visium空间数据推断各spot的细胞类型组成，重建组织微环境空间图谱",
+          "starterCode": "import omicverse as ov\n\n# 加载单细胞参考 + Visium空间数据\nsc_ref = ov.read('scrna_reference.h5ad')\nvisium = ov.read('visium_breast_cancer.h5ad')\n\n# cell2location反卷积\nov.single.cell2location(\n    sc_ref,\n    visium,\n    cell_type_key='cell_type',\n    n_cells_per_location=30,\n    detection_alpha=200\n)\n\n# 可视化各spot的细胞类型比例\nov.pl.spatial_scatter(\n    visium,\n    color=['T_cells', 'B_cells', 'Macrophages', 'Cancer_cells'],\n    ncols=2\n)\n# → 可以看到免疫浸润区域、肿瘤核心vs边界的细胞组成差异"
+        },
+        {
+          "name": "CRISPR sgRNA效率预测",
+          "description": "训练CNN+Transformer混合模型预测sgRNA的on-target cleavage效率，输入序列+表观特征",
+          "starterCode": "import torch.nn as nn\n\nclass SgRNAEfficiencyPredictor(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.conv1d = nn.Conv1d(4, 64, kernel_size=5, padding=2)\n        self.transformer = nn.TransformerEncoderLayer(d_model=64, nhead=4)\n        self.encoder = nn.TransformerEncoder(self.transformer, num_layers=2)\n        self.regressor = nn.Sequential(\n            nn.Linear(64*23, 128), nn.ReLU(), nn.Dropout(0.3),\n            nn.Linear(128, 1), nn.Sigmoid()\n        )\n    \n    def forward(self, seq_onehot, epigen_features):\n        conv_out = self.conv1d(seq_onehot.transpose(1,2))\n        enc_out = self.encoder(conv_out.transpose(0,1))\n        flat = enc_out.transpose(0,1).reshape(enc_out.size(1), -1)\n        combined = torch.cat([flat, epigen_features], dim=1)\n        return self.regressor(combined)\n\n# 数据: DeepHF/CRISPRon数据集\n# 输入: 23bp sgRNA one-hot + CTCF/开放染色质/DNase信号\n# 输出: cleavage效率 (0-1)"
+        },
+        {
+          "name": "AlphaFold2结构预测实战",
+          "description": "使用ColabFold对一系列功能未知蛋白质进行结构预测，分析预测置信度(pLDDT)与功能域的关系",
+          "starterCode": "# ColabFold批处理脚本\n# 安装: pip install colabfold\n\nimport subprocess\nimport json\n\nproteins = [\n    ('>unknown_protein_1', 'MKTVRQERLKSIVRILERSKEPVSGAQLAEELSVSRQVIVQDIAYLRSLGYNIVATPRGYVLAGG'),\n    ('>unknown_protein_2', 'MSELEKLKAKTVIELKQKLKEQKVELEALKAKAELEKAKAKAELKAKLKA'),\n    ('>unknown_protein_3', 'MDKVLIVDDAHPIARGIRNALEKAGYKVVDTATVNGREAVELAKKYPDLILLDVMMPGMDGFTVCRKIR'),\n]\n\nfor name, seq in proteins:\n    # 保存序列\n    with open('query.fasta', 'w') as f:\n        f.write(f'{name}\\n{seq}\\n')\n    \n    # ColabFold预测\n    subprocess.run(['colabfold_batch', 'query.fasta', f'results/{name[1:]}',\n                    '--num-recycle', '3', '--use-gpu-relax'])\n    \n    # 解析pLDDT\n    with open(f'results/{name[1:]}/ranked_0.json') as f:\n        result = json.load(f)\n    mean_plddt = result['plddt'].mean()\n    print(f'{name}: mean pLDDT = {mean_plddt:.1f} — {\"高置信\" if mean_plddt>70 else \"需实验验证\"}')"
+        },
+        {
+          "name": "单细胞扰动响应预测",
+          "description": "使用scGPT条件生成模式预测特定基因敲除后全转录组的变化，验证与CRISPR实验的一致性",
+          "starterCode": "import omicverse as ov\n\nadata = ov.read('perturb_seq_data.h5ad')\n\n# scGPT扰动预测\nmodel = ov.fm.load_model('scGPT')\n\n# 预测敲除TP53后的转录组变化\nperturb_result = ov.fm.predict_perturbation(\n    'scGPT',\n    adata,\n    target_genes=['TP53'],\n    cell_type='A549',  # 肺癌细胞系\n    n_samples=500\n)\n\n# 对比预测 vs 真实CRISPR数据\npred_expr = perturb_result['predicted_expression']\ntrue_expr = perturb_result['true_expression']\n\nfrom scipy.stats import pearsonr\nfor gene in ['CDKN1A', 'MDM2', 'BAX']:  # TP53下游靶基因\n    corr, pval = pearsonr(pred_expr[gene], true_expr[gene])\n    print(f'{gene}: r={corr:.3f}, p={pval:.2e}')\n\n# 可视化扰动前后的表达变化\nov.pl.perturbation_volcano(perturb_result, effect_size_thresh=0.5)"
+        },
+        {
+          "name": "生物大模型对比基准测试",
+          "description": "对scGPT/GeneFormer/scFoundation/UCE在细胞注释、去噪、批次整合等5个任务上进行系统对比",
+          "starterCode": "import omicverse as ov\nfrom sklearn.metrics import adjusted_rand_score, silhouette_score\n\nmodels = ['scGPT', 'GeneFormer', 'scFoundation', 'UCE', 'CellPLM']\nresults = {}\n\nadata = ov.read('benchmark_dataset.h5ad')\n\nfor model_name in models:\n    print(f'\\\\n=== 测试 {model_name} ===')\n    model = ov.fm.load_model(model_name)\n    \n    # 任务1: 嵌入质量\n    emb = ov.fm.embed(model_name, adata)\n    sil = silhouette_score(emb, adata.obs['cell_type'])\n    \n    # 任务2: 细胞注释精度\n    pred = ov.fm.annotate(model_name, adata)\n    ari = adjusted_rand_score(adata.obs['cell_type'], pred)\n    \n    # 任务3: 去噪效果\n    denoised = ov.fm.denoise(model_name, adata)\n    corr = np.corrcoef(adata.X.toarray().flatten()[:1000],\n                        denoised.X.toarray().flatten()[:1000])[0,1]\n    \n    results[model_name] = {'silhouette': sil, 'ARI': ari, 'denoise_corr': corr}\n\n# 综合排名\nimport pandas as pd\nranking = pd.DataFrame(results).T\nprint('\\\\n综合基准测试结果:\\\\n', ranking.round(3))"
+        }
+      ],
+      "resources": [
+        {
+          "name": "AlphaFold论文 (Nature 2021)",
+          "type": "论文"
+        },
+        {
+          "name": "ESM论文系列",
+          "type": "论文"
+        },
+        {
+          "name": "Deep Learning for the Life Sciences",
+          "type": "书籍"
+        },
+        {
+          "name": "CS25: Transformers United (Stanford)",
+          "type": "课程"
+        },
+        {
+          "name": "Ye Zheng CUT&Tag tutorial",
+          "type": "教程"
+        }
+      ],
+      "bioinfoTopics": [
+        {
+          "name": "多组学整合项目",
+          "description": "统一 sample_metadata、genome_build、gene_id、genomic_region、feature_matrix、normalized_signal、contrast_design、differential_result_table 和 enrichment_result。"
+        },
+        {
+          "name": "ML/DL 多模态建模",
+          "description": "把 RNA、ATAC、CUT&Tag、蛋白组、代谢组转为可联合训练的矩阵、图或 embedding，用于分类、聚类、表征学习和调控预测。"
+        }
+      ]
+    }
+  ]
+}

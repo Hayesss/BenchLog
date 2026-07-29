@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { motion } from 'framer-motion'
 import {
+  BookOpen,
   Circle,
   CircleCheck,
   ExternalLink,
@@ -18,6 +19,7 @@ import type { CreateTRPCReact } from '@trpc/react-query'
 import { trpc } from '@/providers/trpc'
 import { cn } from '@/lib/utils'
 import SkillsPanel from '@/components/bioinfo/SkillsPanel'
+import GuidePanel from '@/components/bioinfo/GuidePanel'
 
 type AppRouterFromProxy = typeof trpc extends CreateTRPCReact<infer R, unknown> ? R : never
 type RouterOutputs = inferRouterOutputs<AppRouterFromProxy>
@@ -173,7 +175,7 @@ function GuideBanner() {
 }
 
 export default function Bioinfo() {
-  const [tab, setTab] = useState<'analyses' | 'skills'>('analyses')
+  const [tab, setTab] = useState<'analyses' | 'skills' | 'guide'>('analyses')
   const [projectId, setProjectId] = useState<number | undefined>(undefined)
   const [status, setStatus] = useState<BioStatus | undefined>(undefined)
 
@@ -226,6 +228,7 @@ export default function Bioinfo() {
           [
             { key: 'analyses', label: '分析记录', icon: SquareTerminal },
             { key: 'skills', label: '技能库', icon: Lightbulb },
+            { key: 'guide', label: '学习指南', icon: BookOpen },
           ] as const
         ).map(({ key, label, icon: Icon }) => (
           <button
@@ -243,7 +246,9 @@ export default function Bioinfo() {
         ))}
       </div>
 
-      {tab === 'skills' ? (
+      {tab === 'guide' ? (
+        <GuidePanel />
+      ) : tab === 'skills' ? (
         <SkillsPanel />
       ) : (
         <>
