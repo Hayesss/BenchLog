@@ -12,6 +12,7 @@ import {
   NotebookPen,
   Plus,
   Search,
+  SquareTerminal,
   Tag,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { to: '/protocols', label: '实验方法', en: 'Protocols', icon: FlaskConical },
   { to: '/library', label: '方法库', en: 'Library', icon: BookMarked },
   { to: '/records', label: '实验记录', en: 'Records', icon: NotebookPen },
+  { to: '/bioinfo', label: '生信分析', en: 'Bioinfo', icon: SquareTerminal },
   { to: '/schedule', label: '实验安排', en: 'Schedule', icon: CalendarDays },
   { to: '/export', label: '汇报导出', en: 'Export', icon: FileDown },
 ] as const

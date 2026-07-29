@@ -10,6 +10,8 @@ import Schedule from './pages/Schedule'
 import Export from './pages/Export'
 import Library from './pages/Library'
 import LibraryEntry from './pages/LibraryEntry'
+import Bioinfo from './pages/Bioinfo'
+import BioinfoDetail from './pages/BioinfoDetail'
 
 export default function App() {
   return (
@@ -27,6 +29,9 @@ export default function App() {
         <Route path="schedule" element={<Schedule />} />
         <Route path="library" element={<Library />} />
         <Route path="library/:id" element={<LibraryEntry />} />
+        <Route path="bioinfo" element={<Bioinfo />} />
+        <Route path="bioinfo/new" element={<BioinfoDetail />} />
+        <Route path="bioinfo/:id" element={<BioinfoDetail />} />
         <Route path="export" element={<Export />} />
       </Route>
     </Routes>

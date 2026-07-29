@@ -241,6 +241,35 @@ export type ExportLog = typeof exportLogs.$inferSelect;
 /* ------------------------------------------------------------------ */
 
 /** 方法库章节（12 章） */
+/** 生信分析记录（dry-lab）：代码本体存 Git 仓库，此处登记可复现性锚点 */
+export const bioinfoAnalyses = mysqlTable(
+  "bioinfo_analyses",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+    projectId: bigint("projectId", { mode: "number", unsigned: true }),
+    name: varchar("name", { length: 255 }).notNull(),
+    analysisDate: varchar("analysisDate", { length: 10 }).notNull(), // YYYY-MM-DD
+    pipeline: varchar("pipeline", { length: 64 }).notNull().default("手动脚本"), // Nextflow/Snakemake/WDL/手动脚本/R/Python/Galaxy/其他
+    inputData: text("inputData"), // 输入数据：数据集、SRA/GEO 编号、路径、校验
+    repoUrl: varchar("repoUrl", { length: 500 }), // 代码仓库链接（GitHub/GitLab/Gitee）
+    commitHash: varchar("commitHash", { length: 64 }), // commit 锚定（可复现性关键）
+    environment: text("environment"), // 环境锁定：conda env/docker/软件版本
+    command: text("command"), // 运行命令与关键参数
+    status: mysqlEnum("status", ["running", "done", "failed"]).notNull().default("running"),
+    resultMd: text("resultMd"), // 结果摘要（Markdown）
+    conclusion: text("conclusion"),
+    nextStep: text("nextStep"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [index("bioinfo_user_idx").on(t.userId), index("bioinfo_project_idx").on(t.projectId)],
+);
+export type BioinfoAnalysis = typeof bioinfoAnalyses.$inferSelect;
+
 /** 用户每日活动（活跃日历：登录打点 + 协议使用计数；记录数查询端实时聚合） */
 export const userActivity = mysqlTable(
   "user_activity",
