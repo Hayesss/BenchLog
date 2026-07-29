@@ -495,7 +495,7 @@ export default function Protocols() {
                   whileTap={{ scale: 0.98 }}
                   onClick={() => handleTemplateClick(t.name)}
                   className={cn(
-                    'group flex h-[200px] flex-col rounded-lg border border-line bg-surface p-4 text-left shadow-card transition-shadow duration-180 hover:shadow-card-hover',
+                    'group flex min-h-[200px] flex-col rounded-lg border border-line bg-surface p-4 text-left shadow-card transition-shadow duration-180 hover:shadow-card-hover',
                     pulseTemplates && 'animate-pulse ring-2 ring-bench/50',
                   )}
                 >
@@ -511,7 +511,7 @@ export default function Protocols() {
                     </span>
                   </div>
                   <h3 className="mt-3 font-display text-[18px] font-semibold leading-[24px] text-ink">{t.name}</h3>
-                  <p className="mt-1 line-clamp-2 text-[13px] leading-[20px] text-ink-soft">{meta?.blurb ?? t.description}</p>
+                  <p className="mt-1 text-[13px] leading-[20px] text-ink-soft">{meta?.blurb ?? t.description}</p>
                   <div className="mt-auto flex items-center justify-between pt-2">
                     <span className="font-mono text-[12px] text-ink-mute">
                       {countSteps(t)} 步 · {t.materials.length} 材料
@@ -670,7 +670,7 @@ function GridCard({
           whileHover={{ y: -2 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => navigate(`/protocols/${p.id}`)}
-          className="group relative flex h-40 cursor-pointer flex-col rounded-lg border border-line bg-surface p-4 shadow-card transition-shadow duration-180 hover:shadow-card-hover"
+          className="group relative flex min-h-[10rem] cursor-pointer flex-col rounded-lg border border-line bg-surface p-4 shadow-card transition-shadow duration-180 hover:shadow-card-hover"
         >
       {iteratedRecently(p) && (
         <span
@@ -685,7 +685,7 @@ function GridCard({
         >
           <Icon className="h-4 w-4" strokeWidth={1.8} />
         </span>
-        <h3 className="line-clamp-2 font-display text-[16px] font-semibold leading-[22px] text-ink">{p.name}</h3>
+        <h3 className="min-w-0 font-display text-[16px] font-semibold leading-[22px] text-ink">{p.name}</h3>
       </div>
       <div className="mt-2 flex items-center gap-2">
         <span className="rounded-full bg-bench-wash px-2 py-0.5 font-mono text-[11px] font-medium text-bench-ink">
@@ -693,8 +693,8 @@ function GridCard({
         </span>
         <span className="text-[11.5px] text-ink-mute">更新于 {relativeDate(p.updatedAt)}</span>
       </div>
-      <div className="mt-auto flex items-center gap-1.5 pt-2">
-        {p.tags.slice(0, 2).map((t) => (
+      <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-2">
+        {p.tags.map((t) => (
           <ProtocolTagChip key={t} name={t} color={tagColors.get(t)} />
         ))}
         <div className="ml-auto" onClick={(e) => e.stopPropagation()}>

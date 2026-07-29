@@ -119,7 +119,7 @@ function RecordCard({
             </span>
             <h3
               className={cn(
-                'truncate font-display font-semibold text-ink',
+                'min-w-0 font-display font-semibold text-ink',
                 compact ? 'text-[14.5px]' : 'text-[16px]',
               )}
             >
@@ -161,7 +161,7 @@ function RecordCard({
             {!compact && record.purpose && (
               <>
                 <span className="text-line-strong">·</span>
-                <span className="truncate">
+                <span className="min-w-0">
                   目的：<Highlight text={record.purpose} q={q} />
                 </span>
               </>
@@ -184,11 +184,11 @@ function RecordCard({
           {/* line 3: tags + conclusion quote */}
           {!compact && (tags.length > 0 || record.conclusion) && (
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {tags.slice(0, 3).map((t) => (
+              {tags.map((t) => (
                 <RecordTagChip key={t} name={t} className="!h-5 !text-[11.5px]" />
               ))}
               {record.conclusion && (
-                <p className="min-w-0 flex-1 truncate font-display text-[13px] italic text-ink-soft">
+                <p className="min-w-0 flex-1 font-display text-[13px] italic text-ink-soft">
                   “<Highlight text={record.conclusion} q={q} />”
                 </p>
               )}

@@ -164,7 +164,7 @@ export default function RecordPropertiesPanel({
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] text-ink transition-colors duration-150 hover:bg-paper"
+              className="flex min-h-[2rem] w-full items-center gap-2 rounded-md px-2 py-1 text-[13px] text-ink transition-colors duration-150 hover:bg-paper"
             >
               {project ? (
                 <>
@@ -172,7 +172,7 @@ export default function RecordPropertiesPanel({
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{ backgroundColor: project.color }}
                   />
-                  <span className="truncate">{project.name}</span>
+                  <span className="min-w-0 leading-[18px]">{project.name}</span>
                 </>
               ) : (
                 <span className="text-ink-mute">未分组</span>
@@ -190,9 +190,9 @@ export default function RecordPropertiesPanel({
                 onSelect={() => onProjectChange(p.id)}
                 className="gap-2 text-[13px]"
               >
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
-                <span className="flex-1 truncate">{p.name}</span>
-                {p.id === projectId && <Check className="h-3.5 w-3.5 text-bench" />}
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
+                <span className="min-w-0 flex-1 leading-[18px]">{p.name}</span>
+                {p.id === projectId && <Check className="h-3.5 w-3.5 shrink-0 text-bench" />}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
@@ -213,10 +213,10 @@ export default function RecordPropertiesPanel({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="flex h-8 min-w-0 flex-1 items-center gap-1.5 rounded-md px-2 text-[13px] transition-colors duration-150 hover:bg-paper"
+                className="flex min-h-[2rem] min-w-0 flex-1 items-center gap-1.5 rounded-md px-2 py-1 text-[13px] transition-colors duration-150 hover:bg-paper"
               >
                 {protocol ? (
-                  <span className="truncate font-medium text-bench">{protocol.name}</span>
+                  <span className="min-w-0 font-medium leading-[18px] text-bench">{protocol.name}</span>
                 ) : (
                   <span className="text-ink-mute">不关联协议</span>
                 )}
@@ -234,8 +234,8 @@ export default function RecordPropertiesPanel({
                   className="gap-2 text-[13px]"
                 >
                   <FlaskConical className="h-3.5 w-3.5 shrink-0" style={{ color: p.color }} />
-                  <span className="flex-1 truncate">{p.name}</span>
-                  <span className="font-mono text-[11px] text-ink-mute">{p.version}</span>
+                  <span className="min-w-0 flex-1 leading-[18px]">{p.name}</span>
+                  <span className="shrink-0 font-mono text-[11px] text-ink-mute">{p.version}</span>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -374,7 +374,7 @@ export function RecordProtocolSnapshotCard({
           <FlaskConical className="h-4 w-4" strokeWidth={1.8} />
         </span>
         <div className="min-w-0">
-          <p className="truncate font-display text-[14px] font-semibold text-ink">{protocol.name}</p>
+          <p className="font-display text-[14px] font-semibold leading-[19px] text-ink">{protocol.name}</p>
           <p className="font-mono text-[11px] text-ink-mute">
             {protocol.version} · 步骤 {stepCount} · {protocol.category}
           </p>

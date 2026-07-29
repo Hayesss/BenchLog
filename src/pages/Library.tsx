@@ -274,7 +274,7 @@ export default function Library() {
                     </span>
                   </div>
                   {e.nameEn && (
-                    <p className="mt-0.5 truncate text-[12px] text-ink-mute">{e.nameEn}</p>
+                    <p className="mt-0.5 text-[12px] leading-[17px] text-ink-mute">{e.nameEn}</p>
                   )}
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
                     <span className="rounded-full bg-bench-wash px-2 py-0.5 font-mono text-[11px] font-medium text-bench-ink">
@@ -294,7 +294,7 @@ export default function Library() {
                     )}
                   </div>
                   {e.purposeExcerpt && (
-                    <p className="mt-2 line-clamp-2 text-[12.5px] leading-[19px] text-ink-soft">
+                    <p className="mt-2 text-[12.5px] leading-[19px] text-ink-soft">
                       {e.purposeExcerpt}
                     </p>
                   )}

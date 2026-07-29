@@ -341,7 +341,7 @@ function FlowsCard({ flows }: { flows: FlowRow[] }) {
           {items.map((f, fi) => (
             <div key={f.id} className="group">
               <div className="mb-1.5 flex items-center justify-between gap-2">
-                <span className="truncate text-[13px] font-medium text-ink">{f.name}</span>
+                <span className="min-w-0 text-[13px] font-medium text-ink">{f.name}</span>
                 <span className="flex shrink-0 items-center gap-2">
                   <span className="rounded bg-paper px-1.5 py-0.5 font-mono text-[11px] text-ink-soft">{f.badge}</span>
                   <Link
@@ -565,14 +565,14 @@ function RecentRecords({ records }: { records: RecordRow[] }) {
                   <span className="h-[3px] w-full" style={{ backgroundColor: color }} />
                   <div className="flex flex-1 gap-3 p-4">
                     <div className="min-w-0 flex-1">
-                      <h3 className="line-clamp-2 font-display text-[16px] font-semibold leading-snug text-ink transition-colors duration-150 group-hover:text-bench">
+                      <h3 className="font-display text-[16px] font-semibold leading-snug text-ink transition-colors duration-150 group-hover:text-bench">
                         {r.title}
                       </h3>
                       <p className="mt-1.5 font-mono text-[12px] text-ink-mute">
                         {format(parseDateStr(r.recordDate), 'M月d日')} · {proto}
                       </p>
                       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                        {r.tags.slice(0, 3).map((t) => (
+                        {r.tags.map((t) => (
                           <span
                             key={t}
                             className="rounded-full px-2 py-0.5 text-[12.5px]"
@@ -632,7 +632,7 @@ function FrequentProtocols({ protocols }: { protocols: ProtocolRow[] }) {
             >
               <FlaskConical className="h-5 w-5" style={{ color: p.color }} strokeWidth={1.8} />
             </span>
-            <span className="line-clamp-1 font-display text-[15px] font-semibold text-ink">{p.name}</span>
+            <span className="font-display text-[15px] font-semibold leading-snug text-ink">{p.name}</span>
             <span className="font-mono text-[11.5px] text-ink-mute">
               {p.version} · 使用 {p.useCount} 次
             </span>

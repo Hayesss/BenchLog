@@ -630,7 +630,7 @@ export default function ProtocolDetail() {
                       className="flex items-center justify-between gap-2 rounded-lg px-1 py-1 transition-colors duration-150 hover:bg-paper"
                     >
                       <span className="min-w-0">
-                        <span className="block truncate text-[12.5px] text-ink">{r.title}</span>
+                        <span className="block text-[12.5px] leading-[18px] text-ink">{r.title}</span>
                         <span className="font-mono text-[11px] text-ink-mute">{r.recordDate}</span>
                       </span>
                       <span className={cn('shrink-0 rounded-full px-1.5 py-0.5 text-[10.5px] font-medium', st.className)}>

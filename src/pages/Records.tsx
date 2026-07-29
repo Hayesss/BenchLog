@@ -112,7 +112,7 @@ function GroupHeader({
         className="flex min-w-0 flex-1 items-center gap-2.5 py-1 text-left"
       >
         <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
-        <h2 className="truncate font-display text-[15px] font-semibold tracking-[0.01em] text-ink">
+        <h2 className="min-w-0 font-display text-[15px] font-semibold tracking-[0.01em] text-ink">
           {title}
         </h2>
         <span className="shrink-0 font-mono text-[11.5px] text-ink-mute">{count} 条</span>
@@ -186,14 +186,14 @@ function FilterControls({
               type="button"
               onClick={() => toggleProject(p.id)}
               className={cn(
-                'flex h-9 items-center gap-2.5 rounded-lg px-3 text-[13px] transition-colors duration-150',
+                'flex min-h-[2.25rem] items-center gap-2.5 rounded-lg px-3 py-1.5 text-[13px] transition-colors duration-150',
                 selectedProjects.includes(p.id)
                   ? 'bg-bench-wash text-bench-ink'
                   : 'text-ink-soft hover:bg-paper',
               )}
             >
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
-              <span className="flex-1 truncate text-left">{p.name}</span>
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
+              <span className="min-w-0 flex-1 text-left leading-[18px]">{p.name}</span>
               {selectedProjects.includes(p.id) && <span className="text-bench">✓</span>}
             </button>
           ))}
@@ -618,7 +618,7 @@ export default function Records() {
                         className="h-2 w-2 shrink-0 rounded-full"
                         style={{ backgroundColor: p.color }}
                       />
-                      <span className="truncate">{p.name}</span>
+                      <span className="min-w-0 leading-[18px]">{p.name}</span>
                     </DropdownMenuCheckboxItem>
                   ))}
                   <DropdownMenuSeparator />
