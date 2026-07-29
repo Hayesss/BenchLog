@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { motion } from 'framer-motion'
 import {
   BookOpen,
@@ -174,8 +174,14 @@ function GuideBanner() {
   )
 }
 
+type BioTab = 'analyses' | 'skills' | 'guide'
+
 export default function Bioinfo() {
-  const [tab, setTab] = useState<'analyses' | 'skills' | 'guide'>('analyses')
+  // 页签支持 URL 深链接：/bioinfo?tab=skills|guide（命令面板/外链直达）
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const tab: BioTab = tabParam === 'skills' || tabParam === 'guide' ? tabParam : 'analyses'
+  const setTab = (t: BioTab) => setSearchParams(t === 'analyses' ? {} : { tab: t }, { replace: true })
   const [projectId, setProjectId] = useState<number | undefined>(undefined)
   const [status, setStatus] = useState<BioStatus | undefined>(undefined)
 

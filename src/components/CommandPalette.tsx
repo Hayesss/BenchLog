@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   BookMarked,
+  BookOpen,
   CalendarDays,
   CheckSquare,
   FileDown,
   FlaskConical,
   Folder,
   LayoutDashboard,
+  Lightbulb,
   NotebookPen,
   Search,
   SquareTerminal,
@@ -32,6 +34,8 @@ const NAV_PAGES: Hit[] = [
   { group: '页面', icon: BookMarked, label: '方法库', to: '/library' },
   { group: '页面', icon: NotebookPen, label: '湿实验记录', to: '/records' },
   { group: '页面', icon: SquareTerminal, label: '生信分析', to: '/bioinfo' },
+  { group: '页面', icon: Lightbulb, label: '生信技能库', to: '/bioinfo?tab=skills' },
+  { group: '页面', icon: BookOpen, label: '生信学习指南', to: '/bioinfo?tab=guide' },
   { group: '页面', icon: CalendarDays, label: '实验安排', to: '/schedule' },
   { group: '页面', icon: FileDown, label: '汇报导出', to: '/export' },
 ]
