@@ -3,9 +3,14 @@ import { and, asc, eq, like, or, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { methodChapters, methodEntries, protocols, protocolVersions } from "@db/schema";
+import {
+  methodChapters,
+  methodEntries,
+  protocols,
+  protocolVersions,
+} from "@db/schema";
 
-/** 列表项（瘦身，不含 steps/purpose/principle 大字段） */
+/** 列表项（含 steps/purpose 供悬停浮窗预览；principle 仅详情页返回） */
 const entryListColumns = {
   id: methodEntries.id,
   entryId: methodEntries.entryId,
@@ -18,6 +23,7 @@ const entryListColumns = {
   year: methodEntries.year,
   doi: methodEntries.doi,
   purpose: methodEntries.purpose,
+  steps: methodEntries.steps,
 } as const;
 
 type Db = ReturnType<typeof getDb>;
@@ -33,7 +39,7 @@ async function createProtocolFromEntry(
   db: Db,
   userId: number,
   entry: MethodEntryRow,
-  chapterTitle: string,
+  chapterTitle: string
 ): Promise<number> {
   const description = [
     entry.source ?? "",
@@ -58,14 +64,17 @@ async function createProtocolFromEntry(
     stepGroups: [
       {
         title: "核心步骤概要",
-        steps: entry.steps.map((text) => ({ text })),
+        steps: entry.steps.map(text => ({ text })),
       },
     ],
     params: [],
-    tags: [entry.journal, chapterTitle].map((t) => t.trim()).filter(Boolean),
+    tags: [entry.journal, chapterTitle].map(t => t.trim()).filter(Boolean),
   };
 
-  const [{ id }] = await db.insert(protocols).values(protocolInput).$returningId();
+  const [{ id }] = await db
+    .insert(protocols)
+    .values(protocolInput)
+    .$returningId();
   await db.insert(protocolVersions).values({
     protocolId: id,
     userId,
@@ -93,12 +102,18 @@ export const libraryRouter = createRouter({
     const [chapters, counts] = await Promise.all([
       db.select().from(methodChapters).orderBy(asc(methodChapters.chapterNo)),
       db
-        .select({ chapterNo: methodEntries.chapterNo, count: sql<number>`count(*)` })
+        .select({
+          chapterNo: methodEntries.chapterNo,
+          count: sql<number>`count(*)`,
+        })
         .from(methodEntries)
         .groupBy(methodEntries.chapterNo),
     ]);
-    const countMap = new Map(counts.map((c) => [c.chapterNo, Number(c.count)]));
-    return chapters.map((c) => ({ ...c, entryCount: countMap.get(c.chapterNo) ?? 0 }));
+    const countMap = new Map(counts.map(c => [c.chapterNo, Number(c.count)]));
+    return chapters.map(c => ({
+      ...c,
+      entryCount: countMap.get(c.chapterNo) ?? 0,
+    }));
   }),
 
   /** 条目列表：按章节过滤，或按关键词在名称/小节/期刊/来源上模糊搜索 */
@@ -107,7 +122,7 @@ export const libraryRouter = createRouter({
       z.object({
         chapterNo: z.number().int().optional(),
         q: z.string().optional(),
-      }),
+      })
     )
     .query(async ({ input }) => {
       const db = getDb();
@@ -121,8 +136,8 @@ export const libraryRouter = createRouter({
             like(methodEntries.nameEn, pattern),
             like(methodEntries.section, pattern),
             like(methodEntries.journal, pattern),
-            like(methodEntries.source, pattern),
-          ),
+            like(methodEntries.source, pattern)
+          )
         );
       } else if (input.chapterNo != null) {
         conds.push(eq(methodEntries.chapterNo, input.chapterNo));
@@ -133,18 +148,25 @@ export const libraryRouter = createRouter({
         .where(conds.length ? and(...conds) : undefined)
         .orderBy(asc(methodEntries.chapterNo), asc(methodEntries.entryId))
         .limit(200);
-      // 列表瘦身：去掉 purpose 原文，仅保留卡片摘要
-      return rows.map(({ purpose, ...rest }) => ({
-        ...rest,
-        purposeExcerpt: (purpose ?? "").slice(0, 140),
+      // 卡片用摘要 + 浮窗用完整 purpose/steps
+      return rows.map(row => ({
+        ...row,
+        purpose: row.purpose ?? "",
+        steps: Array.isArray(row.steps) ? row.steps : [],
+        purposeExcerpt: (row.purpose ?? "").slice(0, 140),
       }));
     }),
 
   /** 条目详情（完整字段） */
-  entry: authedQuery.input(z.object({ id: z.number() })).query(async ({ input }) => {
-    const rows = await getDb().select().from(methodEntries).where(eq(methodEntries.id, input.id));
-    return rows[0] ?? null;
-  }),
+  entry: authedQuery
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const rows = await getDb()
+        .select()
+        .from(methodEntries)
+        .where(eq(methodEntries.id, input.id));
+      return rows[0] ?? null;
+    }),
 
   /** 把方法库条目存为当前用户的 Protocol（pointer 条目拒绝导入） */
   importAsProtocol: authedQuery
@@ -152,7 +174,10 @@ export const libraryRouter = createRouter({
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
       const entry = (
-        await db.select().from(methodEntries).where(eq(methodEntries.id, input.id))
+        await db
+          .select()
+          .from(methodEntries)
+          .where(eq(methodEntries.id, input.id))
       )[0];
       if (!entry) {
         throw new TRPCError({ code: "NOT_FOUND", message: "未找到该方法条目" });
@@ -171,7 +196,12 @@ export const libraryRouter = createRouter({
           .where(eq(methodChapters.chapterNo, entry.chapterNo))
       )[0];
 
-      const id = await createProtocolFromEntry(db, ctx.user.id, entry, chapter?.title ?? "");
+      const id = await createProtocolFromEntry(
+        db,
+        ctx.user.id,
+        entry,
+        chapter?.title ?? ""
+      );
       return { id };
     }),
 
@@ -193,7 +223,12 @@ export const libraryRouter = createRouter({
       const entries = await db
         .select()
         .from(methodEntries)
-        .where(and(eq(methodEntries.chapterNo, input.chapterNo), eq(methodEntries.type, "full")))
+        .where(
+          and(
+            eq(methodEntries.chapterNo, input.chapterNo),
+            eq(methodEntries.type, "full")
+          )
+        )
         .orderBy(asc(methodEntries.entryId));
 
       // 该用户现有协议名集合，同名（截断 255 后精确匹配）跳过
@@ -201,7 +236,7 @@ export const libraryRouter = createRouter({
         .select({ name: protocols.name })
         .from(protocols)
         .where(eq(protocols.userId, ctx.user.id));
-      const existingNames = new Set(existing.map((r) => r.name));
+      const existingNames = new Set(existing.map(r => r.name));
 
       let imported = 0;
       let skipped = 0;
