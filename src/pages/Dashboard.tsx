@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils'
 import { trpc } from '@/providers/trpc'
 import ActivityCalendar from '@/components/dashboard/ActivityCalendar'
+import PinStarButton from '@/components/protocols/PinStarButton'
 import type { inferRouterOutputs } from '@trpc/server'
 import type { AppRouter } from '../../api/router'
 
@@ -607,12 +608,18 @@ function RecentRecords({ records }: { records: RecordRow[] }) {
   )
 }
 
-/** 区块 7：常用方法（按使用次数排序，trpc.protocol.list） */
+/** 区块 7：常用方法（星标置顶优先，其余按使用次数；trpc.protocol.list） */
 function FrequentProtocols({ protocols }: { protocols: ProtocolRow[] }) {
-  const items = useMemo(
-    () => [...protocols].sort((a, b) => b.useCount - a.useCount).slice(0, 4),
-    [protocols],
-  )
+  const items = useMemo(() => {
+    const ts = (d: Date | string | null) => (d ? new Date(d).getTime() : 0)
+    return [...protocols]
+      .sort((a, b) => {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+        if (a.pinned && b.pinned) return ts(b.pinnedAt) - ts(a.pinnedAt)
+        return b.useCount - a.useCount
+      })
+      .slice(0, 4)
+  }, [protocols])
   if (items.length === 0) return null
   return (
     <section>
@@ -620,15 +627,19 @@ function FrequentProtocols({ protocols }: { protocols: ProtocolRow[] }) {
         <h2 className="font-display text-[18px] font-semibold leading-[26px] text-ink md:text-[20px] md:leading-[28px]">
           常用方法
         </h2>
-        <p className="caption-en mt-0.5">Frequent Methods</p>
+        <div className="mt-0.5 flex items-baseline gap-2">
+          <p className="caption-en">Frequent Methods</p>
+          <span className="text-[11px] text-ink-mute">星标置顶优先，其余按使用次数</span>
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
         {items.map((p) => (
           <Link
             key={p.id}
             to={`/protocols/${p.id}`}
-            className="group flex flex-col gap-2.5 rounded-lg border border-line bg-surface p-4 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover"
+            className="group relative flex flex-col gap-2.5 rounded-lg border border-line bg-surface p-4 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover"
           >
+            <PinStarButton id={p.id} pinned={p.pinned} className="absolute right-2 top-2" />
             <span
               className="flex h-10 w-10 items-center justify-center rounded-full"
               style={{ backgroundColor: `${p.color}1F` }}

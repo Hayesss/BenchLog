@@ -86,6 +86,8 @@ export const protocols = mysqlTable(
     params: json("params").$type<ProtocolParam[]>().notNull(),
     tags: json("tags").$type<string[]>().notNull(),
     useCount: int("useCount").notNull().default(0),
+    pinned: boolean("pinned").notNull().default(false), // 星标置顶：工作台「常用方法」手动钉选
+    pinnedAt: timestamp("pinnedAt"), // 置顶时间（置顶项按此倒序）
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt")
       .defaultNow()

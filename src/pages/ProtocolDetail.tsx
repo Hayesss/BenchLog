@@ -39,6 +39,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import ProtocolCharTitle from '@/components/protocols/ProtocolCharTitle'
 import ProtocolEditorDialog from '@/components/protocols/ProtocolEditorDialog'
+import PinStarButton from '@/components/protocols/PinStarButton'
 import ProtocolMaterials from '@/components/protocols/ProtocolMaterials'
 import ProtocolSteps, { stepKey } from '@/components/protocols/ProtocolSteps'
 import ProtocolTagChip, { useProtocolTagColors } from '@/components/protocols/ProtocolTagChip'
@@ -302,6 +303,9 @@ export default function ProtocolDetail() {
             viewing={content.version}
             onSelect={selectVersion}
           />
+          <span className="group flex items-center">
+            <PinStarButton id={protocol.id} pinned={protocol.pinned} className="!opacity-100 border border-line bg-surface shadow-card" />
+          </span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button

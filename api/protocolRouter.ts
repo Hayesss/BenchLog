@@ -153,6 +153,17 @@ export const protocolRouter = createRouter({
       return { ok: true };
     }),
 
+  /** 星标置顶：工作台「常用方法」钉选/取消 */
+  setPinned: authedQuery
+    .input(z.object({ id: z.number(), pinned: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await getDb()
+        .update(protocols)
+        .set({ pinned: input.pinned, pinnedAt: input.pinned ? new Date() : null })
+        .where(and(eq(protocols.id, input.id), eq(protocols.userId, ctx.user.id)));
+      return { ok: true };
+    }),
+
   /** 导入预置模板（同名跳过） */
   seedTemplates: authedQuery.mutation(async ({ ctx }) => {
     const db = getDb();

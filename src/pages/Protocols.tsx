@@ -47,6 +47,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import ProtocolCharTitle from '@/components/protocols/ProtocolCharTitle'
 import ProtocolEditorDialog from '@/components/protocols/ProtocolEditorDialog'
+import PinStarButton from '@/components/protocols/PinStarButton'
 import ProtocolTagChip, { useProtocolTagColors } from '@/components/protocols/ProtocolTagChip'
 import ProtocolToaster from '@/components/protocols/ProtocolToaster'
 import {
@@ -697,7 +698,8 @@ function GridCard({
         {p.tags.map((t) => (
           <ProtocolTagChip key={t} name={t} color={tagColors.get(t)} />
         ))}
-        <div className="ml-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="ml-auto flex items-center" onClick={(e) => e.stopPropagation()}>
+          {!isTemplate && <PinStarButton id={p.id} pinned={p.pinned} />}
           <ProtocolCardMenu p={p} onDuplicate={onDuplicate} onDelete={onDelete} />
         </div>
       </div>
