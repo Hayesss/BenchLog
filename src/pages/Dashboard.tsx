@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { trpc } from '@/providers/trpc'
+import ActivityCalendar from '@/components/dashboard/ActivityCalendar'
 import type { inferRouterOutputs } from '@trpc/server'
 import type { AppRouter } from '../../api/router'
 
@@ -739,6 +740,7 @@ export default function Dashboard() {
       </div>
 
       <div className="flex flex-col gap-10">
+        <ActivityCalendar />
         <RecentRecords records={recordsQ.data ?? []} />
         <FrequentProtocols protocols={protocolsQ.data ?? []} />
       </div>

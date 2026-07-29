@@ -6,6 +6,7 @@ import { recordRouter, imageRouter } from "./recordRouter";
 import { flowRouter, todoRouter } from "./scheduleRouter";
 import { searchRouter, exportLogRouter } from "./searchRouter";
 import { libraryRouter } from "./libraryRouter";
+import { activityRouter } from "./activityRouter";
 
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
@@ -20,6 +21,7 @@ export const appRouter = createRouter({
   search: searchRouter,
   exportLog: exportLogRouter,
   library: libraryRouter,
+  activity: activityRouter,
 });
 
 export type AppRouter = typeof appRouter;

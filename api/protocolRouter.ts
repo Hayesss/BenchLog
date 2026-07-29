@@ -5,6 +5,7 @@ import { getDb } from "./queries/connection";
 import { protocols, protocolVersions, type ProtocolSnapshot } from "@db/schema";
 import { materialSchema, stepGroupSchema, paramSchema } from "./zodSchemas";
 import { PROTOCOL_TEMPLATES } from "@contracts/protocol-templates";
+import { bumpProtocolUse } from "./lib/activity";
 
 const protocolContentInput = {
   name: z.string().min(1),
@@ -148,6 +149,7 @@ export const protocolRouter = createRouter({
         .update(protocols)
         .set({ useCount: sql`${protocols.useCount} + 1` })
         .where(and(eq(protocols.id, input.id), eq(protocols.userId, ctx.user.id)));
+      bumpProtocolUse(ctx.user.id);
       return { ok: true };
     }),
 

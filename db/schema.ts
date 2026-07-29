@@ -11,6 +11,7 @@ import {
   int,
   json,
   index,
+  uniqueIndex,
 } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
@@ -240,6 +241,25 @@ export type ExportLog = typeof exportLogs.$inferSelect;
 /* ------------------------------------------------------------------ */
 
 /** 方法库章节（12 章） */
+/** 用户每日活动（活跃日历：登录打点 + 协议使用计数；记录数查询端实时聚合） */
+export const userActivity = mysqlTable(
+  "user_activity",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+    date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD（MySQL CURDATE，与 createdAt 同时区）
+    logins: int("logins").notNull().default(0), // 当日认证请求打点数（≥1 即当日活跃登录）
+    protocolsUsed: int("protocolsUsed").notNull().default(0), // 当日协议使用次数
+    exports: int("exports").notNull().default(0), // 当日导出次数（预留）
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [uniqueIndex("user_activity_user_date_uidx").on(t.userId, t.date)],
+);
+export type UserActivity = typeof userActivity.$inferSelect;
+
 export const methodChapters = mysqlTable("method_chapters", {
   id: serial("id").primaryKey(),
   chapterNo: int("chapterNo").notNull().unique(),

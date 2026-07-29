@@ -2,6 +2,7 @@ import { ErrorMessages } from "@contracts/constants";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
+import { bumpActive } from "./lib/activity";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -19,6 +20,9 @@ const requireAuth = t.middleware(async (opts) => {
       message: ErrorMessages.unauthenticated,
     });
   }
+
+  // 每日活跃打点（fire-and-forget，不阻塞请求）
+  bumpActive(ctx.user.id);
 
   return next({ ctx: { ...ctx, user: ctx.user } });
 });
