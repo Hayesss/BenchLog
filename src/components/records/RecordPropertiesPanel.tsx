@@ -207,7 +207,7 @@ export default function RecordPropertiesPanel({
       </Row>
 
       {/* protocol + version lock */}
-      <Row label="关联协议">
+      <Row label="关联方法">
         <div className="flex items-center gap-1.5">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -218,14 +218,14 @@ export default function RecordPropertiesPanel({
                 {protocol ? (
                   <span className="min-w-0 font-medium leading-[18px] text-bench">{protocol.name}</span>
                 ) : (
-                  <span className="text-ink-mute">不关联协议</span>
+                  <span className="text-ink-mute">不关联方法</span>
                 )}
                 <ChevronDown className="ml-auto h-3 w-3 shrink-0 text-ink-mute" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-64">
               <DropdownMenuItem onSelect={() => onProtocolChange(null)} className="text-[13px]">
-                不关联协议
+                不关联方法
               </DropdownMenuItem>
               {protocols.map((p) => (
                 <DropdownMenuItem
@@ -353,7 +353,7 @@ export default function RecordPropertiesPanel({
 }
 
 /* ------------------------------------------------------------------ */
-/* 协议快照卡                                                           */
+/* 方法快照卡                                                           */
 /* ------------------------------------------------------------------ */
 export function RecordProtocolSnapshotCard({
   protocol,
@@ -395,14 +395,14 @@ export function RecordProtocolSnapshotCard({
       )}
       {stale && (
         <div className="mt-3 rounded-lg border border-warning/30 bg-[#B98A3E12] px-3 py-2 text-[12px] leading-5 text-warning">
-          协议已更新至 {protocol.version}，本记录锚定 {anchoredVersion} 快照（保证科学可溯）
+          方法已更新至 {protocol.version}，本记录锚定 {anchoredVersion} 快照（保证科学可溯）
         </div>
       )}
       <Link
         to={`/protocols/${protocol.id}`}
         className="mt-3 inline-block text-[12.5px] font-medium text-bench transition-colors duration-150 hover:text-bench-deep hover:underline"
       >
-        查看完整协议 →
+        查看完整方法 →
       </Link>
     </div>
   )

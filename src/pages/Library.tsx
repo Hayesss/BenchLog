@@ -385,7 +385,7 @@ export default function Library() {
               整章导入为 Protocol？
             </AlertDialogTitle>
             <AlertDialogDescription className="text-[13px] text-ink-soft">
-              将把本章 {fullCount} 个完整条目导入你的协议库，同名协议自动跳过。
+              将把本章 {fullCount} 个完整条目导入你的实验方法（/protocols 页），同名方法自动跳过。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

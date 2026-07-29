@@ -230,7 +230,7 @@ export default function ExportScopeCard({
                 ))}
               </div>
             ) : allRecords.length === 0 ? (
-              <p className="p-3 text-[12px] text-ink-mute">还没有实验记录</p>
+              <p className="p-3 text-[12px] text-ink-mute">还没有湿实验记录</p>
             ) : (
               allRecords.map((r) => {
                 const checked = manualIds?.includes(r.id) ?? false

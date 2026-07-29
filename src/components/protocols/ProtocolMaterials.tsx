@@ -64,7 +64,7 @@ export default function ProtocolMaterials({
           <span>用量</span>
         </div>
         {materials.length === 0 && (
-          <p className="px-3 py-4 text-[12.5px] text-ink-mute">本协议未列出材料。</p>
+          <p className="px-3 py-4 text-[12.5px] text-ink-mute">本方法未列出材料。</p>
         )}
         {materials.map((m, i) => {
           const key = `m${i}`

@@ -73,8 +73,8 @@ const LABEL = 'mb-1 block text-[11.5px] font-medium tracking-[0.04em] text-ink-m
 const SECTION = 'border-t border-line pt-4'
 
 const TITLES: Record<ProtocolEditorMode, string> = {
-  create: '新建协议',
-  edit: '编辑协议',
+  create: '新建方法',
+  edit: '编辑方法',
   publish: '发布新版本',
 }
 const SUBTITLES: Record<ProtocolEditorMode, string> = {
@@ -150,7 +150,7 @@ export default function ProtocolEditorDialog({
 
   async function submit() {
     if (!draft.name.trim()) {
-      toast.error('请填写协议名称')
+      toast.error('请填写方法名称')
       return
     }
     const clean = {
@@ -170,13 +170,13 @@ export default function ProtocolEditorDialog({
       if (mode === 'create') {
         const { id } = await createMut.mutateAsync({ ...clean, version: version.trim() || 'v1.0' })
         await utils.protocol.list.invalidate()
-        toast.success('协议已创建，初始版本 v1.0 已快照')
+        toast.success('方法已创建，初始版本 v1.0 已快照')
         onOpenChange(false)
         onCreated?.(id)
       } else if (mode === 'edit' && protocol) {
         await updateMut.mutateAsync({ id: protocol.id, ...clean })
         await Promise.all([utils.protocol.list.invalidate(), utils.protocol.byId.invalidate({ id: protocol.id })])
-        toast.success('协议已更新')
+        toast.success('方法已更新')
         onOpenChange(false)
       } else if (mode === 'publish' && protocol) {
         await saveVersionMut.mutateAsync({ id: protocol.id, note: note.trim() || undefined })
@@ -234,7 +234,7 @@ export default function ProtocolEditorDialog({
           {/* 基本信息 */}
           <div className="space-y-3">
             <div>
-              <label className={LABEL}>协议名称 *</label>
+              <label className={LABEL}>方法名称 *</label>
               <input
                 className={INPUT}
                 value={draft.name}
@@ -567,7 +567,7 @@ export default function ProtocolEditorDialog({
             onClick={submit}
             className="h-9 rounded-lg bg-bench px-4 text-[13px] font-medium text-white shadow-card transition-all duration-150 hover:-translate-y-px hover:bg-bench-deep active:scale-[0.97] disabled:opacity-60"
           >
-            {saving ? '保存中…' : mode === 'publish' ? `发布 ${version}` : mode === 'create' ? '创建协议' : '保存修改'}
+            {saving ? '保存中…' : mode === 'publish' ? `发布 ${version}` : mode === 'create' ? '创建方法' : '保存修改'}
           </button>
         </DialogFooter>
       </DialogContent>

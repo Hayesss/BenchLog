@@ -389,7 +389,7 @@ function TablePreview({ records, opts }: { records: ExportRecord[]; opts: Report
       <table className="w-full min-w-[760px] border-collapse text-[12.5px]">
         <thead className="sticky top-0">
           <tr className="bg-paper text-left text-ink-mute">
-            {['日期', '项目', '标题', '协议', '状态', '参数偏离', '结论', '下一步'].map((h) => (
+            {['日期', '项目', '标题', '方法', '状态', '参数偏离', '结论', '下一步'].map((h) => (
               <th key={h} className="whitespace-nowrap border-b border-line-strong px-2.5 py-2 font-medium">
                 {h}
               </th>
@@ -602,7 +602,7 @@ function PdfCoverPage({
       <div className="flex flex-1 flex-col justify-center py-10">
         <p className="caption-en">EXPERIMENT RECORD ARCHIVE</p>
         <h1 className="mt-2 font-display text-[28px] font-bold leading-[38px] text-ink">
-          实验记录存档报告
+          湿实验记录存档报告
         </h1>
         <p className="mt-3 font-mono text-[12.5px] text-ink-mute">
           归档人：{an(meta.researcher)} · 周期：{meta.rangeLabel}
@@ -722,13 +722,13 @@ export default function ReportPaper({
               这个范围内还没有记录
             </h3>
             <p className="mt-1 text-[12.5px] text-ink-mute">
-              调整汇报范围，或先去补一条实验记录
+              调整汇报范围，或先去补一条湿实验记录
             </p>
             <Link
               to="/records"
               className="mt-4 flex h-9 items-center rounded-lg bg-bench px-4 text-[13px] font-medium text-white shadow-card transition-all duration-150 hover:-translate-y-px hover:bg-bench-deep active:scale-[0.97]"
             >
-              前往实验记录
+              前往湿实验记录
             </Link>
           </div>
         ) : (

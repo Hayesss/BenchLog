@@ -363,7 +363,7 @@ export default function ProtocolSteps({
       </div>
       {groups.length === 0 ? (
         <p className="rounded-lg border border-dashed border-line-strong px-4 py-6 text-center text-[12.5px] text-ink-mute">
-          本协议尚未录入步骤。
+          本方法尚未录入步骤。
         </p>
       ) : (
         <div className="space-y-3">

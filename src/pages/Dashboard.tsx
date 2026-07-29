@@ -421,7 +421,7 @@ function FlowsCard({ flows }: { flows: FlowRow[] }) {
 function QuickCreate() {
   const items = [
     { label: '新建记录', icon: NotebookPen, to: '/records/new' },
-    { label: '新建协议', icon: FlaskConical, to: '/protocols' },
+    { label: '新建方法', icon: FlaskConical, to: '/protocols' },
     { label: '安排实验', icon: CalendarDays, to: '/schedule' },
     { label: '拍照上传', icon: Camera, to: '/records/new' },
   ]
@@ -529,7 +529,7 @@ function WeekMini({ flows, weekTodos }: { flows: FlowRow[]; weekTodos: TodoRow[]
   )
 }
 
-/** 区块 6：最近实验记录（trpc.record.list 最新 3 条） */
+/** 区块 6：最近湿实验记录（trpc.record.list 最新 3 条） */
 function RecentRecords({ records }: { records: RecordRow[] }) {
   const items = records.slice(0, 3)
   return (
@@ -537,9 +537,9 @@ function RecentRecords({ records }: { records: RecordRow[] }) {
       <div className="mb-4 flex items-baseline justify-between">
         <div>
           <h2 className="font-display text-[18px] font-semibold leading-[26px] text-ink md:text-[20px] md:leading-[28px]">
-            最近实验记录
+            最近湿实验记录
           </h2>
-          <p className="caption-en mt-0.5">Recent Records</p>
+          <p className="caption-en mt-0.5">Recent Wet-lab</p>
         </div>
         <Link to="/records" className="text-[12.5px] text-bench hover:text-bench-deep">
           全部记录 →
@@ -547,7 +547,7 @@ function RecentRecords({ records }: { records: RecordRow[] }) {
       </div>
       {items.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-lg border border-line bg-surface py-10 shadow-card">
-          <p className="text-[13px] text-ink-mute">还没有实验记录</p>
+          <p className="text-[13px] text-ink-mute">还没有湿实验记录</p>
           <Link
             to="/records/new"
             className="rounded-lg bg-bench px-4 py-2 text-[13px] font-medium text-white shadow-card transition-colors duration-150 hover:bg-bench-deep"
@@ -617,7 +617,7 @@ function RecentRecords({ records }: { records: RecordRow[] }) {
   )
 }
 
-/** 区块 7：常用协议（按使用次数排序，trpc.protocol.list） */
+/** 区块 7：常用方法（按使用次数排序，trpc.protocol.list） */
 function FrequentProtocols({ protocols }: { protocols: ProtocolRow[] }) {
   const items = useMemo(
     () => [...protocols].sort((a, b) => b.useCount - a.useCount).slice(0, 4),
@@ -628,9 +628,9 @@ function FrequentProtocols({ protocols }: { protocols: ProtocolRow[] }) {
     <section>
       <div className="mb-4">
         <h2 className="font-display text-[18px] font-semibold leading-[26px] text-ink md:text-[20px] md:leading-[28px]">
-          常用协议
+          常用方法
         </h2>
-        <p className="caption-en mt-0.5">Frequent Protocols</p>
+        <p className="caption-en mt-0.5">Frequent Methods</p>
       </div>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
         {items.map((p) => (
@@ -655,7 +655,7 @@ function FrequentProtocols({ protocols }: { protocols: ProtocolRow[] }) {
           to="/protocols"
           className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-line-strong p-4 text-ink-mute transition-colors duration-200 hover:border-bench hover:text-bench"
         >
-          <span className="text-[13px] font-medium">浏览全部协议</span>
+          <span className="text-[13px] font-medium">浏览全部方法</span>
           <ArrowRight className="h-4 w-4" />
         </Link>
       </div>

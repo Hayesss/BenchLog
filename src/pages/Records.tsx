@@ -506,8 +506,8 @@ export default function Records() {
         className="flex flex-wrap items-end justify-between gap-3"
       >
         <div>
-          <h1 className="font-display text-[24px] font-bold text-ink md:text-[30px]">实验记录</h1>
-          <p className="caption-en mt-1">Records</p>
+          <h1 className="font-display text-[24px] font-bold text-ink md:text-[30px]">湿实验记录</h1>
+          <p className="caption-en mt-1">Wet Lab</p>
           <p className="mt-2 font-mono text-[12.5px] text-ink-mute">
             共 {stats.total} 条记录 · 本月 {stats.month} 条 · {stats.ongoing} 条进行中
           </p>
@@ -845,10 +845,10 @@ export default function Records() {
         >
           <img src="/empty-records.svg" alt="" className="w-[240px] max-w-full opacity-90" />
           <h2 className="mt-6 font-display text-[20px] font-semibold text-ink">
-            还没有实验记录
+            还没有湿实验记录
           </h2>
           <p className="mt-2 max-w-[360px] text-[13px] leading-6 text-ink-mute">
-            从一条协议开始你的第一次记录，每条记录都会锚定协议版本
+            从一条方法开始你的第一次记录，每条记录都会锚定方法版本
           </p>
           <div className="mt-6 flex items-center gap-3">
             <Link
@@ -862,7 +862,7 @@ export default function Records() {
               to="/protocols"
               className="text-[13.5px] font-medium text-bench transition-colors duration-150 hover:text-bench-deep hover:underline"
             >
-              浏览协议库 →
+              浏览实验方法 →
             </Link>
           </div>
         </motion.div>

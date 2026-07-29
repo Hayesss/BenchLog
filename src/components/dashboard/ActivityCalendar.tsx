@@ -50,7 +50,7 @@ function tooltipOf(date: string, data?: DayCell): string {
   if (!data || (data.records === 0 && data.protocolsUsed === 0 && data.logins === 0)) return `${head} · 无活动`
   const parts = [`${head}`]
   if (data.records > 0) parts.push(`${data.records} 条记录`)
-  if (data.protocolsUsed > 0) parts.push(`使用协议 ${data.protocolsUsed} 次`)
+  if (data.protocolsUsed > 0) parts.push(`使用方法 ${data.protocolsUsed} 次`)
   if (data.logins > 0) parts.push('已登录')
   return parts.join(' · ')
 }
@@ -110,7 +110,7 @@ export default function ActivityCalendar() {
             记录 <b className="font-medium text-ink">{totalRecords}</b> 条
           </span>
           <span>
-            使用协议 <b className="font-medium text-ink">{totalProtocolsUsed}</b> 次
+            使用方法 <b className="font-medium text-ink">{totalProtocolsUsed}</b> 次
           </span>
         </div>
       </div>

@@ -111,7 +111,7 @@ export function buildGroupMarkdown(
       lines.push(`### ${STATUS_ICON[r.status]} ${recordCode(r)} · ${an(r.title)}`)
       lines.push('')
       lines.push(
-        `- **日期**：${r.recordDate} ｜ **协议**：${an(protocolLabel(r))} ｜ **状态**：${STATUS_LABEL[r.status]}`,
+        `- **日期**：${r.recordDate} ｜ **方法**：${an(protocolLabel(r))} ｜ **状态**：${STATUS_LABEL[r.status]}`,
       )
       if (r.purpose) lines.push(`- **目的**：${an(r.purpose)}`)
       if (r.tags.length) lines.push(`- **标签**：${r.tags.map((t) => `#${an(t)}`).join(' ')}`)
@@ -195,7 +195,7 @@ export function buildGroupMarkdown(
   return lines.join('\n')
 }
 
-const TABLE_COLUMNS = ['日期', '项目', '标题', '协议', '状态', '参数偏离', '结论', '下一步'] as const
+const TABLE_COLUMNS = ['日期', '项目', '标题', '方法', '状态', '参数偏离', '结论', '下一步'] as const
 
 function deviationSummary(r: ExportRecord, opts: ReportOptions): string {
   if (!opts.includeDeviations || r.deviations.length === 0) return ''

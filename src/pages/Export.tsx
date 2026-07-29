@@ -371,7 +371,7 @@ export default function Export() {
           </h1>
           <p className="caption-en mt-1">Export &amp; Archive</p>
           <p className="mt-2 text-[13px] text-ink-mute">
-            把实验记录变成一页清晰的组会汇报，或归档为 PDF 长存。
+            把湿实验记录变成一页清晰的组会汇报，或归档为 PDF 长存。
           </p>
         </div>
         <button

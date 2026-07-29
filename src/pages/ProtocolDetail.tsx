@@ -188,7 +188,7 @@ export default function ProtocolDetail() {
         version: 'v1.0',
       })
       await utils.protocol.list.invalidate()
-      toast.success('已复制为我的协议')
+      toast.success('已复制为我的方法')
       navigate(`/protocols/${newId}`)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '复制失败')
@@ -234,7 +234,7 @@ export default function ProtocolDetail() {
       <div className="mx-auto flex w-full max-w-[1080px] flex-col items-center px-4 py-24 md:px-8">
         <ProtocolToaster />
         <img src="/empty-protocols.svg" alt="" className="h-[180px] w-[240px] object-contain" />
-        <h1 className="mt-4 font-display text-[20px] font-semibold text-ink">协议不存在或已归档</h1>
+        <h1 className="mt-4 font-display text-[20px] font-semibold text-ink">方法不存在或已归档</h1>
         <Link
           to="/protocols"
           className="mt-4 flex h-9 items-center rounded-lg bg-bench px-4 text-[13px] font-medium text-white shadow-card transition-all duration-150 hover:-translate-y-px hover:bg-bench-deep"
@@ -314,7 +314,7 @@ export default function ProtocolDetail() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 rounded-lg border-line">
               <DropdownMenuItem className="cursor-pointer gap-2" onSelect={() => setEditOpen(true)}>
-                <Pencil className="h-4 w-4" /> 编辑协议
+                <Pencil className="h-4 w-4" /> 编辑方法
               </DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer gap-2" onSelect={() => setPublishOpen(true)}>
                 <Rocket className="h-4 w-4" /> 发布新版本
@@ -547,7 +547,7 @@ export default function ProtocolDetail() {
                     onClick={createRecordFromProtocol}
                     className="mt-2 flex h-9 w-full items-center justify-center gap-1 rounded-lg border border-line bg-surface text-[12.5px] font-medium text-bench shadow-card transition-colors duration-150 hover:bg-bench-wash"
                   >
-                    基于此协议新建记录
+                    基于此方法新建记录
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </>
@@ -706,7 +706,7 @@ export default function ProtocolDetail() {
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent className="rounded-xl border-line">
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-display text-[18px]">归档该协议？</AlertDialogTitle>
+            <AlertDialogTitle className="font-display text-[18px]">归档该方法？</AlertDialogTitle>
             <AlertDialogDescription className="text-[13px] text-ink-soft">
               「{protocol.name}」及其全部版本历史将被移除。此操作不可撤销。
             </AlertDialogDescription>

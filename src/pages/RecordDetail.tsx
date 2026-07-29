@@ -228,7 +228,7 @@ export default function RecordDetail() {
       (d) => d.param.trim() || d.defaultValue.trim() || d.actualValue.trim(),
     )
     return {
-      title: form.title.trim() || '未命名实验记录',
+      title: form.title.trim() || '未命名湿实验记录',
       recordDate: form.recordDate,
       purpose: form.purpose.trim() || undefined,
       projectId: form.projectId,
@@ -324,7 +324,7 @@ export default function RecordDetail() {
         })
       if (!deviationTouched || form.deviations.length === 0) {
         prefill()
-      } else if (window.confirm('切换协议将按新协议的参数表重铺「协议默认」列，确认？')) {
+      } else if (window.confirm('切换方法将按新方法的参数表重铺「方法默认」列，确认？')) {
         setDeviationTouched(false)
         prefill()
       } else {
@@ -338,7 +338,7 @@ export default function RecordDetail() {
     (version: string, paramsForVersion: ProtocolParamLike[]) => {
       const apply = () => {
         const defaults = new Map(paramsForVersion.map((p) => [p.name, paramToDefault(p)]))
-        // refresh the 协议默认 column, keep user-entered actual values
+        // refresh the 方法默认 column, keep user-entered actual values
         const kept = form.deviations
           .filter((d) => defaults.has(d.param))
           .map((d) => ({ ...d, defaultValue: defaults.get(d.param)! }))
@@ -351,7 +351,7 @@ export default function RecordDetail() {
         patch({ protocolVersion: version, deviations: kept })
         setDeviationTouched(false)
       }
-      if (!deviationTouched || window.confirm(`重新锚定到 ${version} 将刷新「协议默认」列，确认？`)) {
+      if (!deviationTouched || window.confirm(`重新锚定到 ${version} 将刷新「方法默认」列，确认？`)) {
         apply()
         setFlashKey((k) => k + 1)
         toast.success(`已重新锚定到 ${version}`)
@@ -364,11 +364,11 @@ export default function RecordDetail() {
   const exportMarkdown = useCallback(() => {
     const images = record?.images ?? []
     const lines: string[] = [
-      `# ${form.title || '未命名实验记录'}`,
+      `# ${form.title || '未命名湿实验记录'}`,
       '',
       `- 日期：${form.recordDate}`,
       record?.protocol
-        ? `- 协议：${record.protocol.name} ${form.protocolVersion ?? ''}（锚定版本）`
+        ? `- 方法：${record.protocol.name} ${form.protocolVersion ?? ''}（锚定版本）`
         : null,
       form.projectId != null && record?.project ? `- 项目：${record.project.name}` : null,
       form.tags.length ? `- 标签：${form.tags.map((t) => `#${t}`).join(' ')}` : null,
@@ -379,7 +379,7 @@ export default function RecordDetail() {
       '',
     ].filter((l): l is string => l != null)
     if (form.deviations.length > 0) {
-      lines.push('## 参数偏离', '', '| 参数 | 协议默认 | 本次实际 | 偏离说明 |', '| --- | --- | --- | --- |')
+      lines.push('## 参数偏离', '', '| 参数 | 方法默认 | 本次实际 | 偏离说明 |', '| --- | --- | --- | --- |')
       for (const d of form.deviations) {
         lines.push(`| ${d.param} | ${d.defaultValue} | ${d.actualValue} | ${d.reason ?? '—'} |`)
       }
@@ -404,7 +404,7 @@ export default function RecordDetail() {
   const duplicate = useCallback(() => {
     localStorage.setItem(
       DRAFT_KEY,
-      JSON.stringify({ ...form, title: `${form.title || '未命名实验记录'}（副本）` }),
+      JSON.stringify({ ...form, title: `${form.title || '未命名湿实验记录'}（副本）` }),
     )
     toast.success('已复制为新记录草稿')
     navigate('/records/new')
@@ -502,7 +502,7 @@ export default function RecordDetail() {
       >
         <nav className="flex min-w-0 items-center text-[12.5px] text-ink-mute">
           <Link to="/records" className="transition-colors duration-150 hover:text-bench">
-            实验记录
+            湿实验记录
           </Link>
           <ChevronRight className="mx-1 h-3.5 w-3.5 shrink-0" />
           {record?.project && (
@@ -617,7 +617,7 @@ export default function RecordDetail() {
             <input
               value={form.title}
               onChange={(e) => patch({ title: e.target.value })}
-              placeholder={isNew ? '未命名实验记录' : '给这次实验起个名字…'}
+              placeholder={isNew ? '未命名湿实验记录' : '给这次实验起个名字…'}
               className="peer w-full border-none bg-transparent pb-2 font-display text-[22px] font-bold leading-[32px] text-ink outline-none placeholder:text-ink-mute md:text-[28px] md:leading-[38px]"
             />
             <span className="absolute bottom-0 left-0 h-[2px] w-full bg-line" aria-hidden />
@@ -655,8 +655,8 @@ export default function RecordDetail() {
               <p className="caption-en">参数偏离 DEVIATIONS</p>
               <span className="text-[11.5px] text-ink-mute">
                 {form.protocolVersion
-                  ? `与协议 ${form.protocolVersion} 默认值的差异，自动对比生成`
-                  : '关联协议后自动铺入默认参数'}
+                  ? `与方法 ${form.protocolVersion} 默认值的差异，自动对比生成`
+                  : '关联方法后自动铺入默认参数'}
               </span>
             </div>
             <RecordDeviationTable

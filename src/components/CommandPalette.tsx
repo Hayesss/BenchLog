@@ -30,7 +30,7 @@ const NAV_PAGES: Hit[] = [
   { group: '页面', icon: LayoutDashboard, label: '工作台', to: '/' },
   { group: '页面', icon: FlaskConical, label: '实验方法', to: '/protocols' },
   { group: '页面', icon: BookMarked, label: '方法库', to: '/library' },
-  { group: '页面', icon: NotebookPen, label: '实验记录', to: '/records' },
+  { group: '页面', icon: NotebookPen, label: '湿实验记录', to: '/records' },
   { group: '页面', icon: SquareTerminal, label: '生信分析', to: '/bioinfo' },
   { group: '页面', icon: CalendarDays, label: '实验安排', to: '/schedule' },
   { group: '页面', icon: FileDown, label: '汇报导出', to: '/export' },
@@ -111,7 +111,7 @@ export default function CommandPalette() {
       })
     for (const r of d.records)
       out.push({
-        group: '实验记录',
+        group: '湿实验记录',
         icon: NotebookPen,
         label: r.title,
         meta: r.recordDate,

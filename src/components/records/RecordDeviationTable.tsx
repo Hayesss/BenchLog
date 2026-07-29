@@ -71,7 +71,7 @@ function EditableCell({
 }
 
 /**
- * 参数偏离表 (record-detail.md §3): 参数 / 协议默认 / 本次实际 / 偏离说明.
+ * 参数偏离表 (record-detail.md §3): 参数 / 方法默认 / 本次实际 / 偏离说明.
  * Rows where actualValue ≠ defaultValue get the amber left bar + 偏离 chip
  * (design.md §8.4). `flashKey` change replays the amber flash (re-anchor).
  */
@@ -94,7 +94,7 @@ export default function RecordDeviationTable({
     <div className="overflow-hidden rounded-lg border border-line bg-surface shadow-card">
       {/* header */}
       <div className="grid grid-cols-[1.1fr_1fr_1fr_1.2fr_32px] items-center gap-1 border-b border-line bg-paper px-3 py-2">
-        {['参数', '协议默认', '本次实际', '偏离说明'].map((h) => (
+        {['参数', '方法默认', '本次实际', '偏离说明'].map((h) => (
           <span key={h} className="px-2 text-[11.5px] font-medium tracking-[0.04em] text-ink-mute">
             {h}
           </span>
@@ -104,7 +104,7 @@ export default function RecordDeviationTable({
 
       {deviations.length === 0 ? (
         <p className="px-5 py-4 text-[12.5px] text-ink-mute">
-          关联协议后会自动铺入默认参数；修改「本次实际」与默认不同即标记为偏离。
+          关联方法后会自动铺入默认参数；修改「本次实际」与默认不同即标记为偏离。
         </p>
       ) : (
         <motion.div key={flashKey}>

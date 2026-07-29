@@ -24,9 +24,9 @@ import CommandPalette, { openCommandPalette } from '@/components/CommandPalette'
 
 const NAV_ITEMS = [
   { to: '/', label: '工作台', en: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/protocols', label: '实验方法', en: 'Protocols', icon: FlaskConical },
+  { to: '/protocols', label: '实验方法', en: 'Methods', icon: FlaskConical },
   { to: '/library', label: '方法库', en: 'Library', icon: BookMarked },
-  { to: '/records', label: '实验记录', en: 'Records', icon: NotebookPen },
+  { to: '/records', label: '湿实验记录', en: 'Wet Lab', icon: NotebookPen },
   { to: '/bioinfo', label: '生信分析', en: 'Bioinfo', icon: SquareTerminal },
   { to: '/schedule', label: '实验安排', en: 'Schedule', icon: CalendarDays },
   { to: '/export', label: '汇报导出', en: 'Export', icon: FileDown },
@@ -218,7 +218,7 @@ function MobileChrome() {
 
       <nav className="fixed inset-x-0 bottom-0 z-50 flex h-14 items-stretch border-t border-line bg-surface md:hidden">
         <MobileTab to="/" icon={LayoutDashboard} label="工作台" end />
-        <MobileTab to="/protocols" icon={FlaskConical} label="协议" />
+        <MobileTab to="/protocols" icon={FlaskConical} label="方法" />
         <div className="relative flex flex-1 items-start justify-center">
           <Link
             to="/records/new"

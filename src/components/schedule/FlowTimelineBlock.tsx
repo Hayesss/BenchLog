@@ -262,7 +262,7 @@ export default function FlowTimelineBlock({
             </li>
           ))}
         </ol>
-        {protocolLabel && <p className="mt-2 text-[11.5px] text-ink-mute">关联协议 {protocolLabel}</p>}
+        {protocolLabel && <p className="mt-2 text-[11.5px] text-ink-mute">关联方法 {protocolLabel}</p>}
         <button
           type="button"
           onClick={(e) => {

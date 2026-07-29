@@ -20,7 +20,7 @@ const TEMPLATES: Array<{
   {
     key: 'table',
     name: '实验汇总表格',
-    desc: '单张宽表：日期 / 目的 / 协议版本 / 参数偏离 / 结论，适合 Excel',
+    desc: '单张宽表：日期 / 目的 / 方法版本 / 参数偏离 / 结论，适合 Excel',
     icon: Table2,
   },
   {

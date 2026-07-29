@@ -95,7 +95,7 @@ function ProjectDialogInner({
             {project ? '编辑项目' : '新建项目'}
           </DialogTitle>
           <DialogDescription className="text-[12.5px]">
-            项目用于分组实验记录，色点会出现在侧边栏与记录卡上。
+            项目用于分组湿实验记录，色点会出现在侧边栏与记录卡上。
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-4 py-1">

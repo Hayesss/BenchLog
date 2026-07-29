@@ -210,7 +210,7 @@ export default function Protocols() {
         version: 'v1.0',
       })
       await utils.protocol.list.invalidate()
-      toast.success('已复制为我的协议')
+      toast.success('已复制为我的方法')
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '复制失败')
     }
@@ -288,7 +288,7 @@ export default function Protocols() {
             className="font-display text-[24px] font-bold leading-[32px] text-ink md:text-[30px] md:leading-[38px]"
           />
           <p className="caption-en mt-1" style={{ letterSpacing: '0.08em' }}>
-            Protocols
+            Methods
           </p>
         </div>
         <button
@@ -296,7 +296,7 @@ export default function Protocols() {
           onClick={() => setCreateOpen(true)}
           className="flex h-10 items-center gap-1.5 rounded-lg bg-bench px-4 text-[13px] font-medium text-white shadow-card transition-all duration-150 hover:-translate-y-px hover:bg-bench-deep active:scale-[0.97]"
         >
-          <Plus className="h-4 w-4" /> 新建协议
+          <Plus className="h-4 w-4" /> 新建方法
         </button>
       </div>
       <motion.p
@@ -305,7 +305,7 @@ export default function Protocols() {
         transition={{ delay: 0.2, duration: 0.3 }}
         className="mt-2 text-[13px] text-ink-soft"
       >
-        共 {protocols.length} 个协议 · 6 个预置模板 · 累计使用 {totalUse} 次
+        共 {protocols.length} 个方法 · 6 个预置模板 · 累计使用 {totalUse} 次
       </motion.p>
 
       {/* ============ 区块 2：筛选工具栏（粘性） ============ */}
@@ -323,7 +323,7 @@ export default function Protocols() {
             <input
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="搜索协议名、货号、细胞系…"
+              placeholder="搜索方法名、货号、细胞系…"
               className="h-9 w-full rounded-lg border border-line bg-surface pl-9 pr-3 text-[13px] text-ink shadow-card outline-none transition-colors duration-150 placeholder:text-ink-mute focus:border-bench"
             />
           </div>
@@ -529,10 +529,10 @@ export default function Protocols() {
         </div>
       )}
 
-      {/* ============ 区块 4：我的协议 ============ */}
+      {/* ============ 区块 4：我的方法 ============ */}
       <div className="mt-10">
         <div className="flex items-center gap-2">
-          <h2 className="text-[15px] font-semibold leading-[22px] tracking-[0.01em] text-ink">我的协议</h2>
+          <h2 className="text-[15px] font-semibold leading-[22px] tracking-[0.01em] text-ink">我的方法</h2>
           <span className="font-mono text-[12px] text-ink-mute">{filtered.length}</span>
           <div className="ml-auto flex items-center gap-1 rounded-lg border border-line bg-surface p-0.5 shadow-card">
             {(
@@ -568,7 +568,7 @@ export default function Protocols() {
           <div className="flex flex-col items-center py-24">
             <img src="/empty-protocols.svg" alt="" className="h-[180px] w-[240px] object-contain" />
             <h3 className="mt-4 font-display text-[18px] font-semibold text-ink">
-              {protocols.length === 0 ? '还没有自己的协议' : '没有符合条件的协议'}
+              {protocols.length === 0 ? '还没有自己的方法' : '没有符合条件的方法'}
             </h3>
             <p className="mt-1 text-[12.5px] text-ink-mute">
               {protocols.length === 0 ? '从预置模板开始，或新建一套属于你的标准流程' : '试试调整搜索词、分类或标签筛选'}
@@ -607,7 +607,7 @@ export default function Protocols() {
         )}
       </div>
 
-      {/* 新建协议 */}
+      {/* 新建方法 */}
       <ProtocolEditorDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
@@ -619,7 +619,7 @@ export default function Protocols() {
       <AlertDialog open={!!pendingDelete} onOpenChange={(v) => !v && setPendingDelete(null)}>
         <AlertDialogContent className="rounded-xl border-line">
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-display text-[18px]">归档该协议？</AlertDialogTitle>
+            <AlertDialogTitle className="font-display text-[18px]">归档该方法？</AlertDialogTitle>
             <AlertDialogDescription className="text-[13px] text-ink-soft">
               「{pendingDelete?.name}」及其全部版本历史将被移除。此操作不可撤销。
             </AlertDialogDescription>
@@ -715,7 +715,7 @@ function GridCard({
   )
 }
 
-/* ---------------- hover 浮窗：协议简略信息 ---------------- */
+/* ---------------- hover 浮窗：方法简略信息 ---------------- */
 
 function ProtocolHoverContent({ p, tagColors }: { p: ProtocolListItem; tagColors: Map<string, string> }) {
   const groups = Array.isArray(p.stepGroups) ? p.stepGroups : []
@@ -795,7 +795,7 @@ function ProtocolHoverContent({ p, tagColors }: { p: ProtocolListItem; tagColors
         </div>
       )}
 
-      <div className="mt-3 text-[11px] text-ink-mute">点击查看完整协议 →</div>
+      <div className="mt-3 text-[11px] text-ink-mute">点击查看完整方法 →</div>
     </div>
   )
 }
@@ -828,7 +828,7 @@ function ProtocolCardMenu({
           <Eye className="h-4 w-4" /> 查看
         </DropdownMenuItem>
         <DropdownMenuItem className="cursor-pointer gap-2" onSelect={onDuplicate}>
-          <Copy className="h-4 w-4" /> 复制为我的协议
+          <Copy className="h-4 w-4" /> 复制为我的方法
         </DropdownMenuItem>
         <DropdownMenuItem
           className="cursor-pointer gap-2"
@@ -866,7 +866,7 @@ function ListView({
   return (
     <div className="mt-4 overflow-hidden rounded-lg border border-line bg-surface shadow-card">
       <div className="hidden grid-cols-[1.6fr_120px_80px_80px_110px_48px] gap-2 border-b border-line bg-paper px-4 py-2 text-[11.5px] font-medium tracking-[0.04em] text-ink-mute md:grid">
-        <span>协议名</span>
+        <span>方法名</span>
         <span>分类</span>
         <span>版本</span>
         <span>步骤数</span>

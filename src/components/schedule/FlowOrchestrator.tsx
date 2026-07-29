@@ -296,16 +296,16 @@ function OrchestratorDialog({
                       </label>
 
                       <label className="flex flex-col gap-1.5">
-                        <span className="text-[12.5px] font-medium text-ink-soft">关联协议</span>
+                        <span className="text-[12.5px] font-medium text-ink-soft">关联方法</span>
                         <Select
                           value={protocolId == null ? 'none' : String(protocolId)}
                           onValueChange={(v) => pickProtocol(v === 'none' ? null : Number(v))}
                         >
                           <SelectTrigger className="h-10 w-full rounded-lg border-line-strong bg-surface">
-                            <SelectValue placeholder="不关联协议" />
+                            <SelectValue placeholder="不关联方法" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="none">不关联协议</SelectItem>
+                            <SelectItem value="none">不关联方法</SelectItem>
                             {protocols.map((p) => (
                               <SelectItem key={p.id} value={String(p.id)}>
                                 {p.name}
@@ -438,7 +438,7 @@ function OrchestratorDialog({
                           <p className="mt-1 text-[12px] text-ink-mute">
                             {project ? `项目 ${project.name}` : ''}
                             {project && protocol ? ' · ' : ''}
-                            {protocol ? `协议 ${protocol.name} ${protocol.version}` : ''}
+                            {protocol ? `方法 ${protocol.name} ${protocol.version}` : ''}
                           </p>
                         )}
 

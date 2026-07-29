@@ -85,7 +85,7 @@ export default function ScheduleFlowTimeline({
             to="/protocols"
             className="mt-2 flex items-center gap-1 text-[13px] font-medium text-bench transition-colors duration-150 hover:text-bench-deep"
           >
-            从协议发起排期 <ArrowRight className="h-3.5 w-3.5" />
+            从方法发起排期 <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
       ) : (

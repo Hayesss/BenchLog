@@ -6,11 +6,13 @@ import { openCommandPalette } from '@/components/CommandPalette'
 
 const ROUTE_LABELS: Array<[RegExp, string[]]> = [
   [/^\/$/, ['工作台']],
-  [/^\/protocols\/[^/]+/, ['实验方法', '协议详情']],
+  [/^\/protocols\/[^/]+/, ['实验方法', '方法详情']],
   [/^\/protocols/, ['实验方法']],
-  [/^\/records\/new/, ['实验记录', '新建记录']],
-  [/^\/records\/[^/]+/, ['实验记录', '记录详情']],
-  [/^\/records/, ['实验记录']],
+  [/^\/records\/new/, ['湿实验记录', '新建记录']],
+  [/^\/records\/[^/]+/, ['湿实验记录', '记录详情']],
+  [/^\/records/, ['湿实验记录']],
+  [/^\/bioinfo\/[^/]+/, ['生信分析', '分析详情']],
+  [/^\/bioinfo/, ['生信分析']],
   [/^\/schedule/, ['实验安排']],
   [/^\/library\/[^/]+/, ['方法库', '条目详情']],
   [/^\/library/, ['方法库']],
