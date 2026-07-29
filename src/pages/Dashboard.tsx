@@ -9,6 +9,7 @@ import {
   Camera,
   ChevronDown,
   FlaskConical,
+  FolderPlus,
   NotebookPen,
   Plus,
   SquareTerminal,
@@ -17,6 +18,7 @@ import { cn } from '@/lib/utils'
 import { trpc } from '@/providers/trpc'
 import ActivityCalendar from '@/components/dashboard/ActivityCalendar'
 import PinStarButton from '@/components/protocols/PinStarButton'
+import RecordProjectDialog from '@/components/records/RecordProjectDialog'
 import type { inferRouterOutputs } from '@trpc/server'
 import type { AppRouter } from '../../api/router'
 
@@ -420,6 +422,7 @@ function FlowsCard({ flows }: { flows: FlowRow[] }) {
 
 /** 区块 4：快捷新建 */
 function QuickCreate() {
+  const [projectDialogOpen, setProjectDialogOpen] = useState(false)
   const items = [
     { label: '新建记录', icon: NotebookPen, to: '/records/new' },
     { label: '新建方法', icon: FlaskConical, to: '/protocols' },
@@ -427,20 +430,25 @@ function QuickCreate() {
     { label: '拍照上传', icon: Camera, to: '/records/new' },
     { label: '新建分析', icon: SquareTerminal, to: '/bioinfo/new' },
   ]
+  const tileClass =
+    'group flex h-28 flex-col items-center justify-center gap-2.5 rounded-lg border border-line bg-surface shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover'
   return (
     <section className="grid grid-cols-2 gap-3">
       {items.map(({ label, icon: Icon, to }) => (
-        <Link
-          key={label}
-          to={to}
-          className="group flex h-28 flex-col items-center justify-center gap-2.5 rounded-lg border border-line bg-surface shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover"
-        >
+        <Link key={label} to={to} className={tileClass}>
           <span className="flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-200 group-hover:bg-bench-wash">
             <Icon className="h-5 w-5 text-ink-soft transition-colors duration-200 group-hover:text-bench" strokeWidth={1.8} />
           </span>
           <span className="text-[13px] font-medium text-ink">{label}</span>
         </Link>
       ))}
+      <button type="button" onClick={() => setProjectDialogOpen(true)} className={tileClass}>
+        <span className="flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-200 group-hover:bg-bench-wash">
+          <FolderPlus className="h-5 w-5 text-ink-soft transition-colors duration-200 group-hover:text-bench" strokeWidth={1.8} />
+        </span>
+        <span className="text-[13px] font-medium text-ink">新建项目</span>
+      </button>
+      <RecordProjectDialog open={projectDialogOpen} onOpenChange={setProjectDialogOpen} />
     </section>
   )
 }

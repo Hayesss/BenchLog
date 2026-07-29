@@ -24,6 +24,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { trpc } from '@/providers/trpc'
 import { LOGIN_PATH } from '@/const'
 import CommandPalette, { openCommandPalette } from '@/components/CommandPalette'
+import RecordProjectDialog from '@/components/records/RecordProjectDialog'
 
 const NAV_ITEMS = [
   { to: '/', label: '工作台', en: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -60,6 +61,7 @@ function useLenis() {
 
 function Sidebar() {
   const [projectsOpen, setProjectsOpen] = useState(true)
+  const [projectDialogOpen, setProjectDialogOpen] = useState(false)
   const { user, isAuthenticated, isLoading, logout } = useAuth()
   const projectsQuery = trpc.project.list.useQuery(undefined, { enabled: isAuthenticated })
   const sidebarProjects = (projectsQuery.data ?? []).map((p, i) => ({
@@ -111,25 +113,37 @@ function Sidebar() {
 
       {/* projects */}
       <div className="flex-1 overflow-y-auto px-3 pb-4">
-        <button
-          type="button"
-          onClick={() => setProjectsOpen((v) => !v)}
-          className="flex w-full items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11.5px] font-medium tracking-[0.04em] text-ink-mute hover:text-ink-soft"
-        >
-          <ChevronDown
-            className={cn('h-3.5 w-3.5 transition-transform duration-200', !projectsOpen && '-rotate-90')}
-          />
-          项目分组 PROJECTS
-        </button>
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={() => setProjectsOpen((v) => !v)}
+            className="flex flex-1 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11.5px] font-medium tracking-[0.04em] text-ink-mute hover:text-ink-soft"
+          >
+            <ChevronDown
+              className={cn('h-3.5 w-3.5 transition-transform duration-200', !projectsOpen && '-rotate-90')}
+            />
+            项目分组 PROJECTS
+          </button>
+          <button
+            type="button"
+            aria-label="新建项目"
+            title="新建项目"
+            onClick={() => setProjectDialogOpen(true)}
+            className="mr-1 flex h-6 w-6 items-center justify-center rounded-md text-ink-mute transition-colors duration-150 hover:bg-bench-wash hover:text-bench"
+          >
+            <Plus className="h-3.5 w-3.5" strokeWidth={2} />
+          </button>
+        </div>
         {projectsOpen && (
           <div className="mt-1 flex flex-col gap-0.5">
             {sidebarProjects.length === 0 ? (
-              <Link
-                to="/records"
-                className="rounded-lg px-3 py-1.5 text-[12.5px] text-ink-mute transition-colors duration-150 hover:text-ink-soft"
+              <button
+                type="button"
+                onClick={() => setProjectDialogOpen(true)}
+                className="rounded-lg px-3 py-1.5 text-left text-[12.5px] text-ink-mute transition-colors duration-150 hover:text-ink-soft"
               >
-                暂无项目，可在记录页创建
-              </Link>
+                暂无项目，点上方 + 新建
+              </button>
             ) : (
               sidebarProjects.map((p) => (
                 <Link
@@ -186,6 +200,9 @@ function Sidebar() {
           </Link>
         )}
       </div>
+
+      {/* 新建项目对话框（侧边栏 + 按钮触发） */}
+      <RecordProjectDialog open={projectDialogOpen} onOpenChange={setProjectDialogOpen} />
     </aside>
   )
 }
