@@ -270,6 +270,64 @@ export const bioinfoAnalyses = mysqlTable(
 );
 export type BioinfoAnalysis = typeof bioinfoAnalyses.$inferSelect;
 
+/* ------------------------------------------------------------------ */
+/* 站内 Git 对象库（content-addressed，SHA-1 计算与 git 完全兼容，      */
+/* 对象存 MySQL 而非本地磁盘，随数据库持久化；可导出为真实 .git 仓库）  */
+/* ------------------------------------------------------------------ */
+
+/** Git tree 展平条目：path 为仓库内全路径（如 src/utils.R），sha 指向 blob */
+export type GitTreeEntry = { path: string; sha: string; size: number };
+
+/** Git blob 对象：sha = sha1("blob {size}\\0{content}")，与 git hash-object 一致 */
+export const gitBlobs = mysqlTable("git_blobs", {
+  sha: varchar("sha", { length: 40 }).primaryKey(),
+  userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+  content: longtext("content").notNull(), // UTF-8 文本（代码文件）
+  size: int("size").notNull(), // 字节数（UTF-8 编码后）
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type GitBlob = typeof gitBlobs.$inferSelect;
+
+/** Git tree 对象：sha 按 git tree 规则计算；entries 存展平后的完整文件清单便于读取 */
+export const gitTrees = mysqlTable("git_trees", {
+  sha: varchar("sha", { length: 40 }).primaryKey(),
+  userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+  entries: json("entries").$type<GitTreeEntry[]>().notNull(), // [{path, sha, size}] 全路径展平
+  fileCount: int("fileCount").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type GitTree = typeof gitTrees.$inferSelect;
+
+/** Git commit 对象：sha = sha1("commit {len}\\0{标准 commit 文本}")，与 git commit 一致 */
+export const gitCommits = mysqlTable(
+  "git_commits",
+  {
+    sha: varchar("sha", { length: 40 }).primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+    analysisId: bigint("analysisId", { mode: "number", unsigned: true }).notNull(),
+    parentSha: varchar("parentSha", { length: 40 }), // null = 根提交
+    treeSha: varchar("treeSha", { length: 40 }).notNull(),
+    message: text("message").notNull(),
+    authorName: varchar("authorName", { length: 100 }).notNull().default("BenchLog"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => [index("git_commits_analysis_idx").on(t.analysisId), index("git_commits_user_idx").on(t.userId)],
+);
+export type GitCommit = typeof gitCommits.$inferSelect;
+
+/** 仓库引用：每个生信分析一个内置仓库，HEAD 指向最新 commit（首次 commit 时自动建立） */
+export const gitRefs = mysqlTable("git_refs", {
+  analysisId: bigint("analysisId", { mode: "number", unsigned: true }).primaryKey(),
+  userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+  headSha: varchar("headSha", { length: 40 }).notNull(),
+  commitCount: int("commitCount").notNull().default(1),
+  updatedAt: timestamp("updatedAt")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+export type GitRef = typeof gitRefs.$inferSelect;
+
 /** 用户每日活动（活跃日历：登录打点 + 协议使用计数；记录数查询端实时聚合） */
 export const userActivity = mysqlTable(
   "user_activity",

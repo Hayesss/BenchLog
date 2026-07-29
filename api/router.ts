@@ -8,6 +8,7 @@ import { searchRouter, exportLogRouter } from "./searchRouter";
 import { libraryRouter } from "./libraryRouter";
 import { activityRouter } from "./activityRouter";
 import { bioinfoRouter } from "./bioinfoRouter";
+import { gitRouter } from "./gitRouter";
 
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
@@ -24,6 +25,7 @@ export const appRouter = createRouter({
   library: libraryRouter,
   activity: activityRouter,
   bioinfo: bioinfoRouter,
+  git: gitRouter,
 });
 
 export type AppRouter = typeof appRouter;

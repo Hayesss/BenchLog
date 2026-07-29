@@ -2,7 +2,7 @@ import { z } from "zod";
 import { and, desc, eq } from "drizzle-orm";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { bioinfoAnalyses, projects } from "@db/schema";
+import { bioinfoAnalyses, projects, gitCommits, gitRefs } from "@db/schema";
 import { dateStr } from "./zodSchemas";
 
 const bioinfoStatusSchema = z.enum(["running", "done", "failed"]);
@@ -110,6 +110,13 @@ export const bioinfoRouter = createRouter({
     await getDb()
       .delete(bioinfoAnalyses)
       .where(and(eq(bioinfoAnalyses.id, input.id), eq(bioinfoAnalyses.userId, ctx.user.id)));
+    // 清理站内仓库的引用与提交对象（blob/tree 为内容寻址去重共享池，保留）
+    await getDb()
+      .delete(gitRefs)
+      .where(and(eq(gitRefs.analysisId, input.id), eq(gitRefs.userId, ctx.user.id)));
+    await getDb()
+      .delete(gitCommits)
+      .where(and(eq(gitCommits.analysisId, input.id), eq(gitCommits.userId, ctx.user.id)));
     return { ok: true };
   }),
 });

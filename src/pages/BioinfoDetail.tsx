@@ -32,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import RecordMarkdownEditor from '@/components/records/RecordMarkdownEditor'
+import RepoPanel from '@/components/bioinfo/RepoPanel'
 import { BioStatusBadge, PIPELINE_OPTIONS } from '@/pages/Bioinfo'
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
@@ -90,10 +91,10 @@ function Field({ label, en, children }: { label: string; en?: string; children: 
   )
 }
 
-/** commit 直达链接：GitHub/GitLab/Gitee 通用 {repo}/commit/{hash} */
+/** commit 直达链接：GitHub/GitLab/Gitee 通用 {repo}/commit/{hash}；站内仓库（internal）无外链 */
 function commitUrl(repo: string, hash: string): string | null {
   const r = repo.trim().replace(/\.git$/, '').replace(/\/$/, '')
-  if (!r || !hash.trim()) return null
+  if (!r || r === 'internal' || !hash.trim()) return null
   return `${r}/commit/${hash.trim()}`
 }
 
@@ -359,6 +360,12 @@ export default function BioinfoDetail() {
             在仓库中查看此 commit（{form.commitHash.trim().slice(0, 7)}）
           </a>
         )}
+        {form.repoUrl.trim() === 'internal' && form.commitHash.trim() && (
+          <p className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-bench/35 bg-bench-wash px-2 py-1 text-[12px] font-medium text-bench-ink">
+            <GitBranch className="h-3 w-3" />
+            已锚定站内内置仓库 commit {form.commitHash.trim().slice(0, 7)} —— 代码与历史见下方「代码仓库」区；改填外部链接可切换回外部仓库
+          </p>
+        )}
         <div className="mt-4 flex flex-col gap-4">
           <Field label="环境锁定" en="Environment">
             <textarea
@@ -377,6 +384,25 @@ export default function BioinfoDetail() {
             />
           </Field>
         </div>
+      </motion.section>
+
+      {/* 代码仓库（站内 Git）：已保存的分析可用 */}
+      <motion.section variants={sectionVariants} className="mt-4">
+        {analysisId != null ? (
+          <RepoPanel
+            analysisId={analysisId}
+            anchoredHash={form.repoUrl.trim() === 'internal' ? form.commitHash.trim() : ''}
+            onAnchor={(sha) => {
+              patch({ commitHash: sha, repoUrl: 'internal' })
+              toast.success(`已锚定 commit ${sha.slice(0, 7)}，点击右上角「保存」生效`)
+            }}
+          />
+        ) : (
+          <div className="rounded-lg border border-dashed border-line-strong/60 bg-paper/50 p-5 text-center">
+            <p className="caption-en mb-1.5">代码仓库 INTERNAL GIT</p>
+            <p className="text-[12.5px] text-ink-mute">先创建分析，即可上传代码建立站内 Git 仓库（commit 哈希与 git 完全兼容）。</p>
+          </div>
+        )}
       </motion.section>
 
       {/* 结果 */}
@@ -409,7 +435,7 @@ export default function BioinfoDetail() {
           <AlertDialogHeader>
             <AlertDialogTitle className="font-display text-[18px]">删除这条分析记录？</AlertDialogTitle>
             <AlertDialogDescription className="text-[13px] text-ink-soft">
-              「{form.name || '未命名分析'}」将被永久删除，Git 仓库中的代码不受影响。
+              「{form.name || '未命名分析'}」将被永久删除；站内代码仓库的提交历史将一并删除（外部 Git 仓库不受影响）。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
