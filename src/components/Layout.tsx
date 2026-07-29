@@ -10,11 +10,13 @@ import {
   FileDown,
   FlaskConical,
   LayoutDashboard,
+  Menu,
   NotebookPen,
   Plus,
   Search,
   SquareTerminal,
   Tag,
+  X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Navbar from '@/components/Navbar'
@@ -191,9 +193,21 @@ function Sidebar() {
 /** Mobile: 48px slim top bar + 56px bottom tab bar with central FAB (design.md §7/§8.1). */
 function MobileChrome() {
   const { user, isAuthenticated, isLoading } = useAuth()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const { pathname } = useLocation()
+  // 路由切换后自动收起抽屉
+  useEffect(() => setMenuOpen(false), [pathname])
   return (
     <>
       <header className="sticky top-0 z-50 flex h-12 items-center gap-3 border-b border-line bg-paper/90 px-4 backdrop-blur md:hidden">
+        <button
+          type="button"
+          aria-label="打开导航菜单"
+          onClick={() => setMenuOpen(true)}
+          className="-ml-1 flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft"
+        >
+          <Menu className="h-5 w-5" strokeWidth={1.8} />
+        </button>
         <Link to="/" className="flex items-center gap-2">
           <img src="/logo.svg" alt="BenchLog" className="h-6 w-6" />
           <span className="font-display text-[15px] font-bold text-ink">BenchLog</span>
@@ -217,6 +231,65 @@ function MobileChrome() {
           </Link>
         )}
       </header>
+
+      {/* 移动端导航抽屉：底栏 5 个固定位放不下的页面（方法库/生信分析/学习指南/汇报导出）由此进入 */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-[60] md:hidden">
+          <div
+            className="absolute inset-0 bg-ink/30 backdrop-blur-[2px]"
+            onClick={() => setMenuOpen(false)}
+          />
+          <motion.div
+            initial={{ x: -272 }}
+            animate={{ x: 0 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute inset-y-0 left-0 flex w-64 flex-col bg-paper shadow-overlay"
+          >
+            <div className="flex h-12 shrink-0 items-center border-b border-line px-4">
+              <span className="font-display text-[15px] font-bold text-ink">导航</span>
+              <button
+                type="button"
+                aria-label="关闭导航菜单"
+                onClick={() => setMenuOpen(false)}
+                className="ml-auto flex h-8 w-8 items-center justify-center rounded-lg text-ink-mute"
+              >
+                <X className="h-4 w-4" strokeWidth={1.8} />
+              </button>
+            </div>
+            <nav className="flex flex-col gap-0.5 overflow-y-auto px-3 py-3">
+              {NAV_ITEMS.map(({ to, label, en, icon: Icon, ...rest }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={'end' in rest}
+                  className={({ isActive }) =>
+                    cn(
+                      'group relative flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[14px] font-medium transition-colors duration-150',
+                      isActive
+                        ? 'bg-bench-wash text-bench-ink'
+                        : 'text-ink-soft hover:bg-bench-wash/60 hover:text-ink',
+                    )
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <span
+                        className={cn(
+                          'absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-bench transition-opacity duration-150',
+                          isActive ? 'opacity-100' : 'opacity-0',
+                        )}
+                      />
+                      <Icon className="h-5 w-5 shrink-0" strokeWidth={1.8} />
+                      <span>{label}</span>
+                      <span className="caption-en ml-auto !text-[10px]">{en}</span>
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </nav>
+          </motion.div>
+        </div>
+      )}
 
       <nav className="fixed inset-x-0 bottom-0 z-50 flex h-14 items-stretch border-t border-line bg-surface md:hidden">
         <MobileTab to="/" icon={LayoutDashboard} label="工作台" end />
