@@ -154,7 +154,7 @@ function GuideBanner() {
     <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-bench/30 bg-bench-wash/40 px-4 py-3">
       <Info className="mt-0.5 h-4 w-4 shrink-0 text-bench" strokeWidth={1.8} />
       <p className="flex-1 text-[12.5px] leading-[19px] text-ink-soft">
-        代码可直接存进<b className="text-ink">站内内置仓库</b>（详情页上传/粘贴 → 提交 commit，哈希与 git 完全兼容），
+        代码可直接存进<b className="text-ink">站内内置仓库</b>（新建或详情页上传/粘贴 → 提交 commit，哈希与 git 完全兼容），
         也可登记外部 <b className="text-ink">Git 私有仓库</b>（GitHub / GitLab / Gitee）链接 + commit 哈希。
         配合「环境锁定 + 运行命令」即可完整锚定一次分析的可复现现场。大文件数据不进仓库，记录
         SRA/GEO 编号或存储路径。

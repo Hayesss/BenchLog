@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import RecordMarkdownEditor from '@/components/records/RecordMarkdownEditor'
 import RepoPanel from '@/components/bioinfo/RepoPanel'
+import RepoStaging, { type StagedFile } from '@/components/bioinfo/RepoStaging'
 import { BioStatusBadge, PIPELINE_OPTIONS } from '@/pages/Bioinfo'
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
@@ -110,6 +111,9 @@ export default function BioinfoDetail() {
   const [form, setForm] = useState<Form>(EMPTY)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [loaded, setLoaded] = useState(analysisId == null)
+  // 新建草稿：暂存代码 + 提交信息（创建时自动建仓、提交首个 commit 并锚定）
+  const [draftFiles, setDraftFiles] = useState<StagedFile[]>([])
+  const [draftMessage, setDraftMessage] = useState('')
 
   useEffect(() => {
     if (analysisId != null && detailQ.data && !loaded) {
@@ -139,10 +143,41 @@ export default function BioinfoDetail() {
     await Promise.all([utils.bioinfo.list.invalidate(), analysisId != null && utils.bioinfo.byId.invalidate({ id: analysisId })])
   }
 
+  const gitCommitMut = trpc.git.commit.useMutation()
+  const silentUpdateMut = trpc.bioinfo.update.useMutation()
   const createMut = trpc.bioinfo.create.useMutation({
     onSuccess: async ({ id: newId }) => {
       await utils.bioinfo.list.invalidate()
-      toast.success('分析已创建')
+      if (draftFiles.length > 0) {
+        // 创建时自动建仓：提交暂存代码为首个 commit，并锚定（未填外部仓库时）
+        try {
+          const r = await gitCommitMut.mutateAsync({ analysisId: newId, files: draftFiles, message: draftMessage })
+          if (!form.repoUrl.trim()) {
+            const { name, analysisDate, projectId, pipeline, inputData, environment, command, status, resultMd, conclusion, nextStep } = form
+            await silentUpdateMut.mutateAsync({
+              id: newId,
+              name: name.trim(),
+              analysisDate,
+              projectId,
+              pipeline,
+              inputData,
+              repoUrl: 'internal',
+              commitHash: r.sha,
+              environment,
+              command,
+              status,
+              resultMd,
+              conclusion,
+              nextStep,
+            })
+          }
+          toast.success(`分析已创建，代码已提交 ${r.short} 并锚定`)
+        } catch (e) {
+          toast.error(`分析已创建，但代码提交失败：${e instanceof Error ? e.message : '未知错误'}——可在详情页重新提交`)
+        }
+      } else {
+        toast.success('分析已创建')
+      }
       navigate(`/bioinfo/${newId}`)
     },
     onError: (e) => toast.error(`创建失败：${e.message}`),
@@ -167,7 +202,7 @@ export default function BioinfoDetail() {
     onError: (e) => toast.error(`删除失败：${e.message}`),
   })
 
-  const saving = createMut.isPending || updateMut.isPending
+  const saving = createMut.isPending || updateMut.isPending || gitCommitMut.isPending || silentUpdateMut.isPending
   const cUrl = useMemo(() => commitUrl(form.repoUrl, form.commitHash), [form.repoUrl, form.commitHash])
 
   const save = () => {
@@ -319,6 +354,44 @@ export default function BioinfoDetail() {
         </div>
       </motion.section>
 
+      {/* 代码仓库（站内 Git）：新建页直接暂存，创建时自动建仓提交；详情页完整仓库 */}
+      <motion.section variants={sectionVariants} className="mt-4">
+        {analysisId != null ? (
+          <RepoPanel
+            analysisId={analysisId}
+            anchoredHash={form.repoUrl.trim() === 'internal' ? form.commitHash.trim() : ''}
+            onAnchor={(sha) => {
+              patch({ commitHash: sha, repoUrl: 'internal' })
+              toast.success(`已锚定 commit ${sha.slice(0, 7)}，点击右上角「保存」生效`)
+            }}
+          />
+        ) : (
+          <div className="rounded-lg border border-line bg-surface p-5 shadow-card">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="caption-en">代码仓库 INTERNAL GIT</p>
+              <span className="ml-auto text-[11.5px] text-ink-mute">创建时自动建仓</span>
+            </div>
+            <p className="mt-1.5 mb-4 text-[12px] leading-[18px] text-ink-mute">
+              选好项目、命名之后，直接上传或粘贴本次分析的代码——点击「创建」时自动建仓、提交为首个
+              commit 并锚定到此分析（哈希与 git 完全兼容）。
+            </p>
+            <RepoStaging
+              staged={draftFiles}
+              onStagedChange={setDraftFiles}
+              message={draftMessage}
+              onMessageChange={setDraftMessage}
+              footer={
+                draftFiles.length > 0 ? (
+                  <span className="shrink-0 text-[11.5px] text-ink-mute">
+                    创建时将自动提交 {draftFiles.length} 个文件
+                  </span>
+                ) : undefined
+              }
+            />
+          </div>
+        )}
+      </motion.section>
+
       {/* 可复现性锚定 */}
       <motion.section variants={sectionVariants} className="mt-4 rounded-lg border border-bench/35 bg-bench-wash/25 p-5 shadow-card">
         <p className="caption-en mb-1.5 !text-bench">可复现性 REPRODUCIBILITY</p>
@@ -384,25 +457,6 @@ export default function BioinfoDetail() {
             />
           </Field>
         </div>
-      </motion.section>
-
-      {/* 代码仓库（站内 Git）：已保存的分析可用 */}
-      <motion.section variants={sectionVariants} className="mt-4">
-        {analysisId != null ? (
-          <RepoPanel
-            analysisId={analysisId}
-            anchoredHash={form.repoUrl.trim() === 'internal' ? form.commitHash.trim() : ''}
-            onAnchor={(sha) => {
-              patch({ commitHash: sha, repoUrl: 'internal' })
-              toast.success(`已锚定 commit ${sha.slice(0, 7)}，点击右上角「保存」生效`)
-            }}
-          />
-        ) : (
-          <div className="rounded-lg border border-dashed border-line-strong/60 bg-paper/50 p-5 text-center">
-            <p className="caption-en mb-1.5">代码仓库 INTERNAL GIT</p>
-            <p className="text-[12.5px] text-ink-mute">先创建分析，即可上传代码建立站内 Git 仓库（commit 哈希与 git 完全兼容）。</p>
-          </div>
-        )}
       </motion.section>
 
       {/* 结果 */}
