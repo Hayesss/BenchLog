@@ -424,6 +424,7 @@ function QuickCreate() {
     { label: '新建方法', icon: FlaskConical, to: '/protocols' },
     { label: '安排实验', icon: CalendarDays, to: '/schedule' },
     { label: '拍照上传', icon: Camera, to: '/records/new' },
+    { label: '新建分析', icon: SquareTerminal, to: '/bioinfo/new' },
   ]
   return (
     <section className="grid grid-cols-2 gap-3">
@@ -439,17 +440,6 @@ function QuickCreate() {
           <span className="text-[13px] font-medium text-ink">{label}</span>
         </Link>
       ))}
-      {/* 生信分析入口（横跨两列） */}
-      <Link
-        to="/bioinfo"
-        className="group col-span-2 flex h-16 items-center justify-center gap-2.5 rounded-lg border border-line bg-surface shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover"
-      >
-        <span className="flex h-9 w-9 items-center justify-center rounded-full transition-colors duration-200 group-hover:bg-bench-wash">
-          <SquareTerminal className="h-5 w-5 text-ink-soft transition-colors duration-200 group-hover:text-bench" strokeWidth={1.8} />
-        </span>
-        <span className="text-[13px] font-medium text-ink">生信分析</span>
-        <span className="caption-en !text-[10px]">Bioinfo</span>
-      </Link>
     </section>
   )
 }
