@@ -8,6 +8,7 @@ import { searchRouter, exportLogRouter } from "./searchRouter";
 import { libraryRouter } from "./libraryRouter";
 import { activityRouter } from "./activityRouter";
 import { bioinfoRouter } from "./bioinfoRouter";
+import { bioinfoSkillRouter } from "./bioinfoSkillRouter";
 import { gitRouter } from "./gitRouter";
 
 export const appRouter = createRouter({
@@ -25,6 +26,7 @@ export const appRouter = createRouter({
   library: libraryRouter,
   activity: activityRouter,
   bioinfo: bioinfoRouter,
+  bioinfoSkill: bioinfoSkillRouter,
   git: gitRouter,
 });
 

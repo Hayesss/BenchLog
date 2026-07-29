@@ -328,6 +328,28 @@ export const gitRefs = mysqlTable("git_refs", {
 });
 export type GitRef = typeof gitRefs.$inferSelect;
 
+/** 生信技能库：可复用代码片段/命令/工具用法（与分析记录互补——记录锚定"某一次"，技能沉淀"可复用"） */
+export const bioinfoSkills = mysqlTable(
+  "bioinfo_skills",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+    title: varchar("title", { length: 255 }).notNull(), // 技能名称，如「DESeq2 差异表达标准流程」
+    category: varchar("category", { length: 64 }).notNull().default("其他"), // 文件处理/比对与定量/差异与统计/可视化/单细胞/流程与环境/其他
+    language: varchar("language", { length: 32 }).notNull().default("Bash"), // Bash/R/Python/Nextflow/Snakemake/其他
+    summary: text("summary"), // 用途说明：什么时候用、注意点
+    code: longtext("code").notNull(), // 代码片段本体
+    source: varchar("source", { length: 500 }), // 出处/参考链接（可选）
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [index("bioinfo_skills_user_idx").on(t.userId)],
+);
+export type BioinfoSkill = typeof bioinfoSkills.$inferSelect;
+
 /** 用户每日活动（活跃日历：登录打点 + 协议使用计数；记录数查询端实时聚合） */
 export const userActivity = mysqlTable(
   "user_activity",

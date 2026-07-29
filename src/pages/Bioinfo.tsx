@@ -7,6 +7,7 @@ import {
   ExternalLink,
   GitBranch,
   Info,
+  Lightbulb,
   Plus,
   RotateCcw,
   SquareTerminal,
@@ -16,6 +17,7 @@ import type { inferRouterOutputs } from '@trpc/server'
 import type { CreateTRPCReact } from '@trpc/react-query'
 import { trpc } from '@/providers/trpc'
 import { cn } from '@/lib/utils'
+import SkillsPanel from '@/components/bioinfo/SkillsPanel'
 
 type AppRouterFromProxy = typeof trpc extends CreateTRPCReact<infer R, unknown> ? R : never
 type RouterOutputs = inferRouterOutputs<AppRouterFromProxy>
@@ -171,6 +173,7 @@ function GuideBanner() {
 }
 
 export default function Bioinfo() {
+  const [tab, setTab] = useState<'analyses' | 'skills'>('analyses')
   const [projectId, setProjectId] = useState<number | undefined>(undefined)
   const [status, setStatus] = useState<BioStatus | undefined>(undefined)
 
@@ -206,18 +209,47 @@ export default function Bioinfo() {
           </h1>
           <p className="caption-en mt-1">Bioinformatics · Dry Lab</p>
         </div>
-        <Link
-          to="/bioinfo/new"
-          className="flex h-10 items-center gap-1.5 rounded-lg bg-bench px-4 text-[14px] font-medium text-white shadow-card transition-all duration-150 hover:-translate-y-px hover:bg-bench-deep active:scale-[0.97]"
-        >
-          <Plus className="h-4 w-4" />
-          新建分析
-        </Link>
+        {tab === 'analyses' && (
+          <Link
+            to="/bioinfo/new"
+            className="flex h-10 items-center gap-1.5 rounded-lg bg-bench px-4 text-[14px] font-medium text-white shadow-card transition-all duration-150 hover:-translate-y-px hover:bg-bench-deep active:scale-[0.97]"
+          >
+            <Plus className="h-4 w-4" />
+            新建分析
+          </Link>
+        )}
       </motion.div>
 
-      <GuideBanner />
+      {/* 页签：分析记录 / 技能库 */}
+      <div className="mt-5 flex items-center gap-1 border-b border-line">
+        {(
+          [
+            { key: 'analyses', label: '分析记录', icon: SquareTerminal },
+            { key: 'skills', label: '技能库', icon: Lightbulb },
+          ] as const
+        ).map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            className={cn(
+              'flex items-center gap-1.5 border-b-2 px-3 pb-2 pt-1 text-[13px] font-medium transition-colors duration-150',
+              tab === key ? 'border-bench text-bench-ink' : 'border-transparent text-ink-mute hover:text-ink-soft',
+            )}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
 
-      {/* 筛选行 */}
+      {tab === 'skills' ? (
+        <SkillsPanel />
+      ) : (
+        <>
+          <GuideBanner />
+
+          {/* 筛选行 */}
       <div className="mt-5 flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -299,6 +331,8 @@ export default function Bioinfo() {
           <ExternalLink className="h-3 w-3" />
           带仓库链接的分析可在详情页直接跳转 Git 仓库对应 commit。
         </p>
+      )}
+        </>
       )}
     </div>
   )
