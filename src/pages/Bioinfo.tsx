@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { motion } from 'framer-motion'
 import {
-  BookOpen,
   Circle,
   CircleCheck,
   ExternalLink,
@@ -19,7 +18,6 @@ import type { CreateTRPCReact } from '@trpc/react-query'
 import { trpc } from '@/providers/trpc'
 import { cn } from '@/lib/utils'
 import SkillsPanel from '@/components/bioinfo/SkillsPanel'
-import GuidePanel from '@/components/bioinfo/GuidePanel'
 
 type AppRouterFromProxy = typeof trpc extends CreateTRPCReact<infer R, unknown> ? R : never
 type RouterOutputs = inferRouterOutputs<AppRouterFromProxy>
@@ -174,13 +172,14 @@ function GuideBanner() {
   )
 }
 
-type BioTab = 'analyses' | 'skills' | 'guide'
+type BioTab = 'analyses' | 'skills'
 
 export default function Bioinfo() {
-  // 页签支持 URL 深链接：/bioinfo?tab=skills|guide（命令面板/外链直达）
+  // 页签支持 URL 深链接：/bioinfo?tab=skills（命令面板/外链直达）；
+  // 旧的 ?tab=guide 深链接重定向到独立插槽 /guide
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
-  const tab: BioTab = tabParam === 'skills' || tabParam === 'guide' ? tabParam : 'analyses'
+  const tab: BioTab = tabParam === 'skills' ? 'skills' : 'analyses'
   const setTab = (t: BioTab) => setSearchParams(t === 'analyses' ? {} : { tab: t }, { replace: true })
   const [projectId, setProjectId] = useState<number | undefined>(undefined)
   const [status, setStatus] = useState<BioStatus | undefined>(undefined)
@@ -201,6 +200,9 @@ export default function Bioinfo() {
       done: all.filter((a) => a.status === 'done').length,
     }
   }, [items])
+
+  // 旧深链接兼容：?tab=guide 已迁移为独立插槽 /guide
+  if (tabParam === 'guide') return <Navigate to="/guide" replace />
 
   return (
     <div className="mx-auto w-full max-w-[1080px] px-4 py-6 md:px-8 md:py-8">
@@ -234,7 +236,6 @@ export default function Bioinfo() {
           [
             { key: 'analyses', label: '分析记录', icon: SquareTerminal },
             { key: 'skills', label: '技能库', icon: Lightbulb },
-            { key: 'guide', label: '学习指南', icon: BookOpen },
           ] as const
         ).map(({ key, label, icon: Icon }) => (
           <button
@@ -252,9 +253,7 @@ export default function Bioinfo() {
         ))}
       </div>
 
-      {tab === 'guide' ? (
-        <GuidePanel />
-      ) : tab === 'skills' ? (
+      {tab === 'skills' ? (
         <SkillsPanel />
       ) : (
         <>

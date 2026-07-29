@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import Lenis from 'lenis'
 import {
   BookMarked,
+  BookOpen,
   CalendarDays,
   ChevronDown,
   FileDown,
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { to: '/library', label: '方法库', en: 'Library', icon: BookMarked },
   { to: '/records', label: '湿实验记录', en: 'Wet Lab', icon: NotebookPen },
   { to: '/bioinfo', label: '生信分析', en: 'Bioinfo', icon: SquareTerminal },
+  { to: '/guide', label: '学习指南', en: 'Guide', icon: BookOpen },
   { to: '/schedule', label: '实验安排', en: 'Schedule', icon: CalendarDays },
   { to: '/export', label: '汇报导出', en: 'Export', icon: FileDown },
 ] as const

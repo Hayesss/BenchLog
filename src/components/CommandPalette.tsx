@@ -35,7 +35,7 @@ const NAV_PAGES: Hit[] = [
   { group: '页面', icon: NotebookPen, label: '湿实验记录', to: '/records' },
   { group: '页面', icon: SquareTerminal, label: '生信分析', to: '/bioinfo' },
   { group: '页面', icon: Lightbulb, label: '生信技能库', to: '/bioinfo?tab=skills' },
-  { group: '页面', icon: BookOpen, label: '生信学习指南', to: '/bioinfo?tab=guide' },
+  { group: '页面', icon: BookOpen, label: '学习指南', to: '/guide' },
   { group: '页面', icon: CalendarDays, label: '实验安排', to: '/schedule' },
   { group: '页面', icon: FileDown, label: '汇报导出', to: '/export' },
 ]

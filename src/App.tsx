@@ -12,6 +12,7 @@ import Library from './pages/Library'
 import LibraryEntry from './pages/LibraryEntry'
 import Bioinfo from './pages/Bioinfo'
 import BioinfoDetail from './pages/BioinfoDetail'
+import Guide from './pages/Guide'
 
 export default function App() {
   return (
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="bioinfo" element={<Bioinfo />} />
         <Route path="bioinfo/new" element={<BioinfoDetail />} />
         <Route path="bioinfo/:id" element={<BioinfoDetail />} />
+        <Route path="guide" element={<Guide />} />
         <Route path="export" element={<Export />} />
       </Route>
     </Routes>
