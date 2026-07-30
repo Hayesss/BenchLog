@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router'
 import { format } from 'date-fns'
 import {
   Archive,
   ArchiveRestore,
+  Box,
   Check,
   ChevronDown,
   FolderKanban,
@@ -44,6 +46,7 @@ const PROJECT_COLORS = [
 /** 单张项目卡片：色点+名称 / 关联计数 / 创建时间 / 改名·换色·归档·删除 */
 function ProjectCard({
   project,
+  boxCount,
   renaming,
   onStartRename,
   onCancelRename,
@@ -57,6 +60,7 @@ function ProjectCard({
   onStartRename: () => void
   onCancelRename: () => void
   onSubmitRename: (name: string) => void
+  boxCount: number
   onSetColor: (color: string) => void
   onToggleArchived: () => void
   onAskDelete: () => void
@@ -120,8 +124,15 @@ function ProjectCard({
 
       {/* 关联计数 + 创建时间 */}
       <div className="flex items-center justify-between text-[12.5px] text-ink-mute">
-        <span>
+        <span className="flex items-center gap-1.5">
           {project.recordCount} 条记录 · {project.analysisCount} 项分析
+          <Link
+            to={`/samples?project=${project.id}`}
+            className="flex items-center gap-1 rounded-md px-1 text-bench transition-colors duration-150 hover:bg-bench-wash"
+          >
+            <Box className="h-3 w-3" strokeWidth={1.8} />
+            {boxCount} 盒
+          </Link>
         </span>
         <span className="font-mono text-[11.5px]">
           {format(new Date(project.createdAt), 'yyyy-MM-dd')}
@@ -210,6 +221,7 @@ function ProjectCard({
 export default function Projects() {
   const utils = trpc.useUtils()
   const projectsQuery = trpc.project.list.useQuery()
+  const boxesQuery = trpc.sample.listBoxes.useQuery()
   const [createOpen, setCreateOpen] = useState(false)
   const [renamingId, setRenamingId] = useState<number | null>(null)
   const [pendingDelete, setPendingDelete] = useState<ProjectWithCounts | null>(null)
@@ -219,6 +231,11 @@ export default function Projects() {
     () => projectsQuery.data ?? [],
     [projectsQuery.data],
   )
+  const boxCountMap = useMemo(() => {
+    const m = new Map<number, number>()
+    for (const b of boxesQuery.data ?? []) m.set(b.projectId, (m.get(b.projectId) ?? 0) + 1)
+    return m
+  }, [boxesQuery.data])
   const activeProjects = projects.filter((p) => !p.archived)
   const archivedProjects = projects.filter((p) => p.archived)
 
@@ -264,6 +281,7 @@ export default function Projects() {
     <ProjectCard
       key={p.id}
       project={p}
+      boxCount={boxCountMap.get(p.id) ?? 0}
       renaming={renamingId === p.id}
       onStartRename={() => setRenamingId(p.id)}
       onCancelRename={() => setRenamingId(null)}

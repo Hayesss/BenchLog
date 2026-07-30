@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { Box, MapPin, Plus, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -123,7 +123,11 @@ function NewBoxDialog({
 /* Page                                                                 */
 /* ------------------------------------------------------------------ */
 export default function Samples() {
-  const [projectFilter, setProjectFilter] = useState<number | null>(null)
+  const [searchParams] = useSearchParams()
+  const urlProject = Number(searchParams.get('project'))
+  const [projectFilter, setProjectFilter] = useState<number | null>(
+    Number.isFinite(urlProject) && urlProject > 0 ? urlProject : null,
+  )
   const [q, setQ] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
 
