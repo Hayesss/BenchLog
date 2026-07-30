@@ -13,6 +13,7 @@ import { gitRouter } from "./gitRouter";
 import { demoRouter } from "./demoRouter";
 import { quickNoteRouter } from "./quickNoteRouter";
 import { sampleRouter } from "./sampleRouter";
+import { mouseRouter } from "./mouseRouter";
 import { aiRouter } from "./aiRouter";
 
 export const appRouter = createRouter({
@@ -36,6 +37,7 @@ export const appRouter = createRouter({
   demo: demoRouter,
   quickNote: quickNoteRouter,
   sample: sampleRouter,
+  mouse: mouseRouter,
   ai: aiRouter,
 });
 

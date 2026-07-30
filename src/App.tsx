@@ -18,6 +18,7 @@ import Inbox from './pages/Inbox'
 import Assistant from './pages/Assistant'
 import Samples from './pages/Samples'
 import BoxDetail from './pages/BoxDetail'
+import Mice from './pages/Mice'
 import Projects from './pages/Projects'
 
 export default function App() {
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="assistant" element={<Assistant />} />
         <Route path="samples" element={<Samples />} />
         <Route path="samples/:boxId" element={<BoxDetail />} />
+        <Route path="mice" element={<Mice />} />
       </Route>
     </Routes>
   )

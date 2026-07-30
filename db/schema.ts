@@ -572,3 +572,71 @@ export const samples = mysqlTable(
 );
 export type Sample = typeof samples.$inferSelect;
 export type InsertSample = typeof samples.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* 小鼠库存管理 v1 基础台账：品系 → 个体（耳号手动输入）→ 笼位，          */
+/* 附品系库存看板统计与扩繁预警                                          */
+/* ------------------------------------------------------------------ */
+
+/** 小鼠品系：lowStockThreshold > 0 且存活数低于该值时触发扩繁预警（0 = 不预警） */
+export const mouseStrains = mysqlTable(
+  "mouse_strains",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+    name: varchar("name", { length: 80 }).notNull(), // 品系名，如 C57BL/6J-Gt(ROSA)26Sor
+    background: varchar("background", { length: 80 }), // 遗传背景，如 C57BL/6J
+    genotypeDesc: varchar("genotypeDesc", { length: 200 }), // 基因型说明
+    maintenance: varchar("maintenance", { length: 24 }), // 保种方式：自繁/冷冻保存/定期购入
+    color: varchar("color", { length: 7 }).notNull().default("#3E7C6B"), // 看板展示色
+    lowStockThreshold: int("lowStockThreshold").notNull().default(0), // 存活低于此值预警，0=不预警
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => [index("mouse_strains_user_idx").on(t.userId)],
+);
+export type MouseStrain = typeof mouseStrains.$inferSelect;
+export type InsertMouseStrain = typeof mouseStrains.$inferInsert;
+
+/** 笼位：room/rack 记物理位置 */
+export const mouseCages = mysqlTable(
+  "mouse_cages",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+    cageNo: varchar("cageNo", { length: 40 }).notNull(), // 笼号
+    room: varchar("room", { length: 60 }), // 房间
+    rack: varchar("rack", { length: 60 }), // 笼架
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => [index("mouse_cages_user_idx").on(t.userId)],
+);
+export type MouseCage = typeof mouseCages.$inferSelect;
+export type InsertMouseCage = typeof mouseCages.$inferInsert;
+
+/** 小鼠个体：耳号用户手动输入，(userId, strainId, earNo) 唯一；genotype 为 null 表示未鉴定 */
+export const mice = mysqlTable(
+  "mice",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+    strainId: bigint("strainId", { mode: "number", unsigned: true }).notNull(),
+    earNo: varchar("earNo", { length: 40 }).notNull(), // 耳号/编号，手动输入
+    gender: varchar("gender", { length: 8 }).notNull().default("unknown"), // male/female/unknown
+    birthDate: varchar("birthDate", { length: 10 }), // YYYY-MM-DD
+    genotype: varchar("genotype", { length: 40 }), // +/+、+/-、-/-、Tg+ 等；null=未鉴定
+    cageId: bigint("cageId", { mode: "number", unsigned: true }), // 所在笼位，null=未分配
+    source: varchar("source", { length: 24 }), // 来源：自繁/购入/赠送
+    status: varchar("status", { length: 12 }).notNull().default("alive"), // alive/sacrificed/dead/culled
+    statusDate: varchar("statusDate", { length: 10 }), // 状态变更日期 YYYY-MM-DD
+    statusReason: varchar("statusReason", { length: 200 }), // 状态原因
+    notes: varchar("notes", { length: 500 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("mice_strain_earno_uidx").on(t.userId, t.strainId, t.earNo),
+    index("mice_user_strain_idx").on(t.userId, t.strainId),
+    index("mice_user_status_idx").on(t.userId, t.status),
+  ],
+);
+export type Mouse = typeof mice.$inferSelect;
+export type InsertMouse = typeof mice.$inferInsert;

@@ -27,6 +27,7 @@ const ROUTE_LABELS: Array<[RegExp, string[]]> = [
   [/^\/assistant/, ['AI 助手']],
   [/^\/samples\/\d+/, ['样本盒']],
   [/^\/samples/, ['样本库']],
+  [/^\/mice/, ['小鼠库存']],
 ]
 
 function useBreadcrumb(): string[] {
