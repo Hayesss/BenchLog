@@ -769,15 +769,15 @@ export default function RecordDetail() {
           type="button"
           onClick={() => void doSave()}
           disabled={saving}
-          className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line-strong bg-surface text-[13.5px] font-medium text-ink transition-colors duration-150 active:scale-[0.98] disabled:opacity-60"
+          className="flex h-11 flex-[3] items-center justify-center gap-1.5 rounded-lg bg-bench text-[13.5px] font-medium text-white shadow-card transition-all duration-150 active:scale-[0.98] disabled:opacity-60"
         >
-          <Save className="h-4 w-4" />
+          {savePulse ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
           {saving ? '保存中…' : dirty || isNew ? '保存' : '已保存'}
         </button>
         <button
           type="button"
           onClick={() => galleryRef.current?.pick(true)}
-          className="flex h-11 flex-[2] items-center justify-center gap-1.5 rounded-lg bg-bench text-[13.5px] font-medium text-white shadow-card transition-all duration-150 active:scale-[0.98]"
+          className="flex h-11 flex-[2] items-center justify-center gap-1.5 rounded-lg border border-line-strong bg-surface text-[13.5px] font-medium text-ink transition-colors duration-150 active:scale-[0.98]"
         >
           <Camera className="h-4 w-4" />
           拍照上传

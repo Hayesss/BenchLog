@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
+  CalendarDays,
   CheckSquare,
   ChevronDown,
   FileDown,
@@ -163,6 +164,9 @@ function FilterControls({
   toggleTag,
   status,
   setStatus,
+  dateFrom,
+  dateTo,
+  patchParams,
   onNewProject,
 }: {
   projects: ProjectItem[]
@@ -173,6 +177,9 @@ function FilterControls({
   toggleTag: (name: string) => void
   status: RecordStatus | 'all'
   setStatus: (s: RecordStatus | 'all') => void
+  dateFrom: string
+  dateTo: string
+  patchParams: (patch: Record<string, string | null>) => void
   onNewProject: () => void
 }) {
   return (
@@ -225,6 +232,35 @@ function FilterControls({
         )}
       </div>
       <div>
+        <p className="caption-en mb-2">日期范围 DATE</p>
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => patchParams({ from: e.target.value || null })}
+            aria-label="开始日期"
+            className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 text-[12.5px] text-ink outline-none transition-colors focus:border-bench"
+          />
+          <span className="shrink-0 text-[12px] text-ink-mute">至</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => patchParams({ to: e.target.value || null })}
+            aria-label="结束日期"
+            className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 text-[12.5px] text-ink outline-none transition-colors focus:border-bench"
+          />
+        </div>
+        {(dateFrom || dateTo) && (
+          <button
+            type="button"
+            onClick={() => patchParams({ from: null, to: null })}
+            className="mt-1.5 text-[12px] text-ink-mute underline-offset-2 hover:text-bench hover:underline"
+          >
+            清除日期
+          </button>
+        )}
+      </div>
+      <div>
         <p className="caption-en mb-2">状态 STATUS</p>
         <div className="flex flex-wrap gap-1.5">
           {(['all', 'ongoing', 'done', 'failed'] as const).map((s) => (
@@ -269,6 +305,8 @@ export default function Records() {
     () => (searchParams.get('tags') ?? '').split(',').filter(Boolean),
     [searchParams],
   )
+  const dateFrom = searchParams.get('from') ?? ''
+  const dateTo = searchParams.get('to') ?? ''
 
   const patchParams = useCallback(
     (patch: Record<string, string | null>) => {
@@ -325,9 +363,11 @@ export default function Records() {
             (r.projectId != null && selectedProjects.includes(r.projectId))) &&
           (status === 'all' || r.status === status) &&
           (selectedTags.length === 0 || selectedTags.every((t) => (r.tags ?? []).includes(t))) &&
+          (dateFrom === '' || r.recordDate >= dateFrom) &&
+          (dateTo === '' || r.recordDate <= dateTo) &&
           matchesQuery(r, q),
       ),
-    [records, selectedProjects, status, selectedTags, q],
+    [records, selectedProjects, status, selectedTags, q, dateFrom, dateTo],
   )
 
   // stats
@@ -489,8 +529,14 @@ export default function Records() {
 
   const [filterSheetOpen, setFilterSheetOpen] = useState(false)
   const hasFilter =
-    q.trim() !== '' || selectedProjects.length > 0 || selectedTags.length > 0 || status !== 'all'
-  const clearFilters = () => patchParams({ q: null, project: null, tags: null, status: null })
+    q.trim() !== '' ||
+    selectedProjects.length > 0 ||
+    selectedTags.length > 0 ||
+    status !== 'all' ||
+    dateFrom !== '' ||
+    dateTo !== ''
+  const clearFilters = () =>
+    patchParams({ q: null, project: null, tags: null, status: null, from: null, to: null })
 
   const isLoading = recordsQuery.isLoading
 
@@ -575,9 +621,16 @@ export default function Records() {
             >
               <Filter className="h-4 w-4" />
               筛选
-              {(selectedProjects.length > 0 || selectedTags.length > 0 || status !== 'all') && (
+              {(selectedProjects.length > 0 ||
+                selectedTags.length > 0 ||
+                status !== 'all' ||
+                dateFrom !== '' ||
+                dateTo !== '') && (
                 <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-bench px-1 font-mono text-[10px] text-white">
-                  {selectedProjects.length + selectedTags.length + (status !== 'all' ? 1 : 0)}
+                  {selectedProjects.length +
+                    selectedTags.length +
+                    (status !== 'all' ? 1 : 0) +
+                    (dateFrom !== '' || dateTo !== '' ? 1 : 0)}
                 </span>
               )}
             </button>
@@ -715,6 +768,57 @@ export default function Records() {
                   </button>
                 ))}
               </div>
+
+              {/* date range popover */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      'flex h-9 items-center gap-1.5 rounded-lg border px-3 text-[13px] font-medium shadow-card transition-colors duration-150',
+                      dateFrom !== '' || dateTo !== ''
+                        ? 'border-bench bg-bench-wash text-bench-ink'
+                        : 'border-line bg-surface text-ink-soft hover:border-line-strong',
+                    )}
+                  >
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    日期
+                    <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-64">
+                  <p className="caption-en mb-2">日期范围 DATE</p>
+                  <div className="flex flex-col gap-2">
+                    <label className="flex items-center gap-2 text-[12.5px] text-ink-soft">
+                      <span className="w-8 shrink-0">从</span>
+                      <input
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => patchParams({ from: e.target.value || null })}
+                        className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 text-[12.5px] text-ink outline-none focus:border-bench"
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 text-[12.5px] text-ink-soft">
+                      <span className="w-8 shrink-0">至</span>
+                      <input
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => patchParams({ to: e.target.value || null })}
+                        className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 text-[12.5px] text-ink outline-none focus:border-bench"
+                      />
+                    </label>
+                    {(dateFrom || dateTo) && (
+                      <button
+                        type="button"
+                        onClick={() => patchParams({ from: null, to: null })}
+                        className="self-start text-[12px] text-ink-mute underline-offset-2 hover:text-bench hover:underline"
+                      >
+                        清除日期
+                      </button>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </>
           )}
 
@@ -1032,6 +1136,9 @@ export default function Records() {
               toggleTag={toggleTag}
               status={status}
               setStatus={(s) => patchParams({ status: s === 'all' ? null : s })}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              patchParams={patchParams}
               onNewProject={() => {
                 setFilterSheetOpen(false)
                 setEditingProject(null)

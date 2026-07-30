@@ -14,8 +14,10 @@ import {
   NotebookPen,
   Plus,
   Search,
+  Settings2,
   SquareTerminal,
   Tag,
+  Trash2,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -35,6 +37,7 @@ const NAV_ITEMS = [
   { to: '/guide', label: '学习指南', en: 'Guide', icon: BookOpen },
   { to: '/schedule', label: '实验安排', en: 'Schedule', icon: CalendarDays },
   { to: '/export', label: '汇报导出', en: 'Export', icon: FileDown },
+  { to: '/trash', label: '最近删除', en: 'Trash', icon: Trash2 },
 ] as const
 
 const FALLBACK_COLORS = ['#3E7C6B', '#5B7C99', '#B0707C', '#8A7CA8', '#B08D57', '#7C9161']
@@ -64,11 +67,14 @@ function Sidebar() {
   const [projectDialogOpen, setProjectDialogOpen] = useState(false)
   const { user, isAuthenticated, isLoading, logout } = useAuth()
   const projectsQuery = trpc.project.list.useQuery(undefined, { enabled: isAuthenticated })
-  const sidebarProjects = (projectsQuery.data ?? []).map((p, i) => ({
-    id: p.id,
-    name: p.name,
-    color: p.color || FALLBACK_COLORS[i % FALLBACK_COLORS.length],
-  }))
+  // 归档项目不进侧边栏分组（在 /projects 管理页底部折叠区维护）
+  const sidebarProjects = (projectsQuery.data ?? [])
+    .filter((p) => !p.archived)
+    .map((p, i) => ({
+      id: p.id,
+      name: p.name,
+      color: p.color || FALLBACK_COLORS[i % FALLBACK_COLORS.length],
+    }))
 
   return (
     <aside className="sticky top-0 hidden h-[100dvh] w-60 shrink-0 flex-col border-r border-line bg-paper md:flex">
@@ -133,6 +139,14 @@ function Sidebar() {
           >
             <Plus className="h-3.5 w-3.5" strokeWidth={2} />
           </button>
+          <Link
+            to="/projects"
+            aria-label="管理项目"
+            title="管理项目"
+            className="mr-1 flex h-6 w-6 items-center justify-center rounded-md text-ink-mute transition-colors duration-150 hover:bg-bench-wash hover:text-bench"
+          >
+            <Settings2 className="h-3.5 w-3.5" strokeWidth={2} />
+          </Link>
         </div>
         {projectsOpen && (
           <div className="mt-1 flex flex-col gap-0.5">

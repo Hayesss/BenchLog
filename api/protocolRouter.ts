@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { protocols, protocolVersions, type ProtocolSnapshot } from "@db/schema";
@@ -32,12 +33,23 @@ function snapshotOf(p: typeof protocols.$inferSelect): ProtocolSnapshot {
   };
 }
 
+/** 写入前校验：协议须归属当前用户且未进回收站（已软删的协议禁止任何写入） */
+async function assertProtocolWritable(userId: number, protocolId: number) {
+  const rows = await getDb()
+    .select({ id: protocols.id, deletedAt: protocols.deletedAt })
+    .from(protocols)
+    .where(and(eq(protocols.id, protocolId), eq(protocols.userId, userId)));
+  if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "方法不存在" });
+  if (rows[0].deletedAt)
+    throw new TRPCError({ code: "BAD_REQUEST", message: "方法已在回收站，请先恢复再操作" });
+}
+
 export const protocolRouter = createRouter({
   list: authedQuery.query(({ ctx }) =>
     getDb()
       .select()
       .from(protocols)
-      .where(eq(protocols.userId, ctx.user.id))
+      .where(and(eq(protocols.userId, ctx.user.id), isNull(protocols.deletedAt)))
       .orderBy(desc(protocols.updatedAt)),
   ),
 
@@ -45,7 +57,13 @@ export const protocolRouter = createRouter({
     const rows = await getDb()
       .select()
       .from(protocols)
-      .where(and(eq(protocols.id, input.id), eq(protocols.userId, ctx.user.id)));
+      .where(
+        and(
+          eq(protocols.id, input.id),
+          eq(protocols.userId, ctx.user.id),
+          isNull(protocols.deletedAt),
+        ),
+      );
     return rows[0] ?? null;
   }),
 
@@ -86,6 +104,7 @@ export const protocolRouter = createRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
+      await assertProtocolWritable(ctx.user.id, id);
       const clean = Object.fromEntries(
         Object.entries(data).filter(([, v]) => v !== undefined),
       );
@@ -96,7 +115,53 @@ export const protocolRouter = createRouter({
       return { ok: true };
     }),
 
+  /** 软删除：移入回收站（protocolVersions 保留，恢复时完整还原） */
   remove: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    await getDb()
+      .update(protocols)
+      .set({ deletedAt: new Date() })
+      .where(
+        and(
+          eq(protocols.id, input.id),
+          eq(protocols.userId, ctx.user.id),
+          isNull(protocols.deletedAt),
+        ),
+      );
+    return { ok: true };
+  }),
+
+  /** 回收站：当前用户已删除的协议（新→旧） */
+  trash: authedQuery.query(({ ctx }) =>
+    getDb()
+      .select({
+        id: protocols.id,
+        name: protocols.name,
+        category: protocols.category,
+        version: protocols.version,
+        deletedAt: protocols.deletedAt,
+      })
+      .from(protocols)
+      .where(and(eq(protocols.userId, ctx.user.id), isNotNull(protocols.deletedAt)))
+      .orderBy(desc(protocols.deletedAt)),
+  ),
+
+  /** 从回收站恢复 */
+  restore: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    await getDb()
+      .update(protocols)
+      .set({ deletedAt: null })
+      .where(
+        and(
+          eq(protocols.id, input.id),
+          eq(protocols.userId, ctx.user.id),
+          isNotNull(protocols.deletedAt),
+        ),
+      );
+    return { ok: true };
+  }),
+
+  /** 彻底删除：级联清掉 protocolVersions（不可恢复） */
+  purge: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
     await getDb()
       .delete(protocolVersions)
       .where(and(eq(protocolVersions.protocolId, input.id), eq(protocolVersions.userId, ctx.user.id)));
@@ -117,6 +182,8 @@ export const protocolRouter = createRouter({
           .where(and(eq(protocols.id, input.id), eq(protocols.userId, ctx.user.id)))
       )[0];
       if (!p) throw new Error("Protocol not found");
+      if (p.deletedAt)
+        throw new TRPCError({ code: "BAD_REQUEST", message: "方法已在回收站，请先恢复再操作" });
       await getDb().insert(protocolVersions).values({
         protocolId: p.id,
         userId: ctx.user.id,
@@ -145,6 +212,7 @@ export const protocolRouter = createRouter({
   incrementUse: authedQuery
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      await assertProtocolWritable(ctx.user.id, input.id);
       await getDb()
         .update(protocols)
         .set({ useCount: sql`${protocols.useCount} + 1` })
@@ -157,6 +225,7 @@ export const protocolRouter = createRouter({
   setPinned: authedQuery
     .input(z.object({ id: z.number(), pinned: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
+      await assertProtocolWritable(ctx.user.id, input.id);
       await getDb()
         .update(protocols)
         .set({ pinned: input.pinned, pinnedAt: input.pinned ? new Date() : null })

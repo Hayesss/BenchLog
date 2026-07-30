@@ -9,6 +9,7 @@ import {
   FileDown,
   FlaskConical,
   Folder,
+  FolderKanban,
   LayoutDashboard,
   Lightbulb,
   NotebookPen,
@@ -33,12 +34,16 @@ const NAV_PAGES: Hit[] = [
   { group: '页面', icon: FlaskConical, label: '实验方法', to: '/protocols' },
   { group: '页面', icon: BookMarked, label: '方法库', to: '/library' },
   { group: '页面', icon: NotebookPen, label: '湿实验记录', to: '/records' },
+  { group: '页面', icon: FolderKanban, label: '项目管理', to: '/projects' },
   { group: '页面', icon: SquareTerminal, label: '生信分析', to: '/bioinfo' },
   { group: '页面', icon: Lightbulb, label: '生信技能库', to: '/bioinfo?tab=skills' },
   { group: '页面', icon: BookOpen, label: '学习指南', to: '/guide' },
   { group: '页面', icon: CalendarDays, label: '实验安排', to: '/schedule' },
   { group: '页面', icon: FileDown, label: '汇报导出', to: '/export' },
 ]
+
+/** 结果类型筛选：'all' 或具体分组名 */
+const GROUP_FILTERS = ['全部', '湿实验记录', '实验方法', '项目', '标签', '流程', '待办'] as const
 
 function Highlight({ text, q }: { text: string; q: string }) {
   if (!q) return <>{text}</>
@@ -62,6 +67,7 @@ export default function CommandPalette() {
   const [q, setQ] = useState('')
   const [debouncedQ, setDebouncedQ] = useState('')
   const [active, setActive] = useState(0)
+  const [groupFilter, setGroupFilter] = useState<(typeof GROUP_FILTERS)[number]>('全部')
   const inputRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
 
@@ -86,6 +92,7 @@ export default function CommandPalette() {
     if (open) {
       setQ('')
       setActive(0)
+      setGroupFilter('全部')
       setTimeout(() => inputRef.current?.focus(), 60)
     }
   }, [open])
@@ -156,6 +163,13 @@ export default function CommandPalette() {
     return out
   }, [search.data, debouncedQ])
 
+  const visibleHits = useMemo(
+    () => (groupFilter === '全部' ? hits : hits.filter((h) => h.group === groupFilter)),
+    [hits, groupFilter],
+  )
+
+  useEffect(() => setActive(0), [groupFilter])
+
   const go = useCallback(
     (hit: Hit) => {
       setOpen(false)
@@ -167,12 +181,12 @@ export default function CommandPalette() {
   const onInputKey = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setActive((a) => Math.min(a + 1, hits.length - 1))
+      setActive((a) => Math.min(a + 1, visibleHits.length - 1))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       setActive((a) => Math.max(a - 1, 0))
-    } else if (e.key === 'Enter' && hits[active]) {
-      go(hits[active])
+    } else if (e.key === 'Enter' && visibleHits[active]) {
+      go(visibleHits[active])
     }
   }
 
@@ -215,6 +229,26 @@ export default function CommandPalette() {
               </kbd>
             </div>
 
+            {debouncedQ.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 border-b border-line px-4 py-2">
+                {GROUP_FILTERS.map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => setGroupFilter(g)}
+                    className={cn(
+                      'h-[26px] rounded-full px-2.5 text-[11.5px] font-medium transition-colors duration-100',
+                      groupFilter === g
+                        ? 'bg-ink text-paper'
+                        : 'border border-line bg-paper text-ink-soft hover:border-line-strong',
+                    )}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto p-2">
               {debouncedQ.length === 0 ? (
                 <p className="px-3 py-10 text-center text-[12.5px] text-ink-mute">
@@ -222,13 +256,13 @@ export default function CommandPalette() {
                 </p>
               ) : search.isLoading ? (
                 <p className="px-3 py-10 text-center text-[12.5px] text-ink-mute">搜索中…</p>
-              ) : hits.length === 0 ? (
+              ) : visibleHits.length === 0 ? (
                 <p className="px-3 py-10 text-center text-[12.5px] text-ink-mute">
-                  没有找到「{debouncedQ}」相关内容
+                  没有找到「{debouncedQ}」相关{groupFilter === '全部' ? '内容' : `的${groupFilter}`}
                 </p>
               ) : (
                 <ul>
-                  {hits.map((h, i) => {
+                  {visibleHits.map((h, i) => {
                     const showGroup = h.group !== lastGroup
                     lastGroup = h.group
                     const Icon = h.icon

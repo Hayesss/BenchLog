@@ -12,7 +12,13 @@ export type RecordDetailData = NonNullable<RouterOutputs['record']['byId']>
 export type RecordImageItem = RecordDetailData['images'][number]
 export type AttachmentItem = RouterOutputs['attachment']['listByRecord'][number]
 export type RecordVersionItem = RouterOutputs['record']['versions'][number]
-export type ProjectItem = RouterOutputs['project']['list'][number]
+/** 项目基础行（record.project / 对话框编辑目标等场景，不含关联计数） */
+export type ProjectItem = Omit<
+  RouterOutputs['project']['list'][number],
+  'recordCount' | 'analysisCount'
+>
+/** 项目管理页列表项：项目行 + {recordCount, analysisCount} */
+export type ProjectWithCounts = RouterOutputs['project']['list'][number]
 export type ProtocolItem = RouterOutputs['protocol']['list'][number]
 export type TagItem = RouterOutputs['tag']['list'][number]
 export type Deviation = RecordListItem['deviations'][number]

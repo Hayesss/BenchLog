@@ -9,15 +9,28 @@ import {
   Camera,
   ChevronDown,
   CircleCheck,
+  Eraser,
   FlaskConical,
   FolderPlus,
   NotebookPen,
   Plus,
+  Sparkles,
   SquareTerminal,
   X,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { trpc } from '@/providers/trpc'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import ActivityCalendar from '@/components/dashboard/ActivityCalendar'
 import PinStarButton from '@/components/protocols/PinStarButton'
 import RecordProjectDialog from '@/components/records/RecordProjectDialog'
@@ -514,6 +527,123 @@ function OnboardingCard() {
   )
 }
 
+/** 示例数据卡：新手引导关闭/完成且无任何数据时提示一键填充；有示例数据时提供一键清除 */
+function DemoCard() {
+  const utils = trpc.useUtils()
+  const projectsQ = trpc.project.list.useQuery()
+  const recordsQ = trpc.record.list.useQuery()
+  const protocolsQ = trpc.protocol.list.useQuery()
+  const demoQ = trpc.demo.status.useQuery()
+  const [clearOpen, setClearOpen] = useState(false)
+
+  const invalidateAll = () => {
+    void utils.demo.status.invalidate()
+    void utils.project.list.invalidate()
+    void utils.record.list.invalidate()
+    void utils.protocol.list.invalidate()
+  }
+  const generateMut = trpc.demo.generate.useMutation({
+    onSuccess: (res) => {
+      if (res.created) toast.success('已填充示例数据，随便体验')
+      else toast.info('示例数据已存在')
+      invalidateAll()
+    },
+    onError: (e) => toast.error(e.message || '生成失败，请重试'),
+  })
+  const clearMut = trpc.demo.clear.useMutation({
+    onSuccess: () => {
+      toast.success('示例数据已清除')
+      invalidateAll()
+    },
+    onError: (e) => toast.error(e.message || '清除失败，请重试'),
+  })
+
+  if (!projectsQ.data || !recordsQ.data || !protocolsQ.data || !demoQ.data) return null
+  const onboardingHidden =
+    localStorage.getItem(ONBOARD_KEY) === '1' ||
+    (projectsQ.data.length > 0 && protocolsQ.data.length > 0 && recordsQ.data.length > 0)
+  const hasDemo = demoQ.data.hasDemo
+  const noData = projectsQ.data.length === 0 && recordsQ.data.length === 0
+  const showGenerate = onboardingHidden && !hasDemo && noData
+  if (!showGenerate && !hasDemo) return null
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: EASE }}
+      className="mb-8 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-4 shadow-card"
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bench-wash">
+        {hasDemo ? (
+          <Eraser className="h-4 w-4 text-bench" strokeWidth={1.8} />
+        ) : (
+          <Sparkles className="h-4 w-4 text-bench" strokeWidth={1.8} />
+        )}
+      </span>
+      <div className="min-w-0 flex-1">
+        {hasDemo ? (
+          <>
+            <p className="text-[13.5px] font-medium text-ink">正在体验示例数据</p>
+            <p className="text-[12px] text-ink-mute">
+              示例项目 {demoQ.data.projects} 个 · 示例记录 {demoQ.data.records} 条 · 示例方法 {demoQ.data.protocols} 个
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-[13.5px] font-medium text-ink">没有数据？一键填充示例数据体验</p>
+            <p className="text-[12px] text-ink-mute">生成 1 个示例项目、3 条湿实验记录和 1 个 SOP 方法，可随时一键清除</p>
+          </>
+        )}
+      </div>
+      {hasDemo ? (
+        <button
+          type="button"
+          onClick={() => setClearOpen(true)}
+          disabled={clearMut.isPending}
+          className="flex h-9 items-center gap-1.5 rounded-lg border border-line px-3.5 text-[13px] font-medium text-ink-soft transition-colors duration-150 hover:border-danger hover:text-danger"
+        >
+          <Eraser className="h-4 w-4" />
+          清除示例数据
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => generateMut.mutate()}
+          disabled={generateMut.isPending}
+          className="flex h-9 items-center gap-1.5 rounded-lg bg-bench px-3.5 text-[13px] font-medium text-white shadow-card transition-colors duration-150 hover:bg-bench-deep disabled:opacity-60"
+        >
+          <Sparkles className="h-4 w-4" />
+          {generateMut.isPending ? '正在生成…' : '填充示例数据'}
+        </button>
+      )}
+
+      <AlertDialog open={clearOpen} onOpenChange={setClearOpen}>
+        <AlertDialogContent className="rounded-xl border-line">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-[18px]">清除全部示例数据？</AlertDialogTitle>
+            <AlertDialogDescription className="text-[13px] text-ink-soft">
+              将删除所有标记为「示例」的项目、记录与方法（含其图片、附件与版本），不会动你的真实数据。此操作不可恢复。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-lg">取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-lg bg-danger text-white hover:bg-danger/90"
+              onClick={() => {
+                clearMut.mutate()
+                setClearOpen(false)
+              }}
+            >
+              清除示例数据
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </motion.section>
+  )
+}
+
 function QuickCreate() {
   const [projectDialogOpen, setProjectDialogOpen] = useState(false)
   const items = [
@@ -839,6 +969,7 @@ export default function Dashboard() {
 
       {/* 区块 2-5：左 2/3 + 右 1/3 */}
       <OnboardingCard />
+      <DemoCard />
       <div className="mb-10 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
           <TodoCard

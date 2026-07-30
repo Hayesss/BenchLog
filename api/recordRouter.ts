@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, desc, eq, gte, lte } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, isNull, lte } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
@@ -78,6 +78,17 @@ async function snapshotCurrent(userId: number, recordId: number) {
   return true;
 }
 
+/** 写入前校验：记录须归属当前用户且未进回收站（已软删的记录禁止任何写入） */
+async function assertRecordWritable(userId: number, recordId: number) {
+  const rows = await getDb()
+    .select({ id: records.id, deletedAt: records.deletedAt })
+    .from(records)
+    .where(and(eq(records.id, recordId), eq(records.userId, userId)));
+  if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "记录不存在" });
+  if (rows[0].deletedAt)
+    throw new TRPCError({ code: "BAD_REQUEST", message: "记录已在回收站，请先恢复再操作" });
+}
+
 export const recordRouter = createRouter({
   list: authedQuery
     .input(
@@ -91,7 +102,7 @@ export const recordRouter = createRouter({
         .optional(),
     )
     .query(async ({ ctx, input }) => {
-      const conds = [eq(records.userId, ctx.user.id)];
+      const conds = [eq(records.userId, ctx.user.id), isNull(records.deletedAt)];
       if (input?.projectId) conds.push(eq(records.projectId, input.projectId));
       if (input?.status) conds.push(eq(records.status, input.status));
       if (input?.from) conds.push(gte(records.recordDate, input.from));
@@ -110,6 +121,7 @@ export const recordRouter = createRouter({
       .from(records)
       .where(and(eq(records.id, input.id), eq(records.userId, ctx.user.id)));
     if (!rows[0]) return null;
+    if (rows[0].deletedAt) throw new TRPCError({ code: "NOT_FOUND", message: "记录已删除" });
     const [withMeta] = await attachMeta(ctx.user.id, [rows[0]]);
     const images = await getDb()
       .select()
@@ -137,6 +149,7 @@ export const recordRouter = createRouter({
     .input(z.object({ id: z.number(), ...recordFieldsInput }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
+      await assertRecordWritable(ctx.user.id, id);
       // 保存前先把当前行快照进版本历史（留下「上一版」）
       await snapshotCurrent(ctx.user.id, id);
       const res = await getDb()
@@ -176,6 +189,7 @@ export const recordRouter = createRouter({
         .where(and(eq(recordVersions.id, input.versionId), eq(recordVersions.userId, ctx.user.id)));
       const version = vs[0];
       if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "版本不存在" });
+      await assertRecordWritable(ctx.user.id, version.recordId);
       const snap = version.snapshot;
       // 恢复前的当前行也先留一版，保证可反悔
       const owned = await snapshotCurrent(ctx.user.id, version.recordId);
@@ -203,6 +217,7 @@ export const recordRouter = createRouter({
   updateStatus: authedQuery
     .input(z.object({ id: z.number(), status: recordStatusSchema }))
     .mutation(async ({ ctx, input }) => {
+      await assertRecordWritable(ctx.user.id, input.id);
       await getDb()
         .update(records)
         .set({ status: input.status })
@@ -210,7 +225,48 @@ export const recordRouter = createRouter({
       return { ok: true };
     }),
 
+  /** 软删除：移入回收站（images/attachments/versions 保留，恢复时完整还原） */
   remove: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    await getDb()
+      .update(records)
+      .set({ deletedAt: new Date() })
+      .where(
+        and(eq(records.id, input.id), eq(records.userId, ctx.user.id), isNull(records.deletedAt)),
+      );
+    return { ok: true };
+  }),
+
+  /** 回收站：当前用户已删除的记录（新→旧） */
+  trash: authedQuery.query(async ({ ctx }) => {
+    const rows = await getDb()
+      .select({
+        id: records.id,
+        title: records.title,
+        recordDate: records.recordDate,
+        deletedAt: records.deletedAt,
+        projectId: records.projectId,
+        projectName: projects.name,
+      })
+      .from(records)
+      .leftJoin(projects, eq(records.projectId, projects.id))
+      .where(and(eq(records.userId, ctx.user.id), isNotNull(records.deletedAt)))
+      .orderBy(desc(records.deletedAt));
+    return rows;
+  }),
+
+  /** 从回收站恢复 */
+  restore: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    await getDb()
+      .update(records)
+      .set({ deletedAt: null })
+      .where(
+        and(eq(records.id, input.id), eq(records.userId, ctx.user.id), isNotNull(records.deletedAt)),
+      );
+    return { ok: true };
+  }),
+
+  /** 彻底删除：级联清掉 images/attachments/versions（不可恢复） */
+  purge: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
     await getDb()
       .delete(recordImages)
       .where(and(eq(recordImages.recordId, input.id), eq(recordImages.userId, ctx.user.id)));
@@ -252,12 +308,8 @@ export const imageRouter = createRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // 校验记录归属
-      const rec = await getDb()
-        .select({ id: records.id })
-        .from(records)
-        .where(and(eq(records.id, input.recordId), eq(records.userId, ctx.user.id)));
-      if (!rec[0]) throw new TRPCError({ code: "NOT_FOUND", message: "记录不存在" });
+      // 校验记录归属且未在回收站（已删除记录禁止写入）
+      await assertRecordWritable(ctx.user.id, input.recordId);
       const [{ id }] = await getDb()
         .insert(recordImages)
         .values({

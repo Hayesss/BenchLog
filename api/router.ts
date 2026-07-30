@@ -10,6 +10,7 @@ import { activityRouter } from "./activityRouter";
 import { bioinfoRouter } from "./bioinfoRouter";
 import { bioinfoSkillRouter } from "./bioinfoSkillRouter";
 import { gitRouter } from "./gitRouter";
+import { demoRouter } from "./demoRouter";
 
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
@@ -29,6 +30,7 @@ export const appRouter = createRouter({
   bioinfo: bioinfoRouter,
   bioinfoSkill: bioinfoSkillRouter,
   git: gitRouter,
+  demo: demoRouter,
 });
 
 export type AppRouter = typeof appRouter;

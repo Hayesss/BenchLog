@@ -224,15 +224,17 @@ export default function RepoStaging({
               </div>
             ))}
           </div>
-          <div className="mt-2.5 flex items-center gap-2">
+          <div className="mt-2.5 flex flex-col gap-2 sm:flex-row sm:items-center">
             <input
-              className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-[12.5px] text-ink outline-none transition-colors placeholder:text-ink-mute focus:border-bench"
+              className="h-11 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-[13px] text-ink outline-none transition-colors placeholder:text-ink-mute focus:border-bench sm:h-9 sm:text-[12.5px]"
               placeholder="提交信息（git commit message），如：初版差异表达脚本"
               value={message}
               onChange={(e) => onMessageChange(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
             />
-            {footer}
+            <div className="[&>button]:h-11 [&>button]:w-full sm:[&>button]:h-9 sm:[&>button]:w-auto">
+              {footer}
+            </div>
           </div>
         </div>
       )}

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, desc, eq, gte, lte, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lte, inArray } from "drizzle-orm";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { records, recordImages, projects, protocols, tags, flows, todos, exportLogs, bioinfoAnalyses } from "@db/schema";
@@ -14,8 +14,8 @@ export const searchRouter = createRouter({
     const LIMIT = 8;
 
     const [ps, rs, prjs, ts, fs, tds] = await Promise.all([
-      db.select().from(protocols).where(eq(protocols.userId, ctx.user.id)),
-      db.select().from(records).where(eq(records.userId, ctx.user.id)).orderBy(desc(records.recordDate)),
+      db.select().from(protocols).where(and(eq(protocols.userId, ctx.user.id), isNull(protocols.deletedAt))),
+      db.select().from(records).where(and(eq(records.userId, ctx.user.id), isNull(records.deletedAt))).orderBy(desc(records.recordDate)),
       db.select().from(projects).where(eq(projects.userId, ctx.user.id)),
       db.select().from(tags).where(eq(tags.userId, ctx.user.id)),
       db.select().from(flows).where(eq(flows.userId, ctx.user.id)),
@@ -68,7 +68,7 @@ export const exportLogRouter = createRouter({
     )
     .query(async ({ ctx, input }) => {
       const db = getDb();
-      const conds = [eq(records.userId, ctx.user.id)];
+      const conds = [eq(records.userId, ctx.user.id), isNull(records.deletedAt)];
       if (input.from) conds.push(gte(records.recordDate, input.from));
       if (input.to) conds.push(lte(records.recordDate, input.to));
       if (input.projectIds?.length) conds.push(inArray(records.projectId, input.projectIds));
@@ -84,7 +84,7 @@ export const exportLogRouter = createRouter({
           ? db.select().from(recordImages).where(inArray(recordImages.recordId, recIds))
           : Promise.resolve([]),
         db.select().from(projects).where(eq(projects.userId, ctx.user.id)),
-        db.select().from(protocols).where(eq(protocols.userId, ctx.user.id)),
+        db.select().from(protocols).where(and(eq(protocols.userId, ctx.user.id), isNull(protocols.deletedAt))),
       ]);
       const pMap = new Map(ps.map((p) => [p.id, p]));
       const prMap = new Map(prs.map((p) => [p.id, p]));

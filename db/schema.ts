@@ -45,6 +45,8 @@ export const projects = mysqlTable(
     name: varchar("name", { length: 255 }).notNull(),
     color: varchar("color", { length: 16 }).notNull().default("#3E7C6B"),
     description: text("description"),
+    archived: boolean("archived").notNull().default(false), // 归档：退出侧边栏分组，项目管理页底部折叠区展示
+    isDemo: boolean("is_demo").notNull().default(false), // 示例数据标记（一键清除用）
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (t) => [index("projects_user_idx").on(t.userId)],
@@ -88,6 +90,8 @@ export const protocols = mysqlTable(
     useCount: int("useCount").notNull().default(0),
     pinned: boolean("pinned").notNull().default(false), // 星标置顶：工作台「常用方法」手动钉选
     pinnedAt: timestamp("pinnedAt"), // 置顶时间（置顶项按此倒序）
+    isDemo: boolean("is_demo").notNull().default(false), // 示例数据标记
+    deletedAt: timestamp("deleted_at"), // 软删除时间（null = 未删除，回收站可恢复）
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt")
       .defaultNow()
@@ -153,6 +157,8 @@ export const records = mysqlTable(
       .notNull()
       .default("ongoing"),
     tags: json("tags").$type<string[]>().notNull(),
+    isDemo: boolean("is_demo").notNull().default(false), // 示例数据标记
+    deletedAt: timestamp("deleted_at"), // 软删除时间（null = 未删除，回收站可恢复）
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt")
       .defaultNow()

@@ -1,4 +1,4 @@
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { records, userActivity } from "@db/schema";
@@ -35,7 +35,7 @@ export const activityRouter = createRouter({
           c: sql<number>`COUNT(*)`,
         })
         .from(records)
-        .where(and(eq(records.userId, ctx.user.id), gte(records.createdAt, from)))
+        .where(and(eq(records.userId, ctx.user.id), gte(records.createdAt, from), isNull(records.deletedAt)))
         .groupBy(sql`DATE_FORMAT(${records.createdAt}, '%Y-%m-%d')`),
     ]);
 

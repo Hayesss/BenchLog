@@ -13,6 +13,8 @@ import LibraryEntry from './pages/LibraryEntry'
 import Bioinfo from './pages/Bioinfo'
 import BioinfoDetail from './pages/BioinfoDetail'
 import Guide from './pages/Guide'
+import Trash from './pages/Trash'
+import Projects from './pages/Projects'
 
 export default function App() {
   return (
@@ -25,6 +27,7 @@ export default function App() {
         <Route path="protocols" element={<Protocols />} />
         <Route path="protocols/:id" element={<ProtocolDetail />} />
         <Route path="records" element={<Records />} />
+        <Route path="projects" element={<Projects />} />
         <Route path="records/new" element={<RecordDetail />} />
         <Route path="records/:id" element={<RecordDetail />} />
         <Route path="schedule" element={<Schedule />} />
@@ -35,6 +38,7 @@ export default function App() {
         <Route path="bioinfo/:id" element={<BioinfoDetail />} />
         <Route path="guide" element={<Guide />} />
         <Route path="export" element={<Export />} />
+        <Route path="trash" element={<Trash />} />
       </Route>
     </Routes>
   )

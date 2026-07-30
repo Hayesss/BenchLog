@@ -14,6 +14,7 @@ const ROUTE_LABELS: Array<[RegExp, string[]]> = [
   [/^\/records\/new/, ['湿实验记录', '新建记录']],
   [/^\/records\/[^/]+/, ['湿实验记录', '记录详情']],
   [/^\/records/, ['湿实验记录']],
+  [/^\/projects/, ['项目管理']],
   [/^\/bioinfo\/[^/]+/, ['生信分析', '分析详情']],
   [/^\/bioinfo/, ['生信分析']],
   [/^\/schedule/, ['实验安排']],
@@ -21,6 +22,7 @@ const ROUTE_LABELS: Array<[RegExp, string[]]> = [
   [/^\/library/, ['方法库']],
   [/^\/guide/, ['学习指南']],
   [/^\/export/, ['汇报导出']],
+  [/^\/trash/, ['最近删除']],
 ]
 
 function useBreadcrumb(): string[] {
