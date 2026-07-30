@@ -494,6 +494,33 @@ export const aiSettings = mysqlTable("ai_settings", {
 export type AiSetting = typeof aiSettings.$inferSelect;
 export type InsertAiSetting = typeof aiSettings.$inferInsert;
 
+/**
+ * LLM 模型档案（参照 wisp-science ModelProfile）：每用户可保存多套 OpenAI 兼容配置，
+ * 仅一套 active=true；chat/stream 走 active 档案，无档案时回退旧 ai_settings。
+ * apiKey 仅存服务端，任何接口不回传完整 key（只回 hasApiKey/keyPreview 脱敏）。
+ */
+export const aiModelProfiles = mysqlTable("ai_model_profiles", {
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
+  userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+  label: varchar("label", { length: 128 }).notNull(), // 显示名（如「Kimi K3」）
+  provider: varchar("provider", { length: 32 }).notNull().default("openai"), // 预留：当前仅 openai 兼容
+  apiUrl: varchar("apiUrl", { length: 255 }).notNull(),
+  model: varchar("model", { length: 128 }).notNull(),
+  apiKey: text("apiKey"), // 可空：测试连接/调用时报「请先填写 API Key」
+  maxTokens: int("maxTokens").notNull().default(8192), // 单次回复 token 上限（wisp 默认 8192，已知家族自动提至文档上限）
+  contextWindow: int("contextWindow").notNull().default(128000), // 信息字段：模型上下文窗口（展示用）
+  reasoningEffort: varchar("reasoningEffort", { length: 16 }).notNull().default(""), // 空=不传该参数（wisp reasoning_effort: None）
+  active: boolean("active").notNull().default(false),
+  sortOrder: int("sortOrder").notNull().default(0), // 列表手动排序（升序）
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+export type AiModelProfile = typeof aiModelProfiles.$inferSelect;
+export type InsertAiModelProfile = typeof aiModelProfiles.$inferInsert;
+
 /** AI 会话：projectId 可空（null = 未归档/副驾快聊）；title 空串待首条消息自动生成 */
 export const aiConversations = mysqlTable(
   "ai_conversations",

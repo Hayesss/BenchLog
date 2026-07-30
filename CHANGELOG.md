@@ -4,6 +4,16 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-07-31 · AI 模型档案：设置体系吸收 wisp-science（多档案/预设/限额/测试连接）
+
+- 数据层：新表 `ai_model_profiles`（label/provider/apiUrl/model/apiKey/maxTokens/contextWindow/reasoningEffort/active/sortOrder）；迁移脚本幂等建表并把 ai_settings 存量配置自动转为首个 active 档案（1 个用户已迁移）
+- 后端：新 `aiProfileRouter`（trpc `aiProfile.*`）——list（key 脱敏 hasApiKey/keyPreview）/create（首档案自动 active）/update（apiKey 三态）/remove（active 拦截）/setActive（互斥）/reorder（越权拦截）/test（对齐 wisp validate_settings：探测消息 "Reply with OK."、max_tokens 钳 16-64、30s 超时、采样参数不传）；`resolveLlmConfig`（active 档案优先、旧 ai_settings 兜底）接入 chat 与 /api/ai/stream，maxTokens/reasoningEffort 按档案生效
+- 前端：AI 设置对话框重写为「模型档案」双视图（src/components/assistant/AiModelSettings.tsx）——档案列表（使用/删除/上下移排序/缺 Key 徽标）+ 表单（Kimi/GLM/DeepSeek/Kimi Coding/GLM Coding 五预设一键添加；MODEL_LIMITS 18 条已知家族自动填充限额（kimi-k3→131072/1000000）；reasoning effort 按模型家族精选下拉（未知模型给全量+提示）；测试连接内嵌结果）
+- 兼容：getSettings/saveSettings 保留（旧 ai_settings 兜底链未断）；hasKey 引导判断 = 任一档案有 Key 或旧设置有 Key
+- 验证：tsc -b 全过；冒烟 10 断言全过（脱敏/尾斜杠/互斥/三态 key/reorder 越权/active 删拦截/test 三路径/清理复原）；bundle 复核（reasoning_effort/探测消息/五预设/限额表入包，temperature 仅注释残留）
+
+---
+
 ## 2026-07-30 · 修复：LLM 调用方式对齐 wisp-science（根治 K3 temperature 400）
 
 - 参照 github.com/xuzhougeng/wisp-science 的 wisp-llm OpenAI provider 调用方式改造：

@@ -7,16 +7,12 @@
 import type { Context } from "hono";
 import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../queries/connection";
-import { aiConversations, aiMessages, aiSettings } from "@db/schema";
+import { aiConversations, aiMessages } from "@db/schema";
 import { authenticateRequest } from "../kimi/auth";
 import { buildContext } from "../aiRouter";
+import { resolveLlmConfig } from "../aiProfileRouter";
 
 const HISTORY_LIMIT = 20;
-const DEFAULT_BASE_URL = "https://api.moonshot.cn/v1";
-const DEFAULT_MODEL = "kimi-k3";
-
-/** 单次回复 token 上限（对齐 wisp-science ProviderConfig 默认 8192） */
-const MAX_TOKENS = 8192;
 
 interface StreamBody {
   conversationId: number;
@@ -59,14 +55,12 @@ export async function aiStreamHandler(c: Context): Promise<Response> {
   const conv = convRows[0];
   if (!conv) return c.json({ error: "会话不存在" }, 404);
 
-  // 4. LLM 设置
-  const settingRows = await db.select().from(aiSettings).where(eq(aiSettings.userId, user.id));
-  const setting = settingRows[0];
-  if (!setting?.apiKey) {
+  // 4. LLM 设置（active 模型档案优先，回退旧 ai_settings）
+  const llm = await resolveLlmConfig(user.id);
+  if (!llm) {
     return c.json({ error: "尚未配置 LLM，请先在设置页填写 API Key" }, 400);
   }
-  const baseUrl = (setting.baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, "");
-  const model = setting.model || DEFAULT_MODEL;
+  const baseUrl = llm.baseUrl.replace(/\/+$/, "");
 
   // 5. 落库用户消息
   await db.insert(aiMessages).values({
@@ -94,14 +88,16 @@ export async function aiStreamHandler(c: Context): Promise<Response> {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${setting.apiKey}`,
+        Authorization: `Bearer ${llm.apiKey}`,
       },
       body: JSON.stringify({
-        model,
+        model: llm.model,
         messages: [{ role: "system", content: system }, ...history],
         // 采样参数一律不传（对齐 wisp-science build_body），由服务商使用模型默认值——
         // K3 仅允许 temperature=1，传任何值都会 400
-        max_tokens: MAX_TOKENS,
+        max_tokens: llm.maxTokens,
+        // reasoning_effort 仅当档案显式配置时才带（wisp reasoning_effort: None = 不传）
+        ...(llm.reasoningEffort ? { reasoning_effort: llm.reasoningEffort } : {}),
         stream: true,
         // 对齐 wisp-science：让 OpenAI 兼容端点在流中回传 token 用量（缺省 usage 为 0）
         stream_options: { include_usage: true },

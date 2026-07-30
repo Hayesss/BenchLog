@@ -15,6 +15,7 @@ import { quickNoteRouter } from "./quickNoteRouter";
 import { sampleRouter } from "./sampleRouter";
 import { mouseRouter } from "./mouseRouter";
 import { aiRouter } from "./aiRouter";
+import { aiProfileRouter } from "./aiProfileRouter";
 
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
@@ -39,6 +40,7 @@ export const appRouter = createRouter({
   sample: sampleRouter,
   mouse: mouseRouter,
   ai: aiRouter,
+  aiProfile: aiProfileRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -20,12 +20,6 @@ import ReactMarkdown from 'react-markdown'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -37,6 +31,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import { trpc } from '@/providers/trpc'
+import { AiModelSettingsDialog } from '@/components/assistant/AiModelSettings'
 
 type Conversation = {
   id: number
@@ -52,94 +47,6 @@ const QUICK_PROMPTS = [
   '收集箱里还没处理的内容，帮我排个优先级',
   '基于现有数据，帮我想下一步可以验证的假设',
 ]
-
-/* ------------------------------------------------------------------ */
-/* AI 设置对话框                                                         */
-/* ------------------------------------------------------------------ */
-function AiSettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
-  const utils = trpc.useUtils()
-  const settingsQ = trpc.ai.getSettings.useQuery(undefined, { enabled: open })
-  const [baseUrl, setBaseUrl] = useState('')
-  const [model, setModel] = useState('')
-  const [apiKey, setApiKey] = useState('')
-
-  useEffect(() => {
-    if (open && settingsQ.data) {
-      setBaseUrl(settingsQ.data.baseUrl)
-      setModel(settingsQ.data.model)
-      setApiKey('')
-    }
-  }, [open, settingsQ.data])
-
-  const saveMut = trpc.ai.saveSettings.useMutation({
-    onSuccess: () => {
-      toast.success('AI 设置已保存')
-      void utils.ai.getSettings.invalidate()
-      onOpenChange(false)
-    },
-    onError: (e) => toast.error(`保存失败：${e.message}`),
-  })
-
-  const d = settingsQ.data
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[440px]">
-        <DialogHeader>
-          <DialogTitle className="font-display text-[16px]">AI 设置</DialogTitle>
-        </DialogHeader>
-        <p className="text-[12.5px] leading-[19px] text-ink-mute">
-          使用任意 OpenAI 兼容接口（默认 Moonshot/Kimi）。API Key 仅存储在你的数据库中，用于服务端调用。
-        </p>
-        <div className="mt-3 flex flex-col gap-3">
-          <label className="flex flex-col gap-1.5">
-            <span className="caption-en">接口地址 BASE URL</span>
-            <input
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder="https://api.moonshot.cn/v1"
-              className="h-10 rounded-lg border border-line bg-surface px-3 font-mono text-[13px] text-ink outline-none focus:border-bench"
-            />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="caption-en">模型 MODEL</span>
-            <input
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder="kimi-k3"
-              className="h-10 rounded-lg border border-line bg-surface px-3 font-mono text-[13px] text-ink outline-none focus:border-bench"
-            />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="caption-en">API KEY</span>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder={d?.hasKey ? `已保存（${d.keyPreview}），留空保持不变` : 'sk-…'}
-              className="h-10 rounded-lg border border-line bg-surface px-3 font-mono text-[13px] text-ink outline-none focus:border-bench"
-            />
-          </label>
-        </div>
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            onClick={() =>
-              saveMut.mutate({
-                baseUrl: baseUrl.trim() || undefined,
-                model: model.trim() || undefined,
-                apiKey: apiKey === '' ? undefined : apiKey.trim(),
-              })
-            }
-            disabled={saveMut.isPending}
-            className="flex h-9 items-center rounded-lg bg-bench px-4 text-[13px] font-medium text-white shadow-card transition-colors duration-150 hover:bg-bench-deep disabled:opacity-50"
-          >
-            {saveMut.isPending ? '保存中…' : '保存'}
-          </button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
 
 /* ------------------------------------------------------------------ */
 /* 消息气泡                                                              */
@@ -664,6 +571,7 @@ export default function Assistant() {
   const [deleteConv, setDeleteConv] = useState<Conversation | null>(null)
 
   const settingsQ = trpc.ai.getSettings.useQuery()
+  const profilesQ = trpc.aiProfile.list.useQuery()
   const projectsQ = trpc.project.list.useQuery()
   const convsQ = trpc.ai.listConversations.useQuery()
 
@@ -694,7 +602,9 @@ export default function Assistant() {
       ? ((projectsQ.data ?? []).find((p) => p.id === selectedProject)?.name ?? null)
       : null)
 
-  const hasKey = settingsQ.data?.hasKey ?? false
+  // 有可用 LLM = 任一模型档案已存 Key（新体系），或旧 ai_settings 有 Key（兼容兜底）
+  const hasKey =
+    (profilesQ.data ?? []).some((p) => p.hasApiKey) || (settingsQ.data?.hasKey ?? false)
 
   const newConversation = () => {
     createMut.mutate({ projectId: selectedProject ?? undefined })
@@ -820,7 +730,7 @@ export default function Assistant() {
         {selectedConv == null || current == null ? listPane : chatPane}
       </div>
 
-      <AiSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <AiModelSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
 
       <AlertDialog open={deleteConv != null} onOpenChange={(v) => !v && setDeleteConv(null)}>
         <AlertDialogContent>

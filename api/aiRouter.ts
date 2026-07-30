@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, inArray, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
+import { resolveLlmConfig } from "./aiProfileRouter";
 import {
   aiConversations,
   aiMessages,
@@ -23,9 +24,6 @@ import {
 
 const DEFAULT_BASE_URL = "https://api.moonshot.cn/v1";
 const DEFAULT_MODEL = "kimi-k3";
-
-/** 单次回复 token 上限（对齐 wisp-science ProviderConfig 默认 8192） */
-const MAX_TOKENS = 8192;
 
 /**
  * 写操作工具（function calling）：服务端只转发定义，绝不自动执行；
@@ -418,13 +416,9 @@ export const aiRouter = createRouter({
       const db = getDb();
       const conv = await getOwnedConversation(ctx.user.id, input.conversationId);
 
-      // a. 必须已配置 API Key
-      const settingRows = await db
-        .select()
-        .from(aiSettings)
-        .where(eq(aiSettings.userId, ctx.user.id));
-      const setting = settingRows[0];
-      if (!setting?.apiKey) {
+      // a. 必须已配置 API Key（active 模型档案优先，回退旧 ai_settings）
+      const llm = await resolveLlmConfig(ctx.user.id);
+      if (!llm) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "未配置 LLM，请先在 AI 设置中填写 API Key",
@@ -456,20 +450,22 @@ export const aiRouter = createRouter({
       let reply: string | null = null;
       let toolCalls: { id: string; name: string; args: Record<string, unknown> }[] = [];
       try {
-        const url = `${setting.baseUrl.replace(/\/+$/, "")}/chat/completions`;
+        const url = `${llm.baseUrl.replace(/\/+$/, "")}/chat/completions`;
         const callOnce = (useTools: boolean) =>
           fetch(url, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${setting.apiKey}`,
+              Authorization: `Bearer ${llm.apiKey}`,
             },
             body: JSON.stringify({
-              model: setting.model,
+              model: llm.model,
               messages: [{ role: "system", content: system }, ...history],
               // 采样参数一律不传（对齐 wisp-science build_body：body 无 temperature），
               // 由服务商使用模型默认值——K3 仅允许 temperature=1，传任何值都会 400
-              max_tokens: MAX_TOKENS,
+              max_tokens: llm.maxTokens,
+              // reasoning_effort 仅当档案显式配置时才带（wisp reasoning_effort: None = 不传）
+              ...(llm.reasoningEffort ? { reasoning_effort: llm.reasoningEffort } : {}),
               ...(useTools ? { tools: AI_TOOLS, tool_choice: "auto" } : {}),
             }),
             signal: controller.signal,
