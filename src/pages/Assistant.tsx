@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { format } from 'date-fns'
 import {
   ArrowLeft,
   AtSign,
   Bot,
+  Check,
+  ChevronDown,
   ChevronRight,
   Inbox,
   MessageSquarePlus,
@@ -32,6 +35,7 @@ import {
 import { cn } from '@/lib/utils'
 import { trpc } from '@/providers/trpc'
 import { AiModelSettingsDialog } from '@/components/assistant/AiModelSettings'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 type Conversation = {
   id: number
@@ -208,15 +212,19 @@ function ToolCallCard({
 function ChatPane({
   conversation,
   projectName,
+  projects,
   hasKey,
   onOpenSettings,
   onBack,
+  onProjectMoved,
 }: {
   conversation: Conversation | null
   projectName: string | null
+  projects: { id: number; name: string; color: string }[]
   hasKey: boolean
   onOpenSettings: () => void
   onBack: () => void
+  onProjectMoved: (projectId: number | null) => void
 }) {
   const utils = trpc.useUtils()
   const [draft, setDraft] = useState('')
@@ -229,10 +237,20 @@ function ChatPane({
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
+  const [projOpen, setProjOpen] = useState(false)
   const messagesQ = trpc.ai.listMessages.useQuery(
     { conversationId: conversation?.id ?? 0 },
     { enabled: conversation != null },
   )
+  const moveMut = trpc.ai.setConversationProject.useMutation({
+    onSuccess: (_r, v) => {
+      toast.success(v.projectId != null ? '已移入项目，上下文将按该项目注入' : '已移到副驾快聊')
+      setProjOpen(false)
+      void utils.ai.listConversations.invalidate()
+      onProjectMoved(v.projectId)
+    },
+    onError: (e) => toast.error(`移动失败：${e.message}`),
+  })
   const recordsQ = trpc.record.list.useQuery(undefined, { enabled: conversation != null })
   const chatMut = trpc.ai.chat.useMutation({
     onSuccess: (data) => {
@@ -365,10 +383,71 @@ function ChatPane({
         <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-ink">
           {conversation ? conversation.title || '新对话' : 'AI 助手'}
         </span>
-        {projectName && (
-          <span className="shrink-0 rounded-full bg-bench-wash px-2 py-0.5 text-[11px] font-medium text-bench-ink">
-            {projectName}
-          </span>
+        {conversation && (
+          <Popover open={projOpen} onOpenChange={setProjOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                title="对话上下文随项目归属注入；点击更换归属"
+                className={cn(
+                  'flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors duration-150',
+                  projectName
+                    ? 'bg-bench-wash text-bench-ink hover:bg-bench-wash/70'
+                    : 'bg-paper text-ink-mute hover:bg-bench-wash hover:text-bench-ink',
+                )}
+              >
+                {projectName ?? '副驾快聊'}
+                <ChevronDown className="h-3 w-3" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-56 rounded-xl border-line p-2">
+              <p className="caption-en mb-1.5 px-1.5">归属项目 PROJECT</p>
+              <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
+                <button
+                  type="button"
+                  disabled={moveMut.isPending}
+                  onClick={() =>
+                    conversation.projectId != null &&
+                    moveMut.mutate({ id: conversation.id, projectId: null })
+                  }
+                  className={cn(
+                    'flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12.5px] transition-colors duration-150',
+                    conversation.projectId == null
+                      ? 'bg-bench-wash font-medium text-bench-ink'
+                      : 'text-ink-soft hover:bg-paper',
+                  )}
+                >
+                  <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate">副驾快聊</span>
+                  {conversation.projectId == null && <Check className="h-3.5 w-3.5 shrink-0" />}
+                </button>
+                {projects.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    disabled={moveMut.isPending}
+                    onClick={() =>
+                      conversation.projectId !== p.id &&
+                      moveMut.mutate({ id: conversation.id, projectId: p.id })
+                    }
+                    className={cn(
+                      'flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12.5px] transition-colors duration-150',
+                      conversation.projectId === p.id
+                        ? 'bg-bench-wash font-medium text-bench-ink'
+                        : 'text-ink-soft hover:bg-paper',
+                    )}
+                  >
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
+                    <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                    {conversation.projectId === p.id && <Check className="h-3.5 w-3.5 shrink-0" />}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 border-t border-line px-1.5 pt-1.5 text-[11px] leading-[15px] text-ink-mute">
+                项目会话的上下文 = 该项目全部实验记录；副驾快聊 = 最近 15 条记录
+              </p>
+            </PopoverContent>
+          </Popover>
         )}
         <button
           type="button"
@@ -565,7 +644,12 @@ function ChatPane({
 /* ------------------------------------------------------------------ */
 export default function Assistant() {
   const utils = trpc.useUtils()
-  const [selectedProject, setSelectedProject] = useState<number | null>(null)
+  // URL 参数 ?project=<id> 直达：从项目侧入口（侧边栏/项目管理页）跳入时自动选中该项目
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [selectedProject, setSelectedProject] = useState<number | null>(() => {
+    const v = Number(searchParams.get('project'))
+    return Number.isInteger(v) && v > 0 ? v : null
+  })
   const [selectedConv, setSelectedConv] = useState<number | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [deleteConv, setDeleteConv] = useState<Conversation | null>(null)
@@ -590,6 +674,20 @@ export default function Assistant() {
     },
     onError: (e) => toast.error(`删除失败：${e.message}`),
   })
+
+  /** 切换项目过滤并同步 URL（replace 不堆历史）；null=副驾快聊 */
+  const selectProject = (id: number | null) => {
+    setSelectedProject(id)
+    setSearchParams(id != null ? { project: String(id) } : {}, { replace: true })
+  }
+
+  // URL 带入的项目 id 失效（不存在/已归档）时回落副驾快聊
+  useEffect(() => {
+    if (selectedProject == null || !projectsQ.data) return
+    const p = (projectsQ.data ?? []).find((x) => x.id === selectedProject)
+    if (!p || (p as { archived?: boolean }).archived) selectProject(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectsQ.data])
 
   const conversations = (convsQ.data ?? []) as Conversation[]
   const filtered = conversations.filter((c) =>
@@ -619,7 +717,7 @@ export default function Assistant() {
         <div className="flex gap-1 overflow-x-auto pb-1 md:flex-col md:overflow-visible">
           <button
             type="button"
-            onClick={() => setSelectedProject(null)}
+            onClick={() => selectProject(null)}
             className={cn(
               'flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px] font-medium transition-colors duration-150 md:w-full',
               selectedProject === null ? 'bg-bench-wash text-bench-ink' : 'text-ink-soft hover:bg-paper',
@@ -634,7 +732,7 @@ export default function Assistant() {
               <button
                 key={p.id}
                 type="button"
-                onClick={() => setSelectedProject(p.id)}
+                onClick={() => selectProject(p.id)}
                 className={cn(
                   'flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px] font-medium transition-colors duration-150 md:w-full',
                   selectedProject === p.id ? 'bg-bench-wash text-bench-ink' : 'text-ink-soft hover:bg-paper',
@@ -707,9 +805,13 @@ export default function Assistant() {
     <ChatPane
       conversation={current}
       projectName={current?.projectId != null ? currentProjectName : null}
+      projects={(projectsQ.data ?? [])
+        .filter((p) => !(p as { archived?: boolean }).archived)
+        .map((p) => ({ id: p.id, name: p.name, color: p.color }))}
       hasKey={hasKey}
       onOpenSettings={() => setSettingsOpen(true)}
       onBack={() => setSelectedConv(null)}
+      onProjectMoved={(pid) => selectProject(pid)}
     />
   )
 

@@ -172,14 +172,23 @@ function Sidebar() {
               </button>
             ) : (
               sidebarProjects.map((p) => (
-                <Link
-                  key={p.id}
-                  to={`/records?project=${p.id}`}
-                  className="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-[13px] text-ink-soft transition-colors duration-150 hover:bg-bench-wash/60 hover:text-ink"
-                >
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
-                  <span className="truncate">{p.name}</span>
-                </Link>
+                <div key={p.id} className="group flex items-center">
+                  <Link
+                    to={`/records?project=${p.id}`}
+                    className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-3 py-1.5 text-[13px] text-ink-soft transition-colors duration-150 hover:bg-bench-wash/60 hover:text-ink"
+                  >
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
+                    <span className="truncate">{p.name}</span>
+                  </Link>
+                  <Link
+                    to={`/assistant?project=${p.id}`}
+                    aria-label={`用 AI 助手聊「${p.name}」`}
+                    title={`用 AI 助手聊「${p.name}」（以该项目记录为上下文）`}
+                    className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-ink-mute opacity-0 transition-all duration-150 hover:bg-bench-wash hover:text-bench focus:opacity-100 group-hover:opacity-100"
+                  >
+                    <Bot className="h-3.5 w-3.5" strokeWidth={2} />
+                  </Link>
+                </div>
               ))
             )}
           </div>

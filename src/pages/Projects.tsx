@@ -4,6 +4,7 @@ import { format } from 'date-fns'
 import {
   Archive,
   ArchiveRestore,
+  Bot,
   Box,
   Check,
   ChevronDown,
@@ -146,6 +147,14 @@ function ProjectCard({
 
       {/* 操作行 */}
       <div className="mt-auto flex items-center gap-1 border-t border-line pt-2.5">
+        <Link
+          to={`/assistant?project=${project.id}`}
+          title="以该项目记录为上下文与 AI 对话"
+          className="flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-bench transition-colors duration-150 hover:bg-bench-wash"
+        >
+          <Bot className="h-3.5 w-3.5" strokeWidth={1.8} />
+          AI 对话
+        </Link>
         <button
           type="button"
           onClick={onStartRename}

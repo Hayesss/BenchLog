@@ -375,6 +375,25 @@ export const aiRouter = createRouter({
       return { ok: true };
     }),
 
+  /** 修改会话项目归属：null=移到副驾快聊；非空须校验项目归属本人。上下文随归属按项目注入 */
+  setConversationProject: authedQuery
+    .input(z.object({ id: z.number(), projectId: z.number().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      await getOwnedConversation(ctx.user.id, input.id);
+      if (input.projectId != null) {
+        const p = await getDb()
+          .select({ id: projects.id })
+          .from(projects)
+          .where(and(eq(projects.id, input.projectId), eq(projects.userId, ctx.user.id)));
+        if (!p[0]) throw new TRPCError({ code: "NOT_FOUND", message: "项目不存在" });
+      }
+      await getDb()
+        .update(aiConversations)
+        .set({ projectId: input.projectId, updatedAt: new Date() })
+        .where(eq(aiConversations.id, input.id));
+      return { ok: true };
+    }),
+
   /** 删除会话：级联删除其全部消息 */
   removeConversation: authedQuery
     .input(z.object({ id: z.number() }))

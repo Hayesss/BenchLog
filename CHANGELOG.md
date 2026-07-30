@@ -4,6 +4,15 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-07-31 · 项目 × AI 助手双向打通（以项目内容为上下文的对话）
+
+- 项目侧入口：侧边栏项目行 hover 出现 AI 图标、/projects 管理页项目卡操作行加「AI 对话」，均跳 `/assistant?project=<id>`
+- AI 助手页：支持 `?project=<id>` URL 参数直达并自动选中该项目（项目不存在/已归档自动回落副驾快聊）；左栏项目切换同步 URL（replace 不堆历史）
+- 会话归属可改：新接口 `ai.setConversationProject`（会话/项目双重归属校验，null=副驾快聊）；对话头部项目徽标改为 Popover 切换器——移入/移出项目即时生效，并明示「项目会话上下文=该项目全部记录，副驾快聊=最近 15 条」；移动后左栏过滤自动跟随
+- 验证：tsc 全过；冒烟 5 断言全过（移入联查 projectName/不存在项目与对话拦截/移回/清理）；bundle 复核全 OK
+
+---
+
 ## 2026-07-31 · AI 模型档案：设置体系吸收 wisp-science（多档案/预设/限额/测试连接）
 
 - 数据层：新表 `ai_model_profiles`（label/provider/apiUrl/model/apiKey/maxTokens/contextWindow/reasoningEffort/active/sortOrder）；迁移脚本幂等建表并把 ai_settings 存量配置自动转为首个 active 档案（1 个用户已迁移）
