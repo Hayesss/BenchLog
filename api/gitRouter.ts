@@ -11,6 +11,7 @@ import {
   getCommit,
   readTreeEntries,
   readBlobs,
+  diffOfCommit,
   commitFiles,
   listCommits,
   changedFilesOf,
@@ -156,6 +157,24 @@ export const gitRouter = createRouter({
         })),
       );
       return { headSha: head?.headSha ?? null, commitCount: head?.commitCount ?? 0, items };
+    }),
+
+  /** 某 commit 相对父提交的逐文件差异（diff 视图） */
+  diff: authedQuery
+    .input(
+      z.object({
+        analysisId: z.number(),
+        ref: z.string().regex(/^[0-9a-f]{40}$/),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await assertAnalysis(ctx.user.id, input.analysisId);
+      const commit = await getCommit(ctx.user.id, input.ref);
+      if (!commit || commit.analysisId !== input.analysisId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "commit 不存在或不属于该分析" });
+      }
+      const files = await diffOfCommit(ctx.user.id, input.ref);
+      return { files: files ?? [] };
     }),
 
   /** 导出仓库为 ZIP：打包指定 commit（默认 HEAD）的全部文件，base64 返回 */

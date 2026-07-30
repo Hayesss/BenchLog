@@ -6,6 +6,7 @@ import {
   Copy,
   Eye,
   FileCode2,
+  FileDiff,
   FileDown,
   FolderGit2,
   GitCommitHorizontal,
@@ -17,6 +18,7 @@ import { trpc } from '@/providers/trpc'
 import { cn } from '@/lib/utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import RepoStaging, { type StagedFile } from '@/components/bioinfo/RepoStaging'
+import DiffView from '@/components/bioinfo/DiffView'
 
 type Staged = StagedFile
 
@@ -47,6 +49,12 @@ export default function RepoPanel({
   const [staged, setStaged] = useState<Staged[]>([])
   const [message, setMessage] = useState('')
   const [viewer, setViewer] = useState<{ ref: string; path: string } | null>(null)
+  // diff 展开：当前查看变更的 commit sha（null = 全部收起）
+  const [diffOpen, setDiffOpen] = useState<string | null>(null)
+  const diffQ = trpc.git.diff.useQuery(
+    { analysisId, ref: diffOpen ?? '' },
+    { enabled: diffOpen != null },
+  )
 
   const fileQ = trpc.git.file.useQuery(
     { analysisId, ref: viewer?.ref ?? '', path: viewer?.path ?? '' },
@@ -283,6 +291,19 @@ export default function RepoPanel({
                           <Eye className="h-3 w-3" />
                           浏览代码
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => setDiffOpen(diffOpen === c.sha ? null : c.sha)}
+                          className={cn(
+                            'flex h-6 items-center gap-1 rounded border px-2 text-[11px] transition-colors',
+                            diffOpen === c.sha
+                              ? 'border-bench bg-bench-wash text-bench-ink'
+                              : 'border-line text-ink-soft hover:border-bench hover:text-bench',
+                          )}
+                        >
+                          <FileDiff className="h-3 w-3" />
+                          {diffOpen === c.sha ? '收起变更' : '查看变更'}
+                        </button>
                         {!anchored && (
                           <button
                             type="button"
@@ -294,6 +315,19 @@ export default function RepoPanel({
                           </button>
                         )}
                       </div>
+                      {diffOpen === c.sha && (
+                        <div className="mt-2.5 border-t border-line pt-2.5">
+                          {diffQ.isLoading ? (
+                            <div className="flex justify-center py-4">
+                              <Loader2 className="h-4 w-4 animate-spin text-ink-mute" />
+                            </div>
+                          ) : diffQ.data ? (
+                            <DiffView files={diffQ.data.files} />
+                          ) : (
+                            <p className="py-2 text-[12px] text-ink-mute">变更读取失败。</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )

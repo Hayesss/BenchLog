@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { FileDown, FileText, Table2 } from 'lucide-react'
+import { FileDown, FileText, FileType, Table2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ReportOptions, ReportTemplate } from './reportTypes'
 
@@ -28,6 +28,12 @@ const TEMPLATES: Array<{
     name: '存档 PDF',
     desc: '完整记录逐条排版：含图片与参数表，适合长期归档',
     icon: FileDown,
+  },
+  {
+    key: 'docx',
+    name: 'Word 文档（.docx）',
+    desc: '湿实验记录与生信分析排版为 Word 报告，适合直接发给导师',
+    icon: FileType,
   },
 ]
 
@@ -162,7 +168,13 @@ export default function ExportTemplateCard({
           disabled={template === 'table'}
           onChange={(v) => set({ includeImages: v })}
           label="包含结果图片"
-          sub={template === 'table' ? '仅 Markdown / PDF 可用' : undefined}
+          sub={
+            template === 'table'
+              ? '仅 Markdown / PDF 可用'
+              : template === 'docx'
+                ? 'Word 中仅列出图注文字'
+                : undefined
+          }
         />
         <OptionRow
           checked={options.includeDeviations}

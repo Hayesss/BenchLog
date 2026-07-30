@@ -8,6 +8,7 @@ import type {
   RecordListItem,
   RecordStatus,
   ScopePreset,
+  SourceSelection,
 } from './reportTypes'
 import { STATUS_LABEL } from './reportTypes'
 import { recordCode } from './reportBuild'
@@ -76,6 +77,8 @@ export interface ExportScopeCardProps {
   onPreset: (p: ScopePreset) => void
   range: DateRange
   onRange: (r: DateRange) => void
+  sources: SourceSelection
+  onToggleSource: (key: keyof SourceSelection) => void
   projects: ProjectItem[]
   projectIds: number[]
   onToggleProject: (id: number) => void
@@ -88,7 +91,7 @@ export interface ExportScopeCardProps {
   onClearManual: () => void
   selectedRecords: ExportRecord[]
   onRemoveRecord: (id: number) => void
-  stats: { records: number; projects: number; images: number }
+  stats: { records: number; projects: number; images: number; analyses: number }
   scopeLoading: boolean
 }
 
@@ -97,6 +100,8 @@ export default function ExportScopeCard({
   onPreset,
   range,
   onRange,
+  sources,
+  onToggleSource,
   projects,
   projectIds,
   onToggleProject,
@@ -117,6 +122,19 @@ export default function ExportScopeCard({
       <div className="mb-3 flex items-baseline justify-between">
         <h2 className="font-display text-[16px] font-semibold text-ink">汇报范围</h2>
         <span className="caption-en !text-[10px]">SCOPE</span>
+      </div>
+
+      {/* 数据来源双选（至少选一，最后一个不可取消） */}
+      <div className="mb-3">
+        <div className="caption-en mb-1.5 !text-[10.5px]">数据来源 SOURCE</div>
+        <div className="flex flex-wrap gap-1.5">
+          <Chip active={sources.records} onClick={() => onToggleSource('records')}>
+            湿实验记录
+          </Chip>
+          <Chip active={sources.analyses} onClick={() => onToggleSource('analyses')}>
+            生信分析
+          </Chip>
+        </div>
       </div>
 
       {/* 快捷预设 pill 组（layoutId 滑移） */}
@@ -267,6 +285,8 @@ export default function ExportScopeCard({
         <span className="text-ink-mute">已选</span>
         <OdometerNumber value={stats.records} />
         <span className="text-ink-mute">条记录 ·</span>
+        <OdometerNumber value={stats.analyses} />
+        <span className="text-ink-mute">条分析 ·</span>
         <OdometerNumber value={stats.projects} />
         <span className="text-ink-mute">个项目 ·</span>
         <OdometerNumber value={stats.images} />

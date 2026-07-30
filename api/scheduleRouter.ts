@@ -75,6 +75,25 @@ export const flowRouter = createRouter({
 });
 
 export const todoRouter = createRouter({
+  /** 今日议程：某日未完成待办 + 当日到期的流程节点（铃铛提醒数据源） */
+  today: authedQuery.input(z.object({ date: dateStr })).query(async ({ ctx, input }) => {
+    const db = getDb();
+    const [tds, fs] = await Promise.all([
+      db
+        .select()
+        .from(todos)
+        .where(and(eq(todos.userId, ctx.user.id), eq(todos.todoDate, input.date), eq(todos.done, false)))
+        .orderBy(todos.createdAt),
+      db.select().from(flows).where(eq(flows.userId, ctx.user.id)),
+    ]);
+    const flowNodes = fs.flatMap((f) =>
+      f.nodes
+        .filter((n) => n.date === input.date)
+        .map((n) => ({ flowId: f.id, flowName: f.name, color: f.color, name: n.name })),
+    );
+    return { todos: tds, flowNodes };
+  }),
+
   listByRange: authedQuery
     .input(z.object({ from: dateStr, to: dateStr }))
     .query(({ ctx, input }) =>

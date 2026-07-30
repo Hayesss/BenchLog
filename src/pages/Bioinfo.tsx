@@ -25,6 +25,8 @@ type AnalysisItem = RouterOutputs['bioinfo']['list'][number]
 type BioStatus = AnalysisItem['status']
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
+/** 分析列表每段显示条数 */
+const BIO_PAGE_SIZE = 20
 
 export const PIPELINE_OPTIONS = [
   '手动脚本',
@@ -183,6 +185,14 @@ export default function Bioinfo() {
   const setTab = (t: BioTab) => setSearchParams(t === 'analyses' ? {} : { tab: t }, { replace: true })
   const [projectId, setProjectId] = useState<number | undefined>(undefined)
   const [status, setStatus] = useState<BioStatus | undefined>(undefined)
+  // 列表分段显示：默认 20 条，「显示更多」递增（筛选变化时重置）
+  const [visibleCount, setVisibleCount] = useState(BIO_PAGE_SIZE)
+  const filterKey = `${projectId}|${status}`
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey)
+    setVisibleCount(BIO_PAGE_SIZE)
+  }
 
   const analysesQ = trpc.bioinfo.list.useQuery(
     projectId || status ? { projectId, status } : undefined,
@@ -329,9 +339,18 @@ export default function Bioinfo() {
         </div>
       ) : (
         <div className="mt-4 flex flex-col gap-3">
-          {items.map((a, i) => (
+          {items.slice(0, visibleCount).map((a, i) => (
             <AnalysisCard key={a.id} a={a} index={i} />
           ))}
+          {items.length > visibleCount && (
+            <button
+              type="button"
+              onClick={() => setVisibleCount((c) => c + BIO_PAGE_SIZE)}
+              className="mt-1 h-9 rounded-lg border border-line bg-surface text-[12.5px] font-medium text-ink-soft transition-colors duration-150 hover:border-bench hover:text-bench"
+            >
+              显示更多（还有 {items.length - visibleCount} 条）
+            </button>
+          )}
         </div>
       )}
 

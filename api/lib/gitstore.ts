@@ -314,3 +314,37 @@ export async function readBlobs(userId: number, shas: string[]): Promise<Map<str
     .where(and(eq(gitBlobs.userId, userId), inArray(gitBlobs.sha, shas)));
   return new Map(rows.map((r) => [r.sha, r.content]));
 }
+
+export type DiffFile = {
+  path: string;
+  status: "added" | "modified" | "deleted";
+  /** deleted 时为 null；added 时 oldContent 为 null。内容均按文本存储（二进制已被拦截） */
+  oldContent: string | null;
+  newContent: string | null;
+};
+
+/** 某 commit 相对其父 commit 的逐文件内容差异（diff 视图数据源） */
+export async function diffOfCommit(userId: number, commitSha: string): Promise<DiffFile[] | null> {
+  const commit = await getCommit(userId, commitSha);
+  if (!commit) return null;
+  const cur = new Map((await readTreeEntries(userId, commit.treeSha)).map((e) => [e.path, e]));
+  const parent = commit.parentSha ? await getCommit(userId, commit.parentSha) : null;
+  const prev = new Map(parent ? (await readTreeEntries(userId, parent.treeSha)).map((e) => [e.path, e]) : []);
+
+  const changed: { path: string; status: DiffFile["status"]; oldSha?: string; newSha?: string }[] = [];
+  for (const [p, e] of cur) {
+    if (!prev.has(p)) changed.push({ path: p, status: "added", newSha: e.sha });
+    else if (prev.get(p)!.sha !== e.sha) changed.push({ path: p, status: "modified", oldSha: prev.get(p)!.sha, newSha: e.sha });
+  }
+  for (const [p, e] of prev) if (!cur.has(p)) changed.push({ path: p, status: "deleted", oldSha: e.sha });
+  changed.sort((a, b) => a.path.localeCompare(b.path));
+
+  const shas = [...new Set(changed.flatMap((c) => [c.oldSha, c.newSha].filter((s): s is string => !!s)))];
+  const blobs = await readBlobs(userId, shas);
+  return changed.map((c) => ({
+    path: c.path,
+    status: c.status,
+    oldContent: c.oldSha ? (blobs.get(c.oldSha) ?? null) : null,
+    newContent: c.newSha ? (blobs.get(c.newSha) ?? null) : null,
+  }));
+}

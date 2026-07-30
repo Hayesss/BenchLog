@@ -1,5 +1,5 @@
-import type { ExportRecord, RecordStatus, ReportOptions } from './reportTypes'
-import { STATUS_ICON, STATUS_LABEL } from './reportTypes'
+import type { ExportAnalysis, ExportRecord, RecordStatus, ReportOptions } from './reportTypes'
+import { ANALYSIS_STATUS_LABEL, STATUS_ICON, STATUS_LABEL } from './reportTypes'
 
 /** 匿名化货号：掩码 `#4967`、`AB-123456` 一类的 catalog 编号 */
 export function anonymizeText(text: string, on: boolean): string {
@@ -15,6 +15,15 @@ export function recordCode(r: Pick<ExportRecord, 'id'>): string {
   return `R-${r.id}`
 }
 
+export function analysisCode(a: Pick<ExportAnalysis, 'id'>): string {
+  return `A-${a.id}`
+}
+
+/** commit 短哈希（前 7 位），无则空串 */
+export function shortCommit(hash: string | null | undefined): string {
+  return hash ? hash.slice(0, 7) : ''
+}
+
 export function mmdd(date: string): string {
   return date.slice(5) // YYYY-MM-DD → MM-DD
 }
@@ -24,10 +33,11 @@ export function compactDate(d: Date): string {
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`
 }
 
-export function reportFileName(format: 'markdown' | 'table' | 'pdf', date: Date): string {
+export function reportFileName(format: 'markdown' | 'table' | 'pdf' | 'docx', date: Date): string {
   const c = compactDate(date)
   if (format === 'markdown') return `组会汇报-${c}.md`
   if (format === 'table') return `实验汇总-${c}.csv`
+  if (format === 'docx') return `组会汇报-${c}.docx`
   return `存档报告-${c}.pdf`
 }
 
@@ -77,6 +87,7 @@ export function protocolLabel(r: ExportRecord): string {
 /** 组会汇报 Markdown（template 1）—— client-side 生成 */
 export function buildGroupMarkdown(
   records: ExportRecord[],
+  analyses: ExportAnalysis[],
   opts: ReportOptions,
   meta: ReportMeta,
 ): string {
@@ -87,7 +98,7 @@ export function buildGroupMarkdown(
   lines.push(`# 组会汇报 · ${meta.today}`)
   lines.push('')
   lines.push(
-    `博士生：${an(meta.researcher)} · 周期：${meta.rangeLabel} · 共 ${records.length} 条记录`,
+    `博士生：${an(meta.researcher)} · 周期：${meta.rangeLabel} · 共 ${records.length} 条记录${analyses.length ? ` · 生信分析 ${analyses.length} 条` : ''}`,
   )
   lines.push('')
 
@@ -154,6 +165,38 @@ export function buildGroupMarkdown(
       }
     }
   })
+
+  // 生信分析章节
+  if (analyses.length > 0) {
+    lines.push(`## 生信分析（${analyses.length} 条）`)
+    lines.push('')
+    for (const a of analyses) {
+      lines.push(`### ${analysisCode(a)} · ${an(a.name)}`)
+      lines.push('')
+      lines.push(
+        `- **日期**：${a.analysisDate} ｜ **项目**：${an(a.project?.name ?? '未归档')} ｜ **Pipeline**：${an(a.pipeline)} ｜ **状态**：${ANALYSIS_STATUS_LABEL[a.status]}`,
+      )
+      if (a.inputData) lines.push(`- **输入数据**：${an(a.inputData)}`)
+      if (a.environment) lines.push(`- **环境锁定**：${an(a.environment)}`)
+      if (a.command) lines.push(`- **运行命令**：${an(a.command)}`)
+      const commit = shortCommit(a.commitHash)
+      if (commit) lines.push(`- **Commit**：\`${commit}\``)
+      lines.push('')
+      if (a.resultMd) {
+        lines.push('**结果摘要**')
+        lines.push('')
+        lines.push(an(a.resultMd))
+        lines.push('')
+      }
+      const tail: string[] = []
+      if (a.conclusion) tail.push(`**结论**：${an(a.conclusion)}`)
+      if (a.nextStep) tail.push(`**下一步**：${an(a.nextStep)}`)
+      if (tail.length) {
+        lines.push(tail.join('　　'))
+        lines.push('')
+      }
+    }
+  }
 
   // 失败与问题
   const failed = records.filter((r) => r.status === 'failed')
@@ -222,20 +265,73 @@ function csvCell(s: string): string {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
-/** 汇总表格 CSV —— BOM 前缀保证 Excel 中文兼容 */
-export function buildCsv(records: ExportRecord[], opts: ReportOptions): string {
+const ANALYSIS_TABLE_COLUMNS = [
+  '名称',
+  '日期',
+  '项目',
+  'Pipeline',
+  '状态',
+  '输入数据',
+  '环境锁定',
+  '运行命令',
+  'Commit',
+  '结果摘要',
+  '结论',
+  '下一步',
+] as const
+
+/** csv/tsv 单元格内不保留换行（生信分析字段多为多行文本，统一替换为空格） */
+function flat(s: string | null | undefined): string {
+  return (s ?? '').replace(/\s*\n\s*/g, ' ').trim()
+}
+
+function analysisTableRow(a: ExportAnalysis, opts: ReportOptions): string[] {
+  const an = (s: string | null | undefined) => anonymizeText(flat(s), opts.anonymize)
+  return [
+    an(a.name),
+    a.analysisDate,
+    an(a.project?.name ?? '未归档'),
+    an(a.pipeline),
+    ANALYSIS_STATUS_LABEL[a.status],
+    an(a.inputData),
+    an(a.environment),
+    an(a.command),
+    shortCommit(a.commitHash),
+    an(a.resultMd),
+    an(a.conclusion),
+    an(a.nextStep),
+  ]
+}
+
+/** 汇总表格 CSV —— BOM 前缀保证 Excel 中文兼容；尾部附「生信分析」章节 */
+export function buildCsv(
+  records: ExportRecord[],
+  analyses: ExportAnalysis[],
+  opts: ReportOptions,
+): string {
   const rows = [TABLE_COLUMNS.join(','), ...records.map((r) => tableRow(r, opts).map(csvCell).join(','))]
+  if (analyses.length > 0) {
+    rows.push('', '生信分析', ANALYSIS_TABLE_COLUMNS.join(','))
+    for (const a of analyses) rows.push(analysisTableRow(a, opts).map(csvCell).join(','))
+  }
   return '﻿' + rows.join('\r\n')
 }
 
-/** 复制表格到剪贴板用 TSV */
-export function buildTsv(records: ExportRecord[], opts: ReportOptions): string {
+/** 复制表格到剪贴板用 TSV；尾部附「生信分析」章节 */
+export function buildTsv(
+  records: ExportRecord[],
+  analyses: ExportAnalysis[],
+  opts: ReportOptions,
+): string {
   const rows = [TABLE_COLUMNS.join('\t'), ...records.map((r) => tableRow(r, opts).join('\t'))]
+  if (analyses.length > 0) {
+    rows.push('', '生信分析', ANALYSIS_TABLE_COLUMNS.join('\t'))
+    for (const a of analyses) rows.push(analysisTableRow(a, opts).join('\t'))
+  }
   return rows.join('\n')
 }
 
-export function downloadTextFile(name: string, content: string, mime: string) {
-  const blob = new Blob([content], { type: mime })
+export function downloadBlobFile(name: string, blob: Blob) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -244,4 +340,8 @@ export function downloadTextFile(name: string, content: string, mime: string) {
   a.click()
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 4000)
+}
+
+export function downloadTextFile(name: string, content: string, mime: string) {
+  downloadBlobFile(name, new Blob([content], { type: mime }))
 }

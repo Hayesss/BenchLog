@@ -2,7 +2,7 @@ import { z } from "zod";
 import { and, desc, eq, gte, lte, inArray } from "drizzle-orm";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { records, recordImages, projects, protocols, tags, flows, todos, exportLogs } from "@db/schema";
+import { records, recordImages, projects, protocols, tags, flows, todos, exportLogs, bioinfoAnalyses } from "@db/schema";
 import { dateStr } from "./zodSchemas";
 
 /** ⌘K 全局搜索：抗体货号 / 细胞系 / 标签 / 记录结论，跨所有实体 */
@@ -56,7 +56,7 @@ export const searchRouter = createRouter({
 });
 
 export const exportLogRouter = createRouter({
-  /** 按范围取导出数据（记录全文 + 图片 + 项目/协议元信息） */
+  /** 按范围取导出数据（湿实验记录全文 + 图片 + 项目/协议元信息 + 生信分析） */
   data: authedQuery
     .input(
       z.object({
@@ -94,18 +94,40 @@ export const exportLogRouter = createRouter({
         arr.push(im);
         imgMap.set(im.recordId, arr);
       }
-      return rows.map((r) => ({
-        ...r,
-        project: r.projectId ? (pMap.get(r.projectId) ?? null) : null,
-        protocol: r.protocolId ? (prMap.get(r.protocolId) ?? null) : null,
-        images: imgMap.get(r.id) ?? [],
-      }));
+
+      // 生信分析：仅日期范围模式返回；recordIds（手动挑选/最近10条）模式下为空数组
+      let analysisRows: (typeof bioinfoAnalyses.$inferSelect)[] = [];
+      if (!input.recordIds?.length) {
+        const aconds = [eq(bioinfoAnalyses.userId, ctx.user.id)];
+        if (input.from) aconds.push(gte(bioinfoAnalyses.analysisDate, input.from));
+        if (input.to) aconds.push(lte(bioinfoAnalyses.analysisDate, input.to));
+        if (input.projectIds?.length)
+          aconds.push(inArray(bioinfoAnalyses.projectId, input.projectIds));
+        analysisRows = await db
+          .select()
+          .from(bioinfoAnalyses)
+          .where(and(...aconds))
+          .orderBy(bioinfoAnalyses.analysisDate);
+      }
+
+      return {
+        records: rows.map((r) => ({
+          ...r,
+          project: r.projectId ? (pMap.get(r.projectId) ?? null) : null,
+          protocol: r.protocolId ? (prMap.get(r.protocolId) ?? null) : null,
+          images: imgMap.get(r.id) ?? [],
+        })),
+        analyses: analysisRows.map((a) => ({
+          ...a,
+          project: a.projectId ? (pMap.get(a.projectId) ?? null) : null,
+        })),
+      };
     }),
 
   saveLog: authedQuery
     .input(
       z.object({
-        format: z.enum(["markdown", "table", "pdf"]),
+        format: z.enum(["markdown", "table", "pdf", "docx"]),
         scope: z.record(z.string(), z.unknown()),
         content: z.string().optional(),
       }),

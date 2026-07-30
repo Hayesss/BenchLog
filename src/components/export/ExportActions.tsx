@@ -7,12 +7,14 @@ const PRIMARY_LABEL: Record<ReportTemplate, string> = {
   markdown: '复制 Markdown',
   table: '下载 CSV',
   pdf: '导出 PDF',
+  docx: '下载 Word',
 }
 
 const PRIMARY_ICON: Record<ReportTemplate, typeof Copy> = {
   markdown: Copy,
   table: FileDown,
   pdf: Printer,
+  docx: FileDown,
 }
 
 export interface ExportActionsProps {
@@ -21,8 +23,8 @@ export interface ExportActionsProps {
   busy: boolean
   done: boolean
   onPrimary: () => void
-  /** markdown → 下载 .md；table → 复制表格；pdf → 打印 */
-  onSecondary: () => void
+  /** markdown → 下载 .md；table → 复制表格；pdf → 打印；docx → 无副操作 */
+  onSecondary?: () => void
   onPrint: () => void
 }
 
@@ -69,15 +71,17 @@ export default function ExportActions({
 
       {/* 次按钮 */}
       <div className="mt-2 flex gap-2">
-        <button
-          type="button"
-          onClick={onSecondary}
-          disabled={disabled || busy}
-          className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface text-[12.5px] font-medium text-ink-soft shadow-card transition-colors duration-150 hover:border-line-strong hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <SecondaryIcon className="h-3.5 w-3.5" />
-          {secondaryLabel}
-        </button>
+        {onSecondary && (
+          <button
+            type="button"
+            onClick={onSecondary}
+            disabled={disabled || busy}
+            className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface text-[12.5px] font-medium text-ink-soft shadow-card transition-colors duration-150 hover:border-line-strong hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <SecondaryIcon className="h-3.5 w-3.5" />
+            {secondaryLabel}
+          </button>
+        )}
         {template !== 'pdf' && (
           <button
             type="button"

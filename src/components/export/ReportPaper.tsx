@@ -4,10 +4,24 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { PenLine, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { cn } from '@/lib/utils'
-import type { ExportImage, ExportRecord, ReportOptions, ReportTemplate } from './reportTypes'
-import { STATUS_ICON, STATUS_LABEL } from './reportTypes'
+import type {
+  ExportAnalysis,
+  ExportImage,
+  ExportRecord,
+  ReportOptions,
+  ReportTemplate,
+} from './reportTypes'
+import { ANALYSIS_STATUS_LABEL, STATUS_ICON, STATUS_LABEL } from './reportTypes'
 import type { ReportMeta } from './reportBuild'
-import { anonymizeText, groupByProject, protocolLabel, recordCode, statusCounts } from './reportBuild'
+import {
+  analysisCode,
+  anonymizeText,
+  groupByProject,
+  protocolLabel,
+  recordCode,
+  shortCommit,
+  statusCounts,
+} from './reportBuild'
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number]
 
@@ -77,6 +91,86 @@ function StatusChip({ status }: { status: ExportRecord['status'] }) {
     <span className={cn('inline-block rounded-full px-2 py-0.5 text-[11px] font-medium', cls)}>
       {STATUS_LABEL[status]}
     </span>
+  )
+}
+
+function AnalysisStatusChip({ status }: { status: ExportAnalysis['status'] }) {
+  const cls =
+    status === 'done'
+      ? 'bg-[#4C8C6B1F] text-success'
+      : status === 'failed'
+        ? 'bg-[#B4564E1F] text-danger'
+        : 'bg-[#5B7C991F] text-info'
+  return (
+    <span className={cn('inline-block rounded-full px-2 py-0.5 text-[11px] font-medium', cls)}>
+      {ANALYSIS_STATUS_LABEL[status]}
+    </span>
+  )
+}
+
+/** 生信分析条目（Markdown / Word 预览共用结构） */
+function AnalysisBlock({
+  a,
+  opts,
+}: {
+  a: ExportAnalysis
+  opts: ReportOptions
+}) {
+  const an = (s: string | null | undefined) => anonymizeText(s ?? '', opts.anonymize)
+  const commit = shortCommit(a.commitHash)
+  return (
+    <div className="mt-3">
+      <h3 className="text-[14.5px] font-semibold text-ink">
+        <span className="mr-1.5 font-mono text-[12px] text-ink-mute">{analysisCode(a)}</span>
+        {an(a.name)}
+      </h3>
+      <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11.5px] text-ink-mute">
+        <span>{a.analysisDate}</span>
+        <span>｜</span>
+        <span
+          className="inline-flex items-center gap-1"
+        >
+          <span
+            className="inline-block h-2 w-2 rounded-full align-middle"
+            style={{ backgroundColor: a.project?.color || '#8A9099' }}
+          />
+          {an(a.project?.name ?? '未归档')}
+        </span>
+        <span>｜</span>
+        <span>{an(a.pipeline)}</span>
+        <span>｜</span>
+        <AnalysisStatusChip status={a.status} />
+        {commit && (
+          <>
+            <span>｜</span>
+            <span className="rounded bg-paper px-1">commit {commit}</span>
+          </>
+        )}
+      </p>
+      {a.inputData && (
+        <p className="mt-1.5 text-[13px] leading-[20px] text-ink-soft">输入数据：{an(a.inputData)}</p>
+      )}
+      {a.environment && (
+        <p className="mt-1 text-[13px] leading-[20px] text-ink-soft">环境锁定：{an(a.environment)}</p>
+      )}
+      {a.command && (
+        <p className="mt-1 whitespace-pre-wrap font-mono text-[12px] leading-[18px] text-ink-soft">
+          运行命令：{an(a.command)}
+        </p>
+      )}
+      {a.resultMd && (
+        <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-[20px] text-ink-soft">
+          结果摘要：{an(a.resultMd)}
+        </p>
+      )}
+      {(a.conclusion || a.nextStep) && (
+        <p className="mt-1.5 text-[13px] leading-[20px] text-ink">
+          {a.conclusion && <>结论：{an(a.conclusion)}</>}
+          {a.conclusion && a.nextStep && <span className="mx-1.5 text-ink-mute">｜</span>}
+          {a.nextStep && <span className="text-ink-soft">下一步：{an(a.nextStep)}</span>}
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -221,11 +315,13 @@ function MdRecordBlock({
 
 function MarkdownPreview({
   records,
+  analyses,
   opts,
   meta,
   onOpenImg,
 }: {
   records: ExportRecord[]
+  analyses: ExportAnalysis[]
   opts: ReportOptions
   meta: ReportMeta
   onOpenImg: (img: ExportImage) => void
@@ -233,7 +329,14 @@ function MarkdownPreview({
   const an = (s: string) => anonymizeText(s, opts.anonymize)
   const groups = groupByProject(records)
   const failed = records.filter((r) => r.status === 'failed')
-  const plans = [...new Set(records.map((r) => (r.nextStep ?? '').trim()).filter(Boolean))]
+  const plans = [
+    ...new Set(
+      [
+        ...records.map((r) => (r.nextStep ?? '').trim()),
+        ...analyses.map((a) => (a.nextStep ?? '').trim()),
+      ].filter(Boolean),
+    ),
+  ]
 
   return (
     <div>
@@ -242,12 +345,15 @@ function MarkdownPreview({
       </h1>
       <p className="mt-1 font-mono text-[12px] text-ink-mute">
         博士生：{an(meta.researcher)} · 周期：{meta.rangeLabel} · 共 {records.length} 条记录
+        {analyses.length > 0 && ` · 生信分析 ${analyses.length} 条`}
       </p>
       <Hairline />
 
       {/* 项目统计概览 */}
-      <h2 className="font-display text-[15px] font-semibold text-ink">项目统计概览</h2>
-      <div className="mt-2 overflow-x-auto rounded-md border border-line">
+      {groups.length > 0 && (
+        <>
+          <h2 className="font-display text-[15px] font-semibold text-ink">项目统计概览</h2>
+          <div className="mt-2 overflow-x-auto rounded-md border border-line">
         <table className="w-full text-[12px]">
           <thead>
             <tr className="bg-paper text-left text-ink-mute">
@@ -282,7 +388,9 @@ function MarkdownPreview({
             })}
           </tbody>
         </table>
-      </div>
+          </div>
+        </>
+      )}
 
       {/* 按项目分组 */}
       {groups.map((g, gi) => (
@@ -301,6 +409,22 @@ function MarkdownPreview({
           ))}
         </div>
       ))}
+
+      {/* 生信分析 */}
+      {analyses.length > 0 && (
+        <div className="mt-5">
+          <h2 className="flex items-center gap-2 font-display text-[17px] font-semibold text-ink">
+            生信分析
+            <span className="font-mono text-[12px] font-normal text-ink-mute">
+              （{analyses.length} 条）
+            </span>
+          </h2>
+          <Hairline />
+          {analyses.map((a) => (
+            <AnalysisBlock key={a.id} a={a} opts={opts} />
+          ))}
+        </div>
+      )}
 
       {/* 失败与问题 */}
       {failed.length > 0 && (
@@ -382,8 +506,18 @@ function EditedMarkdown({ markdown }: { markdown: string }) {
 
 /* ---------------- 模板 2 · 汇总表格预览 ---------------- */
 
-function TablePreview({ records, opts }: { records: ExportRecord[]; opts: ReportOptions }) {
+function TablePreview({
+  records,
+  analyses,
+  opts,
+}: {
+  records: ExportRecord[]
+  analyses: ExportAnalysis[]
+  opts: ReportOptions
+}) {
   const an = (s: string | null | undefined) => anonymizeText(s ?? '', opts.anonymize)
+  /** 表格单元格不保留换行 */
+  const flat = (s: string | null | undefined) => an((s ?? '').replace(/\s*\n\s*/g, ' ').trim())
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[760px] border-collapse text-[12.5px]">
@@ -434,6 +568,64 @@ function TablePreview({ records, opts }: { records: ExportRecord[]; opts: Report
           ))}
         </tbody>
       </table>
+
+      {/* 生信分析章节（与 CSV/TSV 尾部结构一致） */}
+      {analyses.length > 0 && (
+        <div className="mt-6">
+          <h2 className="flex items-center gap-2 font-display text-[15px] font-semibold text-ink">
+            生信分析
+            <span className="font-mono text-[12px] font-normal text-ink-mute">
+              （{analyses.length} 条）
+            </span>
+          </h2>
+          <table className="mt-2 w-full min-w-[760px] border-collapse text-[12.5px]">
+            <thead>
+              <tr className="bg-paper text-left text-ink-mute">
+                {['名称', '日期', '项目', 'Pipeline', '状态', '输入数据', 'Commit', '结果摘要', '结论', '下一步'].map(
+                  (h) => (
+                    <th
+                      key={h}
+                      className="whitespace-nowrap border-b border-line-strong px-2.5 py-2 font-medium"
+                    >
+                      {h}
+                    </th>
+                  ),
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {analyses.map((a) => (
+                <tr key={a.id} className="border-b border-line align-top last:border-b-0">
+                  <td className="min-w-[140px] px-2.5 py-2 font-medium text-ink">{flat(a.name)}</td>
+                  <td className="whitespace-nowrap px-2.5 py-2 font-mono text-[12px]">
+                    {a.analysisDate}
+                  </td>
+                  <td className="whitespace-nowrap px-2.5 py-2">
+                    <span
+                      className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle"
+                      style={{ backgroundColor: a.project?.color || '#8A9099' }}
+                    />
+                    {flat(a.project?.name ?? '未归档')}
+                  </td>
+                  <td className="whitespace-nowrap px-2.5 py-2 font-mono text-[12px] text-ink-soft">
+                    {flat(a.pipeline)}
+                  </td>
+                  <td className="whitespace-nowrap px-2.5 py-2">
+                    <AnalysisStatusChip status={a.status} />
+                  </td>
+                  <td className="min-w-[140px] px-2.5 py-2 text-ink-soft">{flat(a.inputData) || '—'}</td>
+                  <td className="whitespace-nowrap px-2.5 py-2 font-mono text-[12px] text-ink-soft">
+                    {shortCommit(a.commitHash) || '—'}
+                  </td>
+                  <td className="min-w-[160px] px-2.5 py-2 text-ink-soft">{flat(a.resultMd) || '—'}</td>
+                  <td className="min-w-[140px] px-2.5 py-2 text-ink-soft">{flat(a.conclusion) || '—'}</td>
+                  <td className="min-w-[140px] px-2.5 py-2 text-ink-soft">{flat(a.nextStep) || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
@@ -579,12 +771,107 @@ function PdfRecordPage({
   )
 }
 
+function PdfAnalysisPage({
+  a,
+  index,
+  total,
+  opts,
+}: {
+  a: ExportAnalysis
+  index: number
+  total: number
+  opts: ReportOptions
+}) {
+  const an = (s: string | null | undefined) => anonymizeText(s ?? '', opts.anonymize)
+  const commit = shortCommit(a.commitHash)
+  return (
+    <article className="report-page flex min-h-[720px] flex-col p-8 md:p-10">
+      {/* 页眉 */}
+      <header className="flex items-center justify-between font-mono text-[11px] tracking-[0.04em] text-ink-mute">
+        <span>{analysisCode(a)} · {a.analysisDate}</span>
+        <span>BENCHLOG ARCHIVE · BIOINFO</span>
+      </header>
+      <Hairline />
+
+      <h2 className="font-display text-[20px] font-bold leading-[28px] text-ink">{an(a.name)}</h2>
+      <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11.5px] text-ink-mute">
+        <span>{an(a.project?.name ?? '未归档项目')}</span>
+        <span>·</span>
+        <span>{an(a.pipeline)}</span>
+        <span>·</span>
+        <AnalysisStatusChip status={a.status} />
+        {commit && <span className="rounded bg-paper px-1">commit {commit}</span>}
+      </p>
+
+      {a.inputData && (
+        <section className="mt-4">
+          <h3 className="text-[13px] font-semibold tracking-[0.01em] text-ink">输入数据</h3>
+          <p className="mt-1 whitespace-pre-wrap text-[13px] leading-[21px] text-ink-soft">
+            {an(a.inputData)}
+          </p>
+        </section>
+      )}
+
+      {a.environment && (
+        <section className="mt-4">
+          <h3 className="text-[13px] font-semibold tracking-[0.01em] text-ink">环境锁定</h3>
+          <p className="mt-1 whitespace-pre-wrap text-[13px] leading-[21px] text-ink-soft">
+            {an(a.environment)}
+          </p>
+        </section>
+      )}
+
+      {a.command && (
+        <section className="mt-4">
+          <h3 className="text-[13px] font-semibold tracking-[0.01em] text-ink">运行命令</h3>
+          <p className="mt-1 whitespace-pre-wrap rounded-md border border-line bg-paper p-2.5 font-mono text-[12px] leading-[19px] text-ink-soft">
+            {an(a.command)}
+          </p>
+        </section>
+      )}
+
+      {a.resultMd && (
+        <section className="mt-4">
+          <h3 className="text-[13px] font-semibold tracking-[0.01em] text-ink">结果摘要</h3>
+          <p className="mt-1 whitespace-pre-wrap text-[13px] leading-[21px] text-ink-soft">
+            {an(a.resultMd)}
+          </p>
+        </section>
+      )}
+
+      {(a.conclusion || a.nextStep) && (
+        <section className="mt-4 rounded-md border border-line bg-paper p-3">
+          {a.conclusion && (
+            <p className="text-[13px] leading-[20px] text-ink">
+              <span className="font-semibold">结论：</span>
+              {an(a.conclusion)}
+            </p>
+          )}
+          {a.nextStep && (
+            <p className="mt-1 text-[13px] leading-[20px] text-ink-soft">
+              <span className="font-semibold text-ink">下一步：</span>
+              {an(a.nextStep)}
+            </p>
+          )}
+        </section>
+      )}
+
+      {/* 页脚页码 */}
+      <footer className="mt-auto pt-6 text-center font-mono text-[11px] text-ink-mute">
+        第 {index + 1} 页 · 共 {total} 页
+      </footer>
+    </article>
+  )
+}
+
 function PdfCoverPage({
   records,
+  analyses,
   opts,
   meta,
 }: {
   records: ExportRecord[]
+  analyses: ExportAnalysis[]
   opts: ReportOptions
   meta: ReportMeta
 }) {
@@ -602,17 +889,18 @@ function PdfCoverPage({
       <div className="flex flex-1 flex-col justify-center py-10">
         <p className="caption-en">EXPERIMENT RECORD ARCHIVE</p>
         <h1 className="mt-2 font-display text-[28px] font-bold leading-[38px] text-ink">
-          湿实验记录存档报告
+          {analyses.length > 0 ? '实验与生信分析存档报告' : '湿实验记录存档报告'}
         </h1>
         <p className="mt-3 font-mono text-[12.5px] text-ink-mute">
           归档人：{an(meta.researcher)} · 周期：{meta.rangeLabel}
         </p>
-        <div className="mt-8 grid grid-cols-4 gap-3">
+        <div className={cn('mt-8 grid gap-3', analyses.length > 0 ? 'grid-cols-5' : 'grid-cols-4')}>
           {[
             { label: '记录', value: records.length },
             { label: '已完成', value: c.done },
             { label: '进行中', value: c.ongoing },
             { label: '图片', value: imgCount },
+            ...(analyses.length > 0 ? [{ label: '生信分析', value: analyses.length }] : []),
           ].map((s) => (
             <div key={s.label} className="rounded-md border border-line p-3 text-center">
               <div className="font-mono text-[22px] text-ink">{s.value}</div>
@@ -659,6 +947,7 @@ function PaperSkeleton() {
 export interface ReportPaperProps {
   template: ReportTemplate
   records: ExportRecord[]
+  analyses: ExportAnalysis[]
   options: ReportOptions
   markdown: string
   markdownEdited: boolean
@@ -673,6 +962,7 @@ export interface ReportPaperProps {
 export default function ReportPaper({
   template,
   records,
+  analyses,
   options,
   markdown,
   markdownEdited,
@@ -683,7 +973,7 @@ export default function ReportPaper({
   onEditMarkdown,
 }: ReportPaperProps) {
   const [lightbox, setLightbox] = useState<ExportImage | null>(null)
-  const empty = !loading && records.length === 0
+  const empty = !loading && records.length === 0 && analyses.length === 0
   const paged = template === 'pdf'
 
   return (
@@ -744,13 +1034,14 @@ export default function ReportPaper({
                 : 'max-h-[82vh] overflow-y-auto rounded-[4px] border border-line bg-surface shadow-[0_8px_32px_rgba(33,37,43,0.08)]',
             )}
           >
-            {template === 'markdown' && (
+            {(template === 'markdown' || template === 'docx') && (
               <div className="p-8 md:p-10">
-                {markdownEdited ? (
+                {template === 'markdown' && markdownEdited ? (
                   <EditedMarkdown markdown={markdown} />
                 ) : (
                   <MarkdownPreview
                     records={records}
+                    analyses={analyses}
                     opts={options}
                     meta={meta}
                     onOpenImg={setLightbox}
@@ -758,11 +1049,18 @@ export default function ReportPaper({
                 )}
               </div>
             )}
-            {template === 'table' && <TablePreview records={records} opts={options} />}
+            {template === 'table' && (
+              <TablePreview records={records} analyses={analyses} opts={options} />
+            )}
             {template === 'pdf' && (
               <>
                 <div className="overflow-hidden rounded-[4px] border border-line bg-surface shadow-[0_8px_32px_rgba(33,37,43,0.08)]">
-                  <PdfCoverPage records={records} opts={options} meta={meta} />
+                  <PdfCoverPage
+                    records={records}
+                    analyses={analyses}
+                    opts={options}
+                    meta={meta}
+                  />
                 </div>
                 {records.map((r, i) => (
                   <div
@@ -772,9 +1070,22 @@ export default function ReportPaper({
                     <PdfRecordPage
                       r={r}
                       index={i + 1}
-                      total={records.length + 1}
+                      total={records.length + analyses.length + 1}
                       opts={options}
                       onOpenImg={setLightbox}
+                    />
+                  </div>
+                ))}
+                {analyses.map((a, i) => (
+                  <div
+                    key={a.id}
+                    className="overflow-hidden rounded-[4px] border border-line bg-surface shadow-[0_8px_32px_rgba(33,37,43,0.08)]"
+                  >
+                    <PdfAnalysisPage
+                      a={a}
+                      index={records.length + i + 1}
+                      total={records.length + analyses.length + 1}
+                      opts={options}
                     />
                   </div>
                 ))}

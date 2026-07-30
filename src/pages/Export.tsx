@@ -20,15 +20,18 @@ import type {
   ReportOptions,
   ReportTemplate,
   ScopePreset,
+  SourceSelection,
 } from '@/components/export/reportTypes'
 import {
   buildCsv,
   buildGroupMarkdown,
   buildTsv,
+  downloadBlobFile,
   downloadTextFile,
   mmdd,
   reportFileName,
 } from '@/components/export/reportBuild'
+import { buildDocxBlob } from '@/components/export/buildDocx'
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number]
 
@@ -46,6 +49,7 @@ function parseTemplate(v: string | null): ReportTemplate {
   if (v === 'md' || v === 'markdown') return 'markdown'
   if (v === 'table') return 'table'
   if (v === 'pdf') return 'pdf'
+  if (v === 'docx' || v === 'word') return 'docx'
   return 'markdown'
 }
 
@@ -81,6 +85,7 @@ export default function Export() {
       : 'week'
   })
   const [range, setRange] = useState<DateRange>(() => defaultRange())
+  const [sources, setSources] = useState<SourceSelection>({ records: true, analyses: true })
   const [projectIds, setProjectIds] = useState<number[]>([])
   const [statusFilter, setStatusFilter] = useState<RecordStatus[]>([])
   const [manualIds, setManualIds] = useState<number[] | null>(null)
@@ -182,22 +187,31 @@ export default function Export() {
   const debouncing = JSON.stringify(debouncedInput) !== JSON.stringify(queryInput)
   const scopeLoading = debouncing || waitingForRecent || (queryEnabled && dataQuery.isLoading)
 
-  // 客户端筛选：移除项 / 状态 / 失败开关
+  // 客户端筛选：数据来源开关 / 移除项 / 状态 / 失败开关
   const records = useMemo(() => {
-    let rs = dataQuery.data ?? []
+    let rs = sources.records ? (dataQuery.data?.records ?? []) : []
     if (excludedIds.length) rs = rs.filter((r) => !excludedIds.includes(r.id))
     if (statusFilter.length) rs = rs.filter((r) => statusFilter.includes(r.status))
     if (!options.includeFailed) rs = rs.filter((r) => r.status !== 'failed')
     return rs
-  }, [dataQuery.data, excludedIds, statusFilter, options.includeFailed])
+  }, [dataQuery.data, sources.records, excludedIds, statusFilter, options.includeFailed])
+
+  const analyses = useMemo(
+    () => (sources.analyses ? (dataQuery.data?.analyses ?? []) : []),
+    [dataQuery.data, sources.analyses],
+  )
 
   const stats = useMemo(
     () => ({
       records: records.length,
-      projects: new Set(records.map((r) => r.projectId ?? 'none')).size,
+      analyses: analyses.length,
+      projects: new Set([
+        ...records.map((r) => r.projectId ?? 'none'),
+        ...analyses.map((a) => a.projectId ?? 'none'),
+      ]).size,
       images: records.reduce((n, r) => n + (options.includeImages ? r.images.length : 0), 0),
     }),
-    [records, options.includeImages],
+    [records, analyses, options.includeImages],
   )
 
   // ------- 报告文本 -------
@@ -215,8 +229,8 @@ export default function Export() {
   )
 
   const generatedMd = useMemo(
-    () => buildGroupMarkdown(records, options, meta),
-    [records, options, meta],
+    () => buildGroupMarkdown(records, analyses, options, meta),
+    [records, analyses, options, meta],
   )
   // 范围/选项变化时丢弃手动微调
   useEffect(() => setEditedMd(null), [generatedMd])
@@ -231,20 +245,28 @@ export default function Export() {
         options.includeDeviations,
         options.includeFailed,
         options.anonymize,
+        sources.records,
+        sources.analyses,
         records.length,
+        analyses.length,
       ].join('|'),
-    [template, debouncedInput, options, records.length],
+    [template, debouncedInput, options, sources, records.length, analyses.length],
   )
 
   const scopeForLog = () => ({
     preset,
     from: range.from,
     to: range.to,
+    sources: [
+      ...(sources.records ? ['records'] : []),
+      ...(sources.analyses ? ['analyses'] : []),
+    ],
     ...(projectIds.length ? { projectIds } : {}),
     ...(effectiveIds?.length ? { recordIds: effectiveIds } : {}),
     ...(statusFilter.length ? { statuses: statusFilter } : {}),
     template,
     count: records.length,
+    analyses: analyses.length,
   })
 
   const afterExport = () => {
@@ -253,7 +275,14 @@ export default function Export() {
   }
 
   // ------- 导出操作 -------
-  const empty = records.length === 0
+  const empty = records.length === 0 && analyses.length === 0
+
+  /** toast 计数文案：所选来源的数量描述 */
+  const countDesc = () =>
+    [
+      ...(sources.records ? [`${records.length} 条记录`] : []),
+      ...(sources.analyses ? [`${analyses.length} 条分析`] : []),
+    ].join(' · ')
 
   const guard = (fn: () => void | Promise<void>) => async () => {
     if (empty || busy) return
@@ -268,7 +297,7 @@ export default function Export() {
   const doCopyMarkdown = guard(async () => {
     await copyText(markdown)
     saveLog.mutate({ format: 'markdown', scope: scopeForLog(), content: markdown })
-    toast.success(`已复制 Markdown · ${records.length} 条记录`)
+    toast.success(`已复制 Markdown · ${countDesc()}`)
     afterExport()
   })
 
@@ -276,27 +305,27 @@ export default function Export() {
     const name = reportFileName('markdown', new Date())
     downloadTextFile(name, markdown, 'text/markdown;charset=utf-8')
     saveLog.mutate({ format: 'markdown', scope: scopeForLog(), content: markdown })
-    toast.success(`已导出 ${name} · ${records.length} 条记录`)
+    toast.success(`已导出 ${name} · ${countDesc()}`)
     afterExport()
   })
 
   const doDownloadCsv = guard(() => {
-    const csv = buildCsv(records, options)
+    const csv = buildCsv(records, analyses, options)
     const name = reportFileName('table', new Date())
     downloadTextFile(name, csv, 'text/csv;charset=utf-8')
     saveLog.mutate({ format: 'table', scope: scopeForLog(), content: csv })
-    toast.success(`已导出 ${name} · ${records.length} 条记录`)
+    toast.success(`已导出 ${name} · ${countDesc()}`)
     afterExport()
   })
 
   const doCopyTable = guard(async () => {
-    await copyText(buildTsv(records, options))
+    await copyText(buildTsv(records, analyses, options))
     saveLog.mutate({
       format: 'table',
       scope: scopeForLog(),
-      content: buildCsv(records, options),
+      content: buildCsv(records, analyses, options),
     })
-    toast.success(`已复制表格（TSV）· ${records.length} 条记录，可直接粘贴到 Excel`)
+    toast.success(`已复制表格（TSV）· ${countDesc()}，可直接粘贴到 Excel`)
     afterExport()
   })
 
@@ -304,9 +333,18 @@ export default function Export() {
     saveLog.mutate({ format: 'pdf', scope: scopeForLog() })
     window.setTimeout(() => {
       window.print()
-      toast.success(`已导出 ${reportFileName('pdf', new Date())} · ${records.length} 条记录`)
+      toast.success(`已导出 ${reportFileName('pdf', new Date())} · ${countDesc()}`)
       afterExport()
     }, 350)
+  })
+
+  const doDownloadDocx = guard(async () => {
+    const blob = await buildDocxBlob(records, analyses, options, meta)
+    const name = reportFileName('docx', new Date())
+    downloadBlobFile(name, blob)
+    saveLog.mutate({ format: 'docx', scope: scopeForLog() })
+    toast.success(`已导出 ${name} · ${countDesc()}`)
+    afterExport()
   })
 
   const doPrintOnly = () => {
@@ -315,11 +353,30 @@ export default function Export() {
   }
 
   const primaryHandler =
-    template === 'markdown' ? doCopyMarkdown : template === 'table' ? doDownloadCsv : doPrintPdf
+    template === 'markdown'
+      ? doCopyMarkdown
+      : template === 'table'
+        ? doDownloadCsv
+        : template === 'docx'
+          ? doDownloadDocx
+          : doPrintPdf
   const secondaryHandler =
-    template === 'markdown' ? doDownloadMd : template === 'table' ? doCopyTable : doPrintOnly
+    template === 'markdown'
+      ? doDownloadMd
+      : template === 'table'
+        ? doCopyTable
+        : template === 'pdf'
+          ? doPrintOnly
+          : undefined
 
   // ------- 范围卡片回调 -------
+  const toggleSource = (key: keyof SourceSelection) =>
+    setSources((prev) => {
+      const next = { ...prev, [key]: !prev[key] }
+      // 至少保留一个数据来源
+      if (!next.records && !next.analyses) return prev
+      return next
+    })
   const toggleProject = (id: number) =>
     setProjectIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
@@ -409,6 +466,8 @@ export default function Export() {
               onPreset={applyPreset}
               range={range}
               onRange={setRange}
+              sources={sources}
+              onToggleSource={toggleSource}
               projects={projectsQuery.data ?? []}
               projectIds={projectIds}
               onToggleProject={toggleProject}
@@ -457,11 +516,12 @@ export default function Export() {
           <ReportPaper
             template={template}
             records={records}
+            analyses={analyses}
             options={options}
             markdown={markdown}
             markdownEdited={editedMd !== null}
             meta={meta}
-            loading={scopeLoading && records.length === 0}
+            loading={scopeLoading && records.length === 0 && analyses.length === 0}
             signature={signature}
             onEditMarkdown={() => setMdDrawerOpen(true)}
           />
@@ -495,11 +555,12 @@ export default function Export() {
               <ReportPaper
                 template={template}
                 records={records}
+                analyses={analyses}
                 options={options}
                 markdown={markdown}
                 markdownEdited={editedMd !== null}
                 meta={meta}
-                loading={scopeLoading && records.length === 0}
+                loading={scopeLoading && records.length === 0 && analyses.length === 0}
                 signature={signature}
                 printable={false}
                 onEditMarkdown={() => {
