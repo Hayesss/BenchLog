@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, count, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
@@ -23,6 +23,43 @@ import {
 
 const DEFAULT_BASE_URL = "https://api.moonshot.cn/v1";
 const DEFAULT_MODEL = "kimi-k2-0711-preview";
+
+/**
+ * 写操作工具（function calling）：服务端只转发定义，绝不自动执行；
+ * LLM 返回 tool_calls 后由前端弹确认卡，用户确认才调对应接口落库。
+ */
+export const AI_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "create_todo",
+      description: "创建一条实验待办/提醒（当用户明确要求添加待办、提醒、任务时使用）",
+      parameters: {
+        type: "object",
+        properties: {
+          text: { type: "string", description: "待办内容，简洁具体" },
+          todoDate: { type: "string", description: "YYYY-MM-DD，缺省为今天" },
+        },
+        required: ["text"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "create_quick_note",
+      description: "把临时想法或快速结果存入收集箱（inbox，稍后由用户转正）",
+      parameters: {
+        type: "object",
+        properties: {
+          kind: { type: "string", enum: ["idea", "result"], description: "idea=想法，result=快速结果" },
+          content: { type: "string", description: "内容" },
+        },
+        required: ["kind", "content"],
+      },
+    },
+  },
+];
 /** system prompt 总长上限：先截断单字段，超限再截条数 */
 const CONTEXT_MAX_CHARS = 12000;
 /** 单条会话带入 LLM 的历史消息上限 */
@@ -49,7 +86,11 @@ function clip(value: string | null, max: number): string | null {
  * 构建实验数据快照（system prompt 的一部分）。
  * 目标总长 ≤ CONTEXT_MAX_CHARS：单字段在采集时已截断，超限后按比例缩减各数组条数。
  */
-async function buildContext(userId: number, projectId: number | null): Promise<string> {
+export async function buildContext(
+  userId: number,
+  projectId: number | null,
+  refRecordIds?: number[],
+): Promise<string> {
   const db = getDb();
 
   // 项目清单（全部）+ 各项目记录数（循环 count，项目数量有限可接受）
@@ -160,6 +201,38 @@ async function buildContext(userId: number, projectId: number | null): Promise<s
     };
   });
 
+  // @ 引用的记录全文（最多 3 条，各字段截 800；不计入缩减，优先保留）
+  let referencedRecords: Record<string, unknown>[] = [];
+  if (refRecordIds && refRecordIds.length > 0) {
+    const refRows = await db
+      .select({
+        id: records.id,
+        title: records.title,
+        recordDate: records.recordDate,
+        purpose: records.purpose,
+        resultMd: records.resultMd,
+        conclusion: records.conclusion,
+        nextStep: records.nextStep,
+      })
+      .from(records)
+      .where(
+        and(
+          eq(records.userId, userId),
+          isNull(records.deletedAt),
+          inArray(records.id, refRecordIds.slice(0, 3)),
+        ),
+      );
+    referencedRecords = refRows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      recordDate: r.recordDate,
+      purpose: clip(r.purpose, 800),
+      resultMd: clip(r.resultMd, 800),
+      conclusion: clip(r.conclusion, 300),
+      nextStep: clip(r.nextStep, 300),
+    }));
+  }
+
   const snapshot: Record<string, unknown> = {
     projects: projectList,
     records: recordList,
@@ -169,6 +242,7 @@ async function buildContext(userId: number, projectId: number | null): Promise<s
     todosPending: todoRows,
     mouseStrains: mouseSummary,
   };
+  if (referencedRecords.length > 0) snapshot.referencedRecords = referencedRecords;
 
   // 总长控制：单字段已截断，仍超限则按比例缩减各数组条数（保留头部较新数据）
   let json = JSON.stringify(snapshot);
@@ -326,7 +400,14 @@ export const aiRouter = createRouter({
    * 首条消息后用内容前 20 字自动命名会话。
    */
   chat: authedQuery
-    .input(z.object({ conversationId: z.number(), content: z.string().min(1).max(4000) }))
+    .input(
+      z.object({
+        conversationId: z.number(),
+        content: z.string().min(1).max(4000),
+        refRecordIds: z.array(z.number()).max(3).optional(),
+        withTools: z.boolean().optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
       const conv = await getOwnedConversation(ctx.user.id, input.conversationId);
@@ -351,8 +432,8 @@ export const aiRouter = createRouter({
         content: input.content,
       });
 
-      // c. 数据快照 → system prompt
-      const system = await buildContext(ctx.user.id, conv.projectId);
+      // c. 数据快照 → system prompt（含 @ 引用记录全文）
+      const system = await buildContext(ctx.user.id, conv.projectId, input.refRecordIds);
 
       // d. 最近 20 条消息（含刚插入的这条），按升序送入
       const historyDesc = await db
@@ -363,24 +444,33 @@ export const aiRouter = createRouter({
         .limit(HISTORY_LIMIT);
       const history = historyDesc.reverse().map((m) => ({ role: m.role, content: m.content }));
 
-      // e. 调 OpenAI 兼容 chat/completions（60s 超时）
+      // e. 调 OpenAI 兼容 chat/completions（60s 超时；操作模式带工具定义，模型不支持自动降级重试）
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 60_000);
-      let reply: string;
+      let reply: string | null = null;
+      let toolCalls: { id: string; name: string; args: Record<string, unknown> }[] = [];
       try {
-        const resp = await fetch(`${setting.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${setting.apiKey}`,
-          },
-          body: JSON.stringify({
-            model: setting.model,
-            messages: [{ role: "system", content: system }, ...history],
-            temperature: 0.3,
-          }),
-          signal: controller.signal,
-        });
+        const url = `${setting.baseUrl.replace(/\/+$/, "")}/chat/completions`;
+        const callOnce = (useTools: boolean) =>
+          fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${setting.apiKey}`,
+            },
+            body: JSON.stringify({
+              model: setting.model,
+              messages: [{ role: "system", content: system }, ...history],
+              temperature: 0.3,
+              ...(useTools ? { tools: AI_TOOLS, tool_choice: "auto" } : {}),
+            }),
+            signal: controller.signal,
+          });
+        let resp = await callOnce(!!input.withTools);
+        // 模型/网关不支持 tools 时（400/404/422）自动降级为纯文本重试一次
+        if (!resp.ok && input.withTools && [400, 404, 422].includes(resp.status)) {
+          resp = await callOnce(false);
+        }
         if (!resp.ok) {
           const body = (await resp.text()).slice(0, 300);
           throw new TRPCError({
@@ -389,13 +479,29 @@ export const aiRouter = createRouter({
           });
         }
         const data = (await resp.json()) as {
-          choices?: { message?: { content?: string } }[];
+          choices?: {
+            message?: {
+              content?: string | null;
+              tool_calls?: { id: string; function?: { name?: string; arguments?: string } }[];
+            };
+          }[];
         };
-        const content = data.choices?.[0]?.message?.content;
-        if (!content) {
+        const msg = data.choices?.[0]?.message;
+        reply = (msg?.content ?? "") || null;
+        for (const tc of msg?.tool_calls ?? []) {
+          let args: Record<string, unknown> = {};
+          try {
+            args = JSON.parse(tc.function?.arguments ?? "{}") as Record<string, unknown>;
+          } catch {
+            // 参数 JSON 异常按空参数处理
+          }
+          toolCalls.push({ id: tc.id, name: tc.function?.name ?? "", args });
+        }
+        // 只保留白名单内的工具调用，服务端绝不自动执行
+        toolCalls = toolCalls.filter((t) => AI_TOOLS.some((d) => d.function.name === t.name));
+        if (!reply && toolCalls.length === 0) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "LLM 调用失败：返回内容为空" });
         }
-        reply = content;
       } catch (e) {
         if (e instanceof TRPCError) throw e;
         // 网络错误 / 超时（AbortError）统一报为 LLM 调用失败
@@ -408,21 +514,25 @@ export const aiRouter = createRouter({
         clearTimeout(timer);
       }
 
-      // f. 落库助手回复；刷新会话 updatedAt；空标题用首条消息前 20 字自动命名
-      await db.insert(aiMessages).values({
-        conversationId: conv.id,
-        role: "assistant",
-        content: reply,
-      });
+      // f. 落库助手回复（纯 tool_calls 场景 content 可为空，此时不落库）；刷新会话 updatedAt；空标题自动命名
+      if (reply) {
+        await db.insert(aiMessages).values({
+          conversationId: conv.id,
+          role: "assistant",
+          content: reply,
+        });
+      }
       await db
         .update(aiConversations)
         .set({
           updatedAt: new Date(),
-          ...(conv.title === "" ? { title: input.content.slice(0, 20) } : {}),
+          ...(conv.title === ""
+            ? { title: input.content.replace(/【@[^】]+】/g, "").trim().slice(0, 20) || "新对话" }
+            : {}),
         })
         .where(eq(aiConversations.id, conv.id));
 
-      // g. 返回回复
-      return { reply };
+      // g. 返回回复与工具调用（前端确认后才执行写操作）
+      return { reply, toolCalls };
     }),
 });

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import {
   ArrowLeft,
+  AtSign,
   Bot,
   ChevronRight,
   Inbox,
@@ -11,6 +12,9 @@ import {
   Sparkles,
   Trash2,
   User,
+  Wrench,
+  X,
+  Zap,
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { toast } from 'sonner'
@@ -195,6 +199,105 @@ function MessageBubble({ role, content }: { role: string; content: string }) {
 /* ------------------------------------------------------------------ */
 /* 对话区                                                                */
 /* ------------------------------------------------------------------ */
+type ToolCall = { id: string; name: string; args: Record<string, unknown> }
+type RefChip = { id: number; title: string }
+
+const TOOL_LABELS: Record<string, string> = {
+  create_todo: '创建待办',
+  create_quick_note: '存入收集箱',
+}
+
+/** 写操作确认卡：AI 返回的 tool_calls 只在这里由用户确认后才真正落库 */
+function ToolCallCard({
+  call,
+  onSettled,
+}: {
+  call: ToolCall
+  onSettled: (call: ToolCall, notice?: string) => void
+}) {
+  const utils = trpc.useUtils()
+  const today = format(new Date(), 'yyyy-MM-dd')
+  const done = (notice: string) => onSettled(call, notice)
+  const todoMut = trpc.todo.create.useMutation({
+    onSuccess: () => {
+      void utils.todo.listByRange.invalidate()
+      void utils.todo.today.invalidate()
+      done(`已创建待办：${String(call.args.text ?? '').slice(0, 40)}`)
+    },
+    onError: (e) => toast.error(`执行失败：${e.message}`),
+  })
+  const noteMut = trpc.quickNote.create.useMutation({
+    onSuccess: () => {
+      void utils.quickNote.list.invalidate()
+      done('已存入收集箱')
+    },
+    onError: (e) => toast.error(`执行失败：${e.message}`),
+  })
+  const busy = todoMut.isPending || noteMut.isPending
+
+  const confirm = () => {
+    if (call.name === 'create_todo') {
+      const text = String(call.args.text ?? '').trim()
+      if (!text) return toast.error('工具参数缺少待办内容')
+      const todoDate =
+        typeof call.args.todoDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(call.args.todoDate)
+          ? call.args.todoDate
+          : today
+      todoMut.mutate({ todoDate, text })
+    } else if (call.name === 'create_quick_note') {
+      const content = String(call.args.content ?? '').trim()
+      if (!content) return toast.error('工具参数缺少内容')
+      const kind = call.args.kind === 'result' ? ('result' as const) : ('idea' as const)
+      noteMut.mutate({ kind, content })
+    }
+  }
+
+  return (
+    <div className="flex gap-2.5">
+      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink text-paper">
+        <Wrench className="h-3.5 w-3.5" />
+      </span>
+      <div className="min-w-0 max-w-[82%] rounded-2xl rounded-tl-md border border-bench/30 bg-bench-wash/60 px-3.5 py-3 shadow-card">
+        <p className="text-[12px] font-medium text-bench-ink">
+          AI 请求执行：{TOOL_LABELS[call.name] ?? call.name}
+        </p>
+        <div className="mt-1.5 space-y-1 text-[12.5px] leading-[18px] text-ink-soft">
+          {call.name === 'create_todo' && (
+            <>
+              <p>内容：{String(call.args.text ?? '')}</p>
+              <p>日期：{typeof call.args.todoDate === 'string' ? call.args.todoDate : `${today}（今天）`}</p>
+            </>
+          )}
+          {call.name === 'create_quick_note' && (
+            <>
+              <p>类型：{call.args.kind === 'result' ? '快速结果' : '想法'}</p>
+              <p className="whitespace-pre-wrap">{String(call.args.content ?? '').slice(0, 200)}</p>
+            </>
+          )}
+        </div>
+        <div className="mt-2.5 flex gap-2">
+          <button
+            type="button"
+            onClick={confirm}
+            disabled={busy}
+            className="rounded-lg bg-bench px-3 py-1.5 text-[12px] font-medium text-white transition-colors duration-150 hover:bg-bench-deep disabled:opacity-50"
+          >
+            确认执行
+          </button>
+          <button
+            type="button"
+            onClick={() => onSettled(call)}
+            disabled={busy}
+            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[12px] text-ink-soft transition-colors duration-150 hover:text-ink disabled:opacity-50"
+          >
+            忽略
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ChatPane({
   conversation,
   projectName,
@@ -210,6 +313,12 @@ function ChatPane({
 }) {
   const utils = trpc.useUtils()
   const [draft, setDraft] = useState('')
+  const [opsMode, setOpsMode] = useState(false)
+  const [refs, setRefs] = useState<RefChip[]>([])
+  const [refQuery, setRefQuery] = useState<string | null>(null)
+  const [streaming, setStreaming] = useState<{ active: boolean; text: string }>({ active: false, text: '' })
+  const [pendingToolCalls, setPendingToolCalls] = useState<ToolCall[]>([])
+  const [notices, setNotices] = useState<{ id: number; text: string }[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -217,8 +326,12 @@ function ChatPane({
     { conversationId: conversation?.id ?? 0 },
     { enabled: conversation != null },
   )
+  const recordsQ = trpc.record.list.useQuery(undefined, { enabled: conversation != null })
   const chatMut = trpc.ai.chat.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (data.toolCalls && data.toolCalls.length > 0) {
+        setPendingToolCalls((prev) => [...prev, ...data.toolCalls])
+      }
       void utils.ai.listMessages.invalidate()
       void utils.ai.listConversations.invalidate()
     },
@@ -226,21 +339,108 @@ function ChatPane({
   })
 
   const messages = useMemo(() => messagesQ.data ?? [], [messagesQ.data])
+  const busy = chatMut.isPending || streaming.active
+
+  const recordOptions = useMemo(() => {
+    if (refQuery == null) return []
+    const all = (recordsQ.data ?? []).slice(0, 30)
+    const q = refQuery.trim().toLowerCase()
+    const filtered = q ? all.filter((r) => r.title.toLowerCase().includes(q)) : all
+    return filtered.slice(0, 8)
+  }, [recordsQ.data, refQuery])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
-  }, [messages.length, chatMut.isPending])
+  }, [messages.length, busy, streaming.text, pendingToolCalls.length])
 
   useEffect(() => {
     setDraft('')
+    setRefs([])
+    setRefQuery(null)
+    setPendingToolCalls([])
+    setNotices([])
+    setStreaming({ active: false, text: '' })
     if (conversation) setTimeout(() => inputRef.current?.focus(), 80)
   }, [conversation?.id])
 
+  const onDraftChange = (v: string) => {
+    setDraft(v)
+    const m = /@([^\s@【】]{0,20})$/.exec(v)
+    setRefQuery(m ? m[1] : null)
+  }
+
+  const pickRef = (r: { id: number; title: string }) => {
+    setDraft((d) => d.replace(/@([^\s@【】]{0,20})$/, `【@${r.title}】`))
+    setRefs((prev) => (prev.some((x) => x.id === r.id) ? prev : [...prev, { id: r.id, title: r.title }]))
+    setRefQuery(null)
+    inputRef.current?.focus()
+  }
+
+  const streamSend = async (v: string, refIds: number[]) => {
+    if (!conversation) return
+    setStreaming({ active: true, text: '' })
+    try {
+      const resp = await fetch('/api/ai/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: conversation.id, content: v, refRecordIds: refIds }),
+      })
+      if (!resp.ok || !resp.body) {
+        const j = (await resp.json().catch(() => null)) as { error?: string } | null
+        throw new Error(j?.error ?? `请求失败：HTTP ${resp.status}`)
+      }
+      // 用户消息已在服务端落库，先刷新列表再读流
+      void utils.ai.listMessages.invalidate()
+      const reader = resp.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const parts = buffer.split('\n')
+        buffer = parts.pop() ?? ''
+        for (const raw of parts) {
+          const line = raw.trim()
+          if (!line.startsWith('data:')) continue
+          const payload = line.slice(5).trim()
+          if (payload === '[DONE]') continue
+          try {
+            const json = JSON.parse(payload) as { t?: string; error?: string }
+            if (json.t) setStreaming((s) => ({ active: true, text: s.text + json.t }))
+            if (json.error) toast.error(json.error)
+          } catch {
+            // 非 JSON 帧忽略
+          }
+        }
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    } finally {
+      setStreaming({ active: false, text: '' })
+      void utils.ai.listMessages.invalidate()
+      void utils.ai.listConversations.invalidate()
+    }
+  }
+
   const send = (text: string) => {
     const v = text.trim()
-    if (!v || !conversation || chatMut.isPending) return
+    if (!v || !conversation || busy) return
+    // 只带上仍出现在正文里的引用（用户可能已删掉 token）
+    const refIds = refs.filter((r) => v.includes(`【@${r.title}】`)).map((r) => r.id)
     setDraft('')
-    chatMut.mutate({ conversationId: conversation.id, content: v })
+    setRefs([])
+    setRefQuery(null)
+    if (opsMode) {
+      chatMut.mutate({ conversationId: conversation.id, content: v, refRecordIds: refIds, withTools: true })
+    } else {
+      void streamSend(v, refIds)
+    }
+  }
+
+  const settleToolCall = (call: ToolCall, notice?: string) => {
+    setPendingToolCalls((prev) => prev.filter((t) => t.id !== call.id))
+    if (notice) setNotices((prev) => [...prev, { id: Date.now(), text: notice }])
   }
 
   return (
@@ -263,6 +463,19 @@ function ChatPane({
             {projectName}
           </span>
         )}
+        <button
+          type="button"
+          aria-label="操作模式"
+          title={opsMode ? '操作模式已开启：AI 可提议创建待办/收集箱，确认后才执行' : '开启操作模式：AI 可提议写操作（确认后才落库）；关闭时为流式快聊'}
+          onClick={() => setOpsMode((v) => !v)}
+          className={cn(
+            'flex h-8 items-center gap-1 rounded-lg px-2 text-[12px] transition-colors duration-150',
+            opsMode ? 'bg-bench-wash font-medium text-bench' : 'text-ink-mute hover:text-ink',
+          )}
+        >
+          <Zap className="h-4 w-4" />
+          <span className="hidden sm:inline">操作模式</span>
+        </button>
         <button
           type="button"
           aria-label="AI 设置"
@@ -294,12 +507,12 @@ function ChatPane({
               <p className="font-display text-[17px] font-semibold text-ink">BenchLog AI 副驾</p>
               <p className="mt-1.5 text-[13px] leading-[20px] text-ink-mute">
                 我能读取你的项目、实验记录、方法与收集箱，陪你讨论数据、分析失败原因、规划下一步。
-                写入类操作都会先给你确认。
+                输入 @ 可引用具体记录；开启「操作模式」后，写入类操作都会先给你确认。
               </p>
             </div>
             <p className="text-[12px] text-ink-mute">从左侧选择一个会话，或新建对话开始</p>
           </div>
-        ) : messages.length === 0 && !chatMut.isPending ? (
+        ) : messages.length === 0 && !busy ? (
           <div className="mx-auto max-w-[520px] pt-6">
             <p className="text-[13px] leading-[20px] text-ink-mute">
               开始讨论吧。可以试试：
@@ -323,7 +536,27 @@ function ChatPane({
             {messages.map((m) => (
               <MessageBubble key={m.id} role={m.role} content={m.content} />
             ))}
-            {chatMut.isPending && (
+            {pendingToolCalls.map((tc) => (
+              <ToolCallCard key={tc.id} call={tc} onSettled={settleToolCall} />
+            ))}
+            {notices.map((n) => (
+              <div key={n.id} className="flex justify-center">
+                <span className="rounded-full bg-bench-wash px-3 py-1 text-[11.5px] text-bench-ink">{n.text}</span>
+              </div>
+            ))}
+            {streaming.active && streaming.text !== '' && (
+              <div className="flex gap-2.5">
+                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink text-paper">
+                  <Bot className="h-3.5 w-3.5" />
+                </span>
+                <div className="min-w-0 max-w-[82%] rounded-2xl rounded-tl-md border border-line bg-surface px-3.5 py-2.5 text-[13.5px] leading-[21px] text-ink shadow-card">
+                  <div className="assistant-md">
+                    <ReactMarkdown>{streaming.text}</ReactMarkdown>
+                  </div>
+                </div>
+              </div>
+            )}
+            {busy && streaming.text === '' && (
               <div className="flex gap-2.5">
                 <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink text-paper">
                   <Bot className="h-3.5 w-3.5" />
@@ -340,31 +573,79 @@ function ChatPane({
       {/* 输入框 */}
       {conversation && (
         <div className="shrink-0 border-t border-line bg-surface px-3 py-3 md:px-6">
-          <div className="mx-auto flex max-w-[720px] items-end gap-2">
-            <textarea
-              ref={inputRef}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                  e.preventDefault()
-                  send(draft)
+          <div className="relative mx-auto max-w-[720px]">
+            {refQuery != null && recordOptions.length > 0 && (
+              <div className="absolute bottom-full left-0 z-10 mb-2 w-full max-w-[420px] overflow-hidden rounded-xl border border-line bg-surface shadow-card">
+                <p className="border-b border-line-soft px-3 py-1.5 text-[11px] text-ink-mute">引用记录（点击插入）</p>
+                {recordOptions.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => pickRef(r)}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] text-ink transition-colors duration-150 hover:bg-bench-wash"
+                  >
+                    <span className="shrink-0 text-[11px] text-ink-mute">{r.recordDate}</span>
+                    <span className="truncate">{r.title}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {refs.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {refs.map((r) => (
+                  <span
+                    key={r.id}
+                    className="flex items-center gap-1 rounded-full bg-bench-wash px-2.5 py-1 text-[11.5px] text-bench-ink"
+                  >
+                    <AtSign className="h-3 w-3" />
+                    <span className="max-w-[180px] truncate">{r.title}</span>
+                    <button
+                      type="button"
+                      aria-label="移除引用"
+                      onClick={() => {
+                        setRefs((prev) => prev.filter((x) => x.id !== r.id))
+                        setDraft((d) => d.replace(`【@${r.title}】`, ''))
+                      }}
+                      className="text-bench-ink/60 hover:text-bench-ink"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+              <textarea
+                ref={inputRef}
+                value={draft}
+                onChange={(e) => onDraftChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                    e.preventDefault()
+                    send(draft)
+                  }
+                }}
+                rows={2}
+                placeholder={
+                  hasKey
+                    ? opsMode
+                      ? '操作模式：AI 可提议创建待办/收集箱（Enter 发送，@ 引用记录）'
+                      : '输入问题…（Enter 发送，Shift+Enter 换行，@ 引用记录）'
+                    : '请先配置 LLM'
                 }
-              }}
-              rows={2}
-              placeholder={hasKey ? '输入问题…（Enter 发送，Shift+Enter 换行）' : '请先配置 LLM'}
-              disabled={!hasKey || chatMut.isPending}
-              className="max-h-32 min-h-[44px] flex-1 resize-none rounded-xl border border-line bg-paper px-3 py-2.5 text-[13.5px] leading-[20px] text-ink outline-none transition-colors duration-150 placeholder:text-ink-mute focus:border-bench disabled:opacity-60"
-            />
-            <button
-              type="button"
-              aria-label="发送"
-              onClick={() => send(draft)}
-              disabled={!hasKey || chatMut.isPending || draft.trim() === ''}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-bench text-white shadow-card transition-all duration-150 hover:bg-bench-deep disabled:opacity-50"
-            >
-              <Send className="h-4 w-4" />
-            </button>
+                disabled={!hasKey || busy}
+                className="max-h-32 min-h-[44px] flex-1 resize-none rounded-xl border border-line bg-paper px-3 py-2.5 text-[13.5px] leading-[20px] text-ink outline-none transition-colors duration-150 placeholder:text-ink-mute focus:border-bench disabled:opacity-60"
+              />
+              <button
+                type="button"
+                aria-label="发送"
+                onClick={() => send(draft)}
+                disabled={!hasKey || busy || draft.trim() === ''}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-bench text-white shadow-card transition-all duration-150 hover:bg-bench-deep disabled:opacity-50"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}

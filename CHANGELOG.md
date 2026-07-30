@@ -4,6 +4,26 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-07-30 · AI 助手 v2：流式输出 + 写操作确认卡 + @ 引用记录
+
+**流式输出（纯文本模式）**
+- 新增 SSE 端点 `POST /api/ai/stream`（api/ai/stream.ts）：cookie session 鉴权 → 会话归属/LLM 设置校验 → 落库用户消息 → buildContext → 上游 OpenAI 兼容 `stream:true` → 逐行解析上游 SSE（正确处理跨 chunk 断行与心跳行）→ 转发 `data: {"t": delta}` 帧 → 结束落库完整回复、自动命名会话并发送 `[DONE]`
+- boot.ts 在 `/api/*` 404 前挂载该端点；前端 fetch + ReadableStream 读循环渲染流式气泡（ReactMarkdown 实时渲染半成品），发送即刷新用户消息
+
+**写操作确认卡（操作模式，与流式互斥）**
+- aiRouter 新增 `AI_TOOLS`（create_todo / create_quick_note，OpenAI function 格式）；chat 输入新增 `withTools`，开启后请求携带 tools，模型/网关不支持（400/404/422）自动降级为纯文本重试
+- 服务端只解析转发 tool_calls（白名单过滤），绝不自动执行；纯 tool_calls 场景 assistant 空消息不落库
+- 前端头部「操作模式」开关：开启走 tRPC chat（withTools），AI 提议的写操作渲染确认卡（中文工具名 + 参数摘要），用户点「确认执行」才调 todo.create / quickNote.create 落库，「忽略」直接丢弃；执行结果以本地提示气泡反馈（不入库）
+
+**@ 引用记录**
+- chat/stream 输入新增 `refRecordIds`（最多 3 条）；buildContext 第三参注入 referencedRecords 全文块（各字段截 800/300，归属+软删校验，不计入缩减优先保留）
+- 输入框键入 `@` 弹出记录选择面板（最近 30 条，支持关键词过滤），选中插入 `【@标题】` token 并生成可移除的引用 chip；发送时只带上仍出现在正文中的引用
+- 会话自动命名剔除引用 token
+
+**验证**：tsc -b 全量通过；真实库冒烟（AI_TOOLS 白名单、空引用不注入、真实记录注入含标题、不存在 id 越权不注入、SSE 跨 chunk 解析拼接无损）全过；前后端构建入包 grep 验证
+
+---
+
 ## 2026-07-30 · 样本增强：孔位关联实验记录 + 多规格冻存盒
 
 **孔位关联实验记录**

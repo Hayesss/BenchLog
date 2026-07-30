@@ -6,6 +6,7 @@ import { appRouter } from "./router";
 import { createContext } from "./context";
 import { env } from "./lib/env";
 import { createOAuthCallbackHandler } from "./kimi/auth";
+import { aiStreamHandler } from "./ai/stream";
 import { Paths } from "@contracts/constants";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
@@ -20,6 +21,8 @@ app.use("/api/trpc/*", async (c) => {
     createContext,
   });
 });
+// AI 流式聊天（SSE，纯文本；写操作仍走 tRPC ai.chat withTools 确认卡）
+app.post("/api/ai/stream", aiStreamHandler);
 app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
 
 export default app;
