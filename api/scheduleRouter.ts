@@ -5,6 +5,7 @@ import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { flows, todos, projects, records } from "@db/schema";
 import { dateStr, flowNodeSchema } from "./zodSchemas";
+import { snapshotCurrent } from "./recordRouter";
 
 export const flowRouter = createRouter({
   list: authedQuery.query(async ({ ctx }) => {
@@ -158,9 +159,9 @@ export const todoRouter = createRouter({
   }),
 
   /**
-   * 把某日「已完成且未关联记录」的待办整理为一条当日实验记录：
-   * 创建记录（完成事项清单入 resultMd）→ 回写这些待办的 recordId 建立关联。
-   * 已关联记录的待办不会重复整理。
+   * 把某日「已完成且未关联记录」的待办并入当日实验记录：
+   * 当日已有记录 → 追加到最近更新那一条的「## 今日完成」段（段不存在则新建段；追加前留版本快照）；
+   * 当日没有记录 → 新建一条。最后回写这些待办的 recordId 建立关联，已关联的不会重复整理。
    */
   summarizeToRecord: authedQuery
     .input(z.object({ date: dateStr }))
@@ -182,19 +183,63 @@ export const todoRouter = createRouter({
         throw new TRPCError({ code: "BAD_REQUEST", message: "没有可整理的已完成待办" });
       }
       const checklist = doneTodos.map((t) => `- [x] ${t.text}`).join("\n");
-      const [{ id: recordId }] = await db
-        .insert(records)
-        .values({
-          userId: ctx.user.id,
-          title: `${input.date} 实验记录`,
-          recordDate: input.date,
-          purpose: "由当日已完成待办整理生成，可继续补充细节",
-          deviations: [],
-          resultMd: `## 今日完成\n\n${checklist}\n`,
-          tags: ["待办整理"],
-          status: "done",
-        })
-        .$returningId();
+      const SECTION = "## 今日完成";
+
+      // 当日已有记录：取最近更新的一条（排除回收站；updatedAt 秒级精度，同秒时取后创建的）
+      const dayRecords = await db
+        .select()
+        .from(records)
+        .where(
+          and(
+            eq(records.userId, ctx.user.id),
+            eq(records.recordDate, input.date),
+            isNull(records.deletedAt),
+          ),
+        )
+        .orderBy(desc(records.updatedAt), desc(records.id));
+
+      let recordId: number;
+      let appended = false;
+      if (dayRecords.length > 0) {
+        const rec = dayRecords[0];
+        recordId = rec.id;
+        appended = true;
+        // 追加前留版本快照（与手动编辑保存一致）
+        await snapshotCurrent(ctx.user.id, rec.id);
+        const base = (rec.resultMd ?? "").trimEnd();
+        let next: string;
+        const segIdx = base.indexOf(SECTION);
+        if (segIdx === -1) {
+          // 无「今日完成」段 → 文末新建段
+          next = `${base}${base ? "\n\n" : ""}${SECTION}\n\n${checklist}\n`;
+        } else {
+          // 已有段 → 追加到该段末尾（下一个二级标题前或文末）
+          const afterIdx = base.indexOf("\n## ", segIdx + SECTION.length);
+          if (afterIdx === -1) {
+            next = `${base}\n${checklist}`;
+          } else {
+            next = `${base.slice(0, afterIdx).trimEnd()}\n${checklist}\n${base.slice(afterIdx + 1)}`;
+          }
+        }
+        await db.update(records).set({ resultMd: next }).where(eq(records.id, rec.id));
+      } else {
+        // 当日没有记录 → 新建
+        const [{ id }] = await db
+          .insert(records)
+          .values({
+            userId: ctx.user.id,
+            title: `${input.date} 实验记录`,
+            recordDate: input.date,
+            purpose: "由当日已完成待办整理生成，可继续补充细节",
+            deviations: [],
+            resultMd: `${SECTION}\n\n${checklist}\n`,
+            tags: ["待办整理"],
+            status: "done",
+          })
+          .$returningId();
+        recordId = id;
+      }
+
       await db
         .update(todos)
         .set({ recordId })
@@ -207,6 +252,6 @@ export const todoRouter = createRouter({
             ),
           ),
         );
-      return { recordId, count: doneTodos.length };
+      return { recordId, count: doneTodos.length, appended };
     }),
 });

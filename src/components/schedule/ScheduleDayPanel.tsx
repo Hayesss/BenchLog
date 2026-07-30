@@ -108,7 +108,11 @@ export default function ScheduleDayPanel({
       void utils.todo.listByRange.invalidate()
       void utils.todo.today.invalidate()
       void utils.record.list.invalidate()
-      toast.success(`已整理 ${data.count} 项完成为当日实验记录`)
+      toast.success(
+        data.appended
+          ? `已把 ${data.count} 项完成追加进当日实验记录`
+          : `已整理 ${data.count} 项完成为当日实验记录`,
+      )
       navigate(`/records/${data.recordId}`)
     },
     onError: (e) => toast.error(e.message),
@@ -157,7 +161,7 @@ export default function ScheduleDayPanel({
                 type="button"
                 onClick={() => summarizeMut.mutate({ date: day })}
                 disabled={summarizeMut.isPending}
-                title="把已完成待办整理为当日实验记录（已整理过的不会重复计入）"
+                title="把已完成待办并入当日实验记录（当日有记录则追加到「今日完成」段，没有则新建；已整理过的不会重复计入）"
                 className="flex items-center gap-1 rounded-md bg-bench-wash px-2 py-0.5 text-[11.5px] font-medium text-bench-ink transition-all duration-150 hover:bg-bench-wash/70 active:scale-[0.97] disabled:opacity-50"
               >
                 <FileText className="h-3 w-3" />

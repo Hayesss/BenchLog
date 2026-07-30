@@ -63,7 +63,8 @@ function snapshotOf(r: typeof records.$inferSelect): RecordSnapshot {
 }
 
 /** 覆盖保存/恢复前留「上一版」快照；记录不存在或非本人时不留（由调用方继续抛错或静默） */
-async function snapshotCurrent(userId: number, recordId: number) {
+/** 把记录当前行快照进版本历史（update / summarizeToRecord 追加前调用） */
+export async function snapshotCurrent(userId: number, recordId: number) {
   const db = getDb();
   const cur = await db
     .select()
