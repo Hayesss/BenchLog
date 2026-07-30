@@ -299,12 +299,15 @@ export const aiRouter = createRouter({
         .select({ userId: aiSettings.userId })
         .from(aiSettings)
         .where(eq(aiSettings.userId, ctx.user.id));
+      // 粘贴常带首尾空格/换行，入库前统一 trim；trim 后为空则视为未提供（不动原值）
+      const baseUrl = input.baseUrl?.trim();
+      const model = input.model?.trim();
+      const apiKey = input.apiKey?.trim();
       // apiKey 三态：undefined=不动；''=清除（存 null）；有值=覆盖
-      const keyPatch =
-        input.apiKey === undefined ? {} : { apiKey: input.apiKey === "" ? null : input.apiKey };
+      const keyPatch = apiKey === undefined ? {} : { apiKey: apiKey === "" ? null : apiKey };
       const basePatch = {
-        ...(input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
-        ...(input.model !== undefined ? { model: input.model } : {}),
+        ...(baseUrl ? { baseUrl } : {}),
+        ...(model ? { model } : {}),
         ...keyPatch,
       };
       if (rows[0]) {
