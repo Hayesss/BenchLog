@@ -4,6 +4,26 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-07-30 · 实验方法库：添加自建方法条目
+
+**数据层**
+- `method_entries` 新增 `userId` 列（幂等迁移 scripts/add-method-entry-userid.ts）：null=预置全局条目，非 null=用户自建（仅本人可见/可删）
+
+**后端（libraryRouter）**
+- 可见性规则 `visibleTo`：所有列表/章节计数/详情仅返回「全局预置 + 本人自建」，他人自建不可见
+- `createEntry`：章节存在校验，entryId 取 max+1 避让预置编号，steps 空行/纯空白行服务端再过滤；字段覆盖章节/小节/中英文名/类型(full|pointer)/期刊/年份/DOI/来源/目的/原理/步骤
+- `removeEntry`：仅本人自建可删；预置条目 FORBIDDEN、他人条目 FORBIDDEN、不存在 NOT_FOUND
+- 自建条目同样支持「存为 Protocol」（importAsProtocol 天然兼容）
+
+**前端**
+- Library 页头新增「添加方法」主按钮 → AddEntryDialog（章节下拉/小节/中英文名/类型 chips/期刊/年份/DOI/来源/目的/原理/每行一步步骤域），创建成功跳转条目详情页
+- 条目卡片/详情页/浮窗显示「自建」徽标（info 蓝）；journal/section 空值保护不再渲染空 chip
+- LibraryEntry 详情页自建条目显示「删除此自建条目」（danger，AlertDialog 确认，已存 Protocol 副本不受影响）
+
+**验证**：tsc -b 全过；真实库 tRPC caller 冒烟（创建→详情字段/空行过滤→列表徽标数据→预置防删→删除→重复删除 NOT_FOUND→全清理）全过；前后端构建入包逐项验证
+
+---
+
 ## 2026-07-30 · 已完成待办一键整理为当日实验记录
 
 - todoRouter 新增 `summarizeToRecord(date)`：把某日「已完成且未关联记录」的待办整理为一条当日实验记录——标题 `YYYY-MM-DD 实验记录`、完成事项 checklist 入 resultMd、tags「待办整理」、status done；创建后回写这些待办的 recordId 建立关联，已关联的不会重复整理（无符合条件项时报「没有可整理的已完成待办」）

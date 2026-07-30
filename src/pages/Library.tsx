@@ -7,11 +7,18 @@ import {
   BookmarkPlus,
   FolderInput,
   Loader2,
+  Plus,
   Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/providers/trpc";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   HoverCard,
   HoverCardContent,
@@ -45,6 +52,7 @@ const cardVariants = {
 type EntryItem = {
   id: number;
   entryId: number;
+  userId: number | null;
   chapterNo: number;
   section: string;
   nameCn: string;
@@ -97,6 +105,7 @@ export default function Library() {
   const importEntryMut = trpc.library.importAsProtocol.useMutation();
   const [chapterImportOpen, setChapterImportOpen] = useState(false);
   const [importingEntryId, setImportingEntryId] = useState<number | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
 
   const chapters = useMemo(
     () => chaptersQuery.data ?? [],
@@ -141,17 +150,26 @@ export default function Library() {
     <div className="mx-auto w-full max-w-[1080px] px-4 pb-16 md:px-8">
       <ProtocolToaster />
       {/* 页头 */}
-      <div className="pt-8">
-        <h1 className="font-display text-[24px] font-bold leading-[32px] text-ink md:text-[30px] md:leading-[38px]">
-          实验方法库
-        </h1>
-        <p className="caption-en mt-1" style={{ letterSpacing: "0.08em" }}>
-          Method Library
-        </p>
-        <p className="mt-2 text-[13px] text-ink-soft">
-          收录 {chapters.length} 章 · {totalEntries}{" "}
-          条经同行评议的实验方案，可一键存为我的 Protocol
-        </p>
+      <div className="flex items-start justify-between gap-4 pt-8">
+        <div>
+          <h1 className="font-display text-[24px] font-bold leading-[32px] text-ink md:text-[30px] md:leading-[38px]">
+            实验方法库
+          </h1>
+          <p className="caption-en mt-1" style={{ letterSpacing: "0.08em" }}>
+            Method Library
+          </p>
+          <p className="mt-2 text-[13px] text-ink-soft">
+            收录 {chapters.length} 章 · {totalEntries}{" "}
+            条经同行评议的实验方案，可一键存为我的 Protocol
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setAddOpen(true)}
+          className="mt-1 flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-bench px-3.5 text-[13px] font-medium text-white shadow-card transition-all duration-150 hover:-translate-y-px hover:bg-bench-deep active:scale-[0.97]"
+        >
+          <Plus className="h-4 w-4" /> 添加方法
+        </button>
       </div>
 
       {/* 搜索框 */}
@@ -337,13 +355,22 @@ export default function Library() {
                         </p>
                       )}
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                        <span className="rounded-full bg-bench-wash px-2 py-0.5 font-mono text-[11px] font-medium text-bench-ink">
-                          {e.journal}
-                          {e.year ? ` · ${e.year}` : ""}
-                        </span>
-                        <span className="rounded border border-line bg-paper px-1.5 py-0.5 text-[11px] text-ink-mute">
-                          {e.section}
-                        </span>
+                        {e.userId != null && (
+                          <span className="rounded-full bg-[#5B7C991F] px-2 py-0.5 text-[11px] font-medium text-[#5B7C99]">
+                            自建
+                          </span>
+                        )}
+                        {e.journal && (
+                          <span className="rounded-full bg-bench-wash px-2 py-0.5 font-mono text-[11px] font-medium text-bench-ink">
+                            {e.journal}
+                            {e.year ? ` · ${e.year}` : ""}
+                          </span>
+                        )}
+                        {e.section && (
+                          <span className="rounded border border-line bg-paper px-1.5 py-0.5 text-[11px] text-ink-mute">
+                            {e.section}
+                          </span>
+                        )}
                         {e.type === "pointer" && (
                           <span className="rounded-full bg-[#B08D571F] px-2 py-0.5 text-[11px] font-medium text-[#8a6a3f]">
                             跨章指引
@@ -376,6 +403,14 @@ export default function Library() {
           )}
         </div>
       </div>
+
+      {/* 添加自建方法 */}
+      <AddEntryDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        chapters={chapters}
+        defaultChapterNo={chapterNo ?? chapters[0]?.chapterNo ?? 1}
+      />
 
       {/* 整章导入确认 */}
       <AlertDialog open={chapterImportOpen} onOpenChange={setChapterImportOpen}>
@@ -411,6 +446,251 @@ export default function Library() {
   );
 }
 
+/* ---------------- 添加自建方法对话框 ---------------- */
+
+const inputCls =
+  "h-9 w-full rounded-lg border border-line bg-paper px-3 text-[13px] text-ink outline-none transition-colors duration-150 placeholder:text-ink-mute focus:border-bench";
+const textareaCls =
+  "w-full resize-none rounded-lg border border-line bg-paper px-3 py-2 text-[13px] leading-[19px] text-ink outline-none transition-colors duration-150 placeholder:text-ink-mute focus:border-bench";
+const labelCls = "mb-1 block text-[12px] font-medium text-ink-soft";
+
+function AddEntryDialog({
+  open,
+  onOpenChange,
+  chapters,
+  defaultChapterNo,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  chapters: { chapterNo: number; title: string }[];
+  defaultChapterNo: number;
+}) {
+  const navigate = useNavigate();
+  const utils = trpc.useUtils();
+  const [chapterNo, setChapterNo] = useState(defaultChapterNo);
+  const [section, setSection] = useState("");
+  const [nameCn, setNameCn] = useState("");
+  const [nameEn, setNameEn] = useState("");
+  const [type, setType] = useState<"full" | "pointer">("full");
+  const [journal, setJournal] = useState("");
+  const [year, setYear] = useState("");
+  const [doi, setDoi] = useState("");
+  const [source, setSource] = useState("");
+  const [purpose, setPurpose] = useState("");
+  const [principle, setPrinciple] = useState("");
+  const [stepsText, setStepsText] = useState("");
+
+  useEffect(() => {
+    if (open) setChapterNo(defaultChapterNo);
+  }, [open, defaultChapterNo]);
+
+  const createMut = trpc.library.createEntry.useMutation({
+    onSuccess: ({ id }) => {
+      toast.success("已添加到方法库");
+      void utils.library.chapters.invalidate();
+      void utils.library.entries.invalidate();
+      onOpenChange(false);
+      navigate(`/library/${id}`);
+    },
+    onError: e => toast.error(`添加失败：${e.message}`),
+  });
+
+  const submit = () => {
+    const name = nameCn.trim();
+    if (!name) {
+      toast.error("请填写方法中文名");
+      return;
+    }
+    createMut.mutate({
+      chapterNo,
+      section: section.trim(),
+      nameCn: name,
+      nameEn: nameEn.trim(),
+      type,
+      journal: journal.trim(),
+      year: year.trim(),
+      doi: doi.trim(),
+      ...(source.trim() ? { source: source.trim() } : {}),
+      ...(purpose.trim() ? { purpose: purpose.trim() } : {}),
+      ...(principle.trim() ? { principle: principle.trim() } : {}),
+      steps: stepsText
+        .split("\n")
+        .map(s => s.trim())
+        .filter(Boolean),
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85vh] max-w-[560px] overflow-y-auto rounded-xl border-line">
+        <DialogHeader>
+          <DialogTitle className="font-display text-[18px]">添加实验方法</DialogTitle>
+        </DialogHeader>
+        <div className="mt-1 flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>所属章节</label>
+              <select
+                value={chapterNo}
+                onChange={e => setChapterNo(Number(e.target.value))}
+                className={inputCls}
+              >
+                {chapters.map(c => (
+                  <option key={c.chapterNo} value={c.chapterNo}>
+                    第 {c.chapterNo} 章 · {c.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>小节（可选）</label>
+              <input
+                value={section}
+                onChange={e => setSection(e.target.value)}
+                placeholder="如：细胞培养"
+                className={inputCls}
+              />
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>方法中文名 *</label>
+            <input
+              value={nameCn}
+              onChange={e => setNameCn(e.target.value)}
+              placeholder="如：慢病毒包装（三质粒系统）"
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>英文名（可选）</label>
+            <input
+              value={nameEn}
+              onChange={e => setNameEn(e.target.value)}
+              placeholder="Lentivirus packaging"
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>条目类型</label>
+            <div className="flex gap-2">
+              {(
+                [
+                  { v: "full", label: "完整方案" },
+                  { v: "pointer", label: "跨章指引" },
+                ] as const
+              ).map(o => (
+                <button
+                  key={o.v}
+                  type="button"
+                  onClick={() => setType(o.v)}
+                  className={cn(
+                    "h-8 rounded-lg px-3 text-[12.5px] font-medium transition-colors duration-150",
+                    type === o.v
+                      ? "bg-bench-wash text-bench-ink"
+                      : "border border-line bg-surface text-ink-soft hover:text-ink"
+                  )}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className={labelCls}>期刊/出处</label>
+              <input
+                value={journal}
+                onChange={e => setJournal(e.target.value)}
+                placeholder="Nat. Protoc."
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>年份</label>
+              <input
+                value={year}
+                onChange={e => setYear(e.target.value)}
+                placeholder="2024"
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>DOI</label>
+              <input
+                value={doi}
+                onChange={e => setDoi(e.target.value)}
+                placeholder="10.xxxx/…"
+                className={inputCls}
+              />
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>来源说明（可选）</label>
+            <textarea
+              value={source}
+              onChange={e => setSource(e.target.value)}
+              rows={2}
+              placeholder="文献出处、课题组内部 SOP 等"
+              className={textareaCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>目的与用途（可选）</label>
+            <textarea
+              value={purpose}
+              onChange={e => setPurpose(e.target.value)}
+              rows={3}
+              placeholder="该方法解决什么问题、适用于什么场景"
+              className={textareaCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>原理（可选）</label>
+            <textarea
+              value={principle}
+              onChange={e => setPrinciple(e.target.value)}
+              rows={3}
+              placeholder="方法背后的基本原理"
+              className={textareaCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>核心步骤（每行一步，可选）</label>
+            <textarea
+              value={stepsText}
+              onChange={e => setStepsText(e.target.value)}
+              rows={5}
+              placeholder={"第 1 步…\n第 2 步…"}
+              className={textareaCls}
+            />
+          </div>
+          <div className="mt-1 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="h-9 rounded-lg border border-line bg-surface px-4 text-[13px] text-ink-soft transition-colors duration-150 hover:text-ink"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={createMut.isPending}
+              className="flex h-9 items-center gap-1.5 rounded-lg bg-bench px-4 text-[13px] font-medium text-white shadow-card transition-all duration-150 hover:bg-bench-deep active:scale-[0.97] disabled:opacity-60"
+            >
+              {createMut.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {createMut.isPending ? "添加中…" : "添加到方法库"}
+            </button>
+          </div>
+          <p className="text-[11.5px] text-ink-mute">
+            自建条目仅自己可见，同样支持「存为 Protocol」；在条目详情页可删除。
+          </p>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /* ---------------- hover 浮窗：方法条目简略信息 ---------------- */
 
 function LibraryEntryHoverContent({ e }: { e: EntryItem }) {
@@ -435,12 +715,14 @@ function LibraryEntryHoverContent({ e }: { e: EntryItem }) {
       </div>
       {/* 徽标行 */}
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-        <span className="rounded-full bg-bench-wash px-2 py-0.5 font-mono text-[11px] font-medium text-bench-ink">
-          {e.journal}
-          {e.year ? ` · ${e.year}` : ""}
-        </span>
+        {e.journal && (
+          <span className="rounded-full bg-bench-wash px-2 py-0.5 font-mono text-[11px] font-medium text-bench-ink">
+            {e.journal}
+            {e.year ? ` · ${e.year}` : ""}
+          </span>
+        )}
         <span className="rounded border border-line bg-paper px-1.5 py-0.5 text-[11px] text-ink-mute">
-          第 {e.chapterNo} 章 · {e.section}
+          第 {e.chapterNo} 章{e.section ? ` · ${e.section}` : ""}
         </span>
         {e.type === "pointer" && (
           <span className="rounded-full bg-[#B08D571F] px-2 py-0.5 text-[11px] font-medium text-[#8a6a3f]">

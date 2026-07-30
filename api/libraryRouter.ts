@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, eq, like, or, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, like, or, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
@@ -10,10 +10,11 @@ import {
   protocolVersions,
 } from "@db/schema";
 
-/** 列表项（含 steps/purpose 供悬停浮窗预览；principle 仅详情页返回） */
+/** 列表项（含 steps/purpose 供悬停浮窗预览；principle 仅详情页返回；userId 供「自建」徽标） */
 const entryListColumns = {
   id: methodEntries.id,
   entryId: methodEntries.entryId,
+  userId: methodEntries.userId,
   chapterNo: methodEntries.chapterNo,
   section: methodEntries.section,
   nameCn: methodEntries.nameCn,
@@ -25,6 +26,10 @@ const entryListColumns = {
   purpose: methodEntries.purpose,
   steps: methodEntries.steps,
 } as const;
+
+/** 条目可见性：预置全局（userId null）+ 本人自建 */
+const visibleTo = (userId: number) =>
+  or(isNull(methodEntries.userId), eq(methodEntries.userId, userId));
 
 type Db = ReturnType<typeof getDb>;
 type MethodEntryRow = typeof methodEntries.$inferSelect;
@@ -96,8 +101,8 @@ async function createProtocolFromEntry(
 }
 
 export const libraryRouter = createRouter({
-  /** 12 章及每章条目数 */
-  chapters: authedQuery.query(async () => {
+  /** 12 章及每章条目数（计数仅含可见条目：全局 + 本人自建） */
+  chapters: authedQuery.query(async ({ ctx }) => {
     const db = getDb();
     const [chapters, counts] = await Promise.all([
       db.select().from(methodChapters).orderBy(asc(methodChapters.chapterNo)),
@@ -107,6 +112,7 @@ export const libraryRouter = createRouter({
           count: sql<number>`count(*)`,
         })
         .from(methodEntries)
+        .where(visibleTo(ctx.user.id))
         .groupBy(methodEntries.chapterNo),
     ]);
     const countMap = new Map(counts.map(c => [c.chapterNo, Number(c.count)]));
@@ -124,10 +130,10 @@ export const libraryRouter = createRouter({
         q: z.string().optional(),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const db = getDb();
       const q = input.q?.trim();
-      const conds = [];
+      const conds = [visibleTo(ctx.user.id)];
       if (q) {
         const pattern = `%${q}%`;
         conds.push(
@@ -157,15 +163,94 @@ export const libraryRouter = createRouter({
       }));
     }),
 
-  /** 条目详情（完整字段） */
+  /** 条目详情（完整字段；仅可见条目：全局 + 本人自建） */
   entry: authedQuery
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const rows = await getDb()
         .select()
         .from(methodEntries)
-        .where(eq(methodEntries.id, input.id));
+        .where(and(eq(methodEntries.id, input.id), visibleTo(ctx.user.id)));
       return rows[0] ?? null;
+    }),
+
+  /**
+   * 添加自建方法条目（仅本人可见、可删除）。
+   * entryId 取当前 max(entryId)+1 避开预置编号；章节须存在；steps 去除空行。
+   */
+  createEntry: authedQuery
+    .input(
+      z.object({
+        chapterNo: z.number().int(),
+        section: z.string().max(128).default(""),
+        nameCn: z.string().min(1).max(255),
+        nameEn: z.string().max(255).default(""),
+        type: z.enum(["full", "pointer"]).default("full"),
+        source: z.string().max(8000).optional(),
+        journal: z.string().max(64).default(""),
+        year: z.string().max(8).default(""),
+        doi: z.string().max(128).default(""),
+        purpose: z.string().max(8000).optional(),
+        principle: z.string().max(8000).optional(),
+        steps: z.array(z.string().min(1).max(2000)).max(200).default([]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const chapter = (
+        await db
+          .select()
+          .from(methodChapters)
+          .where(eq(methodChapters.chapterNo, input.chapterNo))
+      )[0];
+      if (!chapter) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "所选章节不存在" });
+      }
+      const [maxRow] = await db
+        .select({ maxId: sql<number | null>`max(${methodEntries.entryId})` })
+        .from(methodEntries);
+      const nextEntryId = Number(maxRow?.maxId ?? 0) + 1;
+      const [{ id }] = await db
+        .insert(methodEntries)
+        .values({
+          entryId: nextEntryId,
+          userId: ctx.user.id,
+          chapterNo: input.chapterNo,
+          section: input.section,
+          nameCn: input.nameCn,
+          nameEn: input.nameEn,
+          type: input.type,
+          source: input.source ?? null,
+          journal: input.journal,
+          year: input.year,
+          doi: input.doi,
+          purpose: input.purpose ?? null,
+          principle: input.principle ?? null,
+          steps: input.steps.map((s) => s.trim()).filter(Boolean),
+        })
+        .$returningId();
+      return { id };
+    }),
+
+  /** 删除自建条目（仅本人；预置全局条目拒绝） */
+  removeEntry: authedQuery
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const entry = (
+        await db.select().from(methodEntries).where(eq(methodEntries.id, input.id))
+      )[0];
+      if (!entry) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "未找到该方法条目" });
+      }
+      if (entry.userId == null) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "预置条目不可删除" });
+      }
+      if (entry.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "只能删除自己添加的条目" });
+      }
+      await db.delete(methodEntries).where(eq(methodEntries.id, input.id));
+      return { ok: true };
     }),
 
   /** 把方法库条目存为当前用户的 Protocol（pointer 条目拒绝导入） */

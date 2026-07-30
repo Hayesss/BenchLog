@@ -450,12 +450,13 @@ export const methodChapters = mysqlTable("method_chapters", {
 });
 export type MethodChapter = typeof methodChapters.$inferSelect;
 
-/** 方法库条目（full=完整方案，pointer=跨章指引） */
+/** 方法库条目（full=完整方案，pointer=跨章指引）；userId null=预置全局条目，非 null=用户自建（仅本人可见/可删） */
 export const methodEntries = mysqlTable(
   "method_entries",
   {
     id: serial("id").primaryKey(),
-    entryId: int("entryId").notNull().unique(), // methods.json 中的 id
+    entryId: int("entryId").notNull().unique(), // methods.json 中的 id；自建条目取 max(entryId)+1
+    userId: bigint("userId", { mode: "number", unsigned: true }),
     chapterNo: int("chapterNo").notNull(),
     section: varchar("section", { length: 128 }).notNull().default(""),
     nameCn: varchar("nameCn", { length: 255 }).notNull(),

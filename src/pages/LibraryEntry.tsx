@@ -1,8 +1,19 @@
+import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { motion } from 'framer-motion'
-import { ArrowLeft, BookMarked, ExternalLink, FlaskConical, Loader2 } from 'lucide-react'
+import { ArrowLeft, BookMarked, ExternalLink, FlaskConical, Loader2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { trpc } from '@/providers/trpc'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import ProtocolToaster from '@/components/protocols/ProtocolToaster'
 
 export default function LibraryEntry() {
@@ -14,9 +25,21 @@ export default function LibraryEntry() {
     { enabled: Number.isFinite(entryId) && entryId > 0 },
   )
   const importMut = trpc.library.importAsProtocol.useMutation()
+  const utils = trpc.useUtils()
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const removeMut = trpc.library.removeEntry.useMutation({
+    onSuccess: () => {
+      toast.success('已删除该自建条目')
+      void utils.library.chapters.invalidate()
+      void utils.library.entries.invalidate()
+      navigate('/library')
+    },
+    onError: (e) => toast.error(`删除失败：${e.message}`),
+  })
 
   const entry = entryQuery.data
   const isPointer = entry?.type === 'pointer'
+  const isCustom = entry?.userId != null
 
   async function handleImport() {
     if (!entry) return
@@ -64,12 +87,19 @@ export default function LibraryEntry() {
         >
           {/* 标题区 */}
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="rounded-full bg-bench-wash px-2 py-0.5 font-mono text-[11px] font-medium text-bench-ink">
-              {entry.journal}
-              {entry.year ? ` · ${entry.year}` : ''}
-            </span>
+            {isCustom && (
+              <span className="rounded-full bg-[#5B7C991F] px-2 py-0.5 text-[11px] font-medium text-[#5B7C99]">
+                自建
+              </span>
+            )}
+            {entry.journal && (
+              <span className="rounded-full bg-bench-wash px-2 py-0.5 font-mono text-[11px] font-medium text-bench-ink">
+                {entry.journal}
+                {entry.year ? ` · ${entry.year}` : ''}
+              </span>
+            )}
             <span className="rounded border border-line bg-paper px-1.5 py-0.5 text-[11px] text-ink-mute">
-              第 {entry.chapterNo} 章 · {entry.section}
+              第 {entry.chapterNo} 章{entry.section ? ` · ${entry.section}` : ''}
             </span>
             {isPointer && (
               <span className="rounded-full bg-[#B08D571F] px-2 py-0.5 text-[11px] font-medium text-[#8a6a3f]">
@@ -141,6 +171,19 @@ export default function LibraryEntry() {
             </section>
           )}
 
+          {/* 删除自建条目 */}
+          {isCustom && (
+            <div className="mt-6 border-t border-line-soft pt-4">
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(true)}
+                className="flex h-9 items-center gap-1.5 rounded-lg border border-danger/40 bg-surface px-3.5 text-[12.5px] font-medium text-danger transition-colors duration-150 hover:bg-danger/5"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> 删除此自建条目
+              </button>
+            </div>
+          )}
+
           {/* 存为 Protocol */}
           {!isPointer && (
             <div className="mt-6">
@@ -164,6 +207,31 @@ export default function LibraryEntry() {
           )}
         </motion.div>
       )}
+
+      {/* 删除确认 */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent className="rounded-xl border-line">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-[18px]">删除该自建条目？</AlertDialogTitle>
+            <AlertDialogDescription className="text-[13px] text-ink-soft">
+              「{entry?.nameCn}」将从方法库中移除，此操作不可恢复；已存为 Protocol 的副本不受影响。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-lg border-line">取消</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={removeMut.isPending}
+              onClick={(ev) => {
+                ev.preventDefault()
+                if (entry) removeMut.mutate({ id: entry.id })
+              }}
+              className="rounded-lg bg-danger text-white hover:bg-danger/90"
+            >
+              {removeMut.isPending ? '删除中…' : '确认删除'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
