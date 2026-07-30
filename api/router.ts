@@ -12,6 +12,7 @@ import { bioinfoSkillRouter } from "./bioinfoSkillRouter";
 import { gitRouter } from "./gitRouter";
 import { demoRouter } from "./demoRouter";
 import { quickNoteRouter } from "./quickNoteRouter";
+import { sampleRouter } from "./sampleRouter";
 import { aiRouter } from "./aiRouter";
 
 export const appRouter = createRouter({
@@ -34,6 +35,7 @@ export const appRouter = createRouter({
   git: gitRouter,
   demo: demoRouter,
   quickNote: quickNoteRouter,
+  sample: sampleRouter,
   ai: aiRouter,
 });
 

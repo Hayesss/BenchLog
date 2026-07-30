@@ -16,6 +16,8 @@ import Guide from './pages/Guide'
 import Trash from './pages/Trash'
 import Inbox from './pages/Inbox'
 import Assistant from './pages/Assistant'
+import Samples from './pages/Samples'
+import BoxDetail from './pages/BoxDetail'
 import Projects from './pages/Projects'
 
 export default function App() {
@@ -43,6 +45,8 @@ export default function App() {
         <Route path="trash" element={<Trash />} />
         <Route path="inbox" element={<Inbox />} />
         <Route path="assistant" element={<Assistant />} />
+        <Route path="samples" element={<Samples />} />
+        <Route path="samples/:boxId" element={<BoxDetail />} />
       </Route>
     </Routes>
   )

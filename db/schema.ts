@@ -524,3 +524,51 @@ export const aiMessages = mysqlTable(
 );
 export type AiMessage = typeof aiMessages.$inferSelect;
 export type InsertAiMessage = typeof aiMessages.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* 项目样本管理：96 孔冻存盒（8 行 × 12 列，坐标 A1-H12），               */
+/* 每项目多盒、每孔位一份样本                                            */
+/* ------------------------------------------------------------------ */
+
+/** 冻存盒：rows 行 × cols 列（默认 8×12 = 96 孔）；location 记物理位置 */
+export const sampleBoxes = mysqlTable(
+  "sample_boxes",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+    projectId: bigint("projectId", { mode: "number", unsigned: true }).notNull(),
+    name: varchar("name", { length: 80 }).notNull(),
+    location: varchar("location", { length: 80 }), // 如「-80℃ 冰箱 B2 层」「液氮罐 3」
+    rows: int("rows").notNull().default(8), // 行数（行坐标 A 起）
+    cols: int("cols").notNull().default(12), // 列数（列坐标 1 起）
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => [index("sample_boxes_user_project_idx").on(t.userId, t.projectId)],
+);
+export type SampleBox = typeof sampleBoxes.$inferSelect;
+export type InsertSampleBox = typeof sampleBoxes.$inferInsert;
+
+/** 样本：每盒每孔位（row/col 均 0 起）至多一份，唯一索引 (boxId, row, col) 保证 */
+export const samples = mysqlTable(
+  "samples",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+    boxId: bigint("boxId", { mode: "number", unsigned: true }).notNull(),
+    row: int("row").notNull(), // 0 起：0 → 坐标 A
+    col: int("col").notNull(), // 0 起：0 → 坐标 1
+    name: varchar("name", { length: 120 }).notNull(),
+    type: varchar("type", { length: 24 }).notNull().default("其他"), // DNA/RNA/蛋白/细胞/组织/血清/质粒/引物/其他
+    concentration: varchar("concentration", { length: 40 }), // 如「56 ng/µL」
+    volume: varchar("volume", { length: 40 }),
+    sampleDate: varchar("sampleDate", { length: 10 }), // YYYY-MM-DD 存入日期
+    notes: varchar("notes", { length: 500 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("samples_box_slot_uidx").on(t.boxId, t.row, t.col),
+    index("samples_user_idx").on(t.userId),
+  ],
+);
+export type Sample = typeof samples.$inferSelect;
+export type InsertSample = typeof samples.$inferInsert;
