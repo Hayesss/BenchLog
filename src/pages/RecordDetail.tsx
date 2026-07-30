@@ -9,6 +9,7 @@ import {
   Copy,
   Download,
   FileText,
+  History,
   MoreHorizontal,
   Save,
   Trash2,
@@ -44,6 +45,8 @@ import RecordPropertiesPanel, {
 } from '@/components/records/RecordPropertiesPanel'
 import type { ProtocolParamLike } from '@/components/records/RecordPropertiesPanel'
 import RecordStatusMenu from '@/components/records/RecordStatusMenu'
+import RecordAttachments from '@/components/records/RecordAttachments'
+import RecordVersionsDialog from '@/components/records/RecordVersionsDialog'
 import { useUnsavedGuard } from '@/hooks/useUnsavedGuard'
 import { EASE_OUT, recordCode, todayStr } from '@/components/records/record-types'
 import type {
@@ -160,6 +163,7 @@ export default function RecordDetail() {
   const [flashKey, setFlashKey] = useState(0)
   const [propsOpen, setPropsOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const galleryRef = useRef<RecordImageGalleryHandle | null>(null)
   const draftTimer = useRef<number | null>(null)
 
@@ -521,6 +525,16 @@ export default function RecordDetail() {
 
         <div className="ml-auto flex items-center gap-2">
           <RecordStatusMenu status={form.status} onChange={(s) => void onStatusChange(s)} />
+          {!isNew && (
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(true)}
+              className="flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[13px] font-medium text-ink-soft shadow-card transition-colors duration-150 hover:border-line-strong hover:text-ink"
+            >
+              <History className="h-4 w-4" />
+              历史
+            </button>
+          )}
           <motion.span
             key={savedLabel ?? 'dirty'}
             animate={savePulse ? { opacity: [1, 0.3, 1] } : { opacity: 1 }}
@@ -691,6 +705,11 @@ export default function RecordDetail() {
             </div>
           </motion.section>
 
+          {/* attachments */}
+          <motion.section variants={sectionVariants}>
+            <RecordAttachments recordId={recordId} ensureRecordId={ensureRecordId} />
+          </motion.section>
+
           {/* conclusion / next step */}
           <motion.section variants={sectionVariants} className="grid gap-4 md:grid-cols-2">
             <div>
@@ -771,7 +790,7 @@ export default function RecordDetail() {
           <AlertDialogHeader>
             <AlertDialogTitle className="font-display">删除这条记录？</AlertDialogTitle>
             <AlertDialogDescription className="text-[13px]">
-              记录与其结果图片将被永久删除。失败记录也是数据，确认要删除吗？
+              记录与其结果图片、附件、历史版本将被永久删除。失败记录也是数据，确认要删除吗？
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -785,6 +804,15 @@ export default function RecordDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* version history */}
+      {!isNew && recordId != null && (
+        <RecordVersionsDialog
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+          recordId={recordId}
+        />
+      )}
     </div>
   )
 }

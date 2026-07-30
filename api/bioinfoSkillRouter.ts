@@ -59,6 +59,31 @@ export const bioinfoSkillRouter = createRouter({
     return { id };
   }),
 
+  /** 导出全部技能（JSON 备份/迁移） */
+  exportAll: authedQuery.query(({ ctx }) =>
+    getDb()
+      .select({
+        title: bioinfoSkills.title,
+        category: bioinfoSkills.category,
+        language: bioinfoSkills.language,
+        summary: bioinfoSkills.summary,
+        code: bioinfoSkills.code,
+        source: bioinfoSkills.source,
+      })
+      .from(bioinfoSkills)
+      .where(eq(bioinfoSkills.userId, ctx.user.id))
+      .orderBy(desc(bioinfoSkills.updatedAt)),
+  ),
+
+  /** 批量导入（JSON 数组，逐项校验；单次 ≤200 条） */
+  importMany: authedQuery
+    .input(z.object({ items: z.array(z.object(skillFieldsInput)).min(1).max(200) }))
+    .mutation(async ({ ctx, input }) => {
+      const rows = input.items.map((it) => ({ ...normalize(it), userId: ctx.user.id }));
+      await getDb().insert(bioinfoSkills).values(rows);
+      return { count: rows.length };
+    }),
+
   update: authedQuery
     .input(z.object({ id: z.number(), ...skillFieldsInput }))
     .mutation(async ({ ctx, input }) => {

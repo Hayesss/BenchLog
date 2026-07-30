@@ -184,6 +184,53 @@ export const recordImages = mysqlTable(
 );
 export type RecordImage = typeof recordImages.$inferSelect;
 
+/** 记录附件（Excel / PDF / fcs 等原始数据文件，base64 存库，单文件 ≤2MB） */
+export const recordAttachments = mysqlTable(
+  "record_attachments",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+    recordId: bigint("recordId", { mode: "number", unsigned: true }).notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    mime: varchar("mime", { length: 64 }).notNull(),
+    size: int("size").notNull(), // 字节
+    data: longtext("data").notNull(), // base64 本体（不带 data: 前缀）
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => [index("recordAttachments_record_idx").on(t.recordId)],
+);
+export type RecordAttachment = typeof recordAttachments.$inferSelect;
+
+/** 记录快照（每次保存/恢复前留「上一版」的核心字段） */
+export type RecordSnapshot = {
+  title: string;
+  recordDate: string;
+  projectId: number | null;
+  protocolId: number | null;
+  protocolVersion: string | null;
+  purpose: string | null;
+  deviations: Deviation[];
+  resultMd: string | null;
+  conclusion: string | null;
+  nextStep: string | null;
+  status: "ongoing" | "done" | "failed";
+  tags: string[];
+};
+
+/** 记录修改历史（覆盖保存前的旧版快照，新→旧查阅，可恢复） */
+export const recordVersions = mysqlTable(
+  "record_versions",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+    recordId: bigint("recordId", { mode: "number", unsigned: true }).notNull(),
+    snapshot: json("snapshot").$type<RecordSnapshot>().notNull(),
+    savedAt: timestamp("savedAt").defaultNow().notNull(),
+  },
+  (t) => [index("recordVersions_record_idx").on(t.recordId)],
+);
+export type RecordVersion = typeof recordVersions.$inferSelect;
+
 export type FlowNode = { date: string; name: string }; // date: YYYY-MM-DD
 
 /** 跨天实验流程（铺板 → 转染 → 收样） */

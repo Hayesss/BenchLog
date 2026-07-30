@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Copy,
+  Download,
   ExternalLink,
   FileCode2,
   Lightbulb,
@@ -10,6 +11,7 @@ import {
   Plus,
   Search,
   Trash2,
+  Upload,
 } from 'lucide-react'
 import { toast, Toaster } from 'sonner'
 import { trpc } from '@/providers/trpc'
@@ -237,6 +239,71 @@ export default function SkillsPanel() {
     onError: (e) => toast.error(`删除失败：${e.message}`),
   })
 
+  /* ------------------------------ 导入 / 导出 ------------------------------ */
+
+  const importInputRef = useRef<HTMLInputElement>(null)
+
+  const doExport = async () => {
+    try {
+      const all = await utils.bioinfoSkill.exportAll.fetch()
+      if (all.length === 0) {
+        toast.error('还没有技能可导出')
+        return
+      }
+      const payload = JSON.stringify({ app: 'BenchLog', kind: 'bioinfo-skills', version: 1, items: all }, null, 2)
+      const url = URL.createObjectURL(new Blob([payload], { type: 'application/json;charset=utf-8' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `benchlog-skills-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success(`已导出 ${all.length} 个技能`)
+    } catch (e) {
+      toast.error(`导出失败：${e instanceof Error ? e.message : '未知错误'}`)
+    }
+  }
+
+  const importMut = trpc.bioinfoSkill.importMany.useMutation({
+    onSuccess: async ({ count }) => {
+      toast.success(`已导入 ${count} 个技能`)
+      await invalidate()
+    },
+    onError: (e) => toast.error(`导入失败：${e.message}`),
+  })
+
+  const pickImport = async (list: FileList | null) => {
+    const file = list?.[0]
+    if (importInputRef.current) importInputRef.current.value = ''
+    if (!file) return
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown
+      const items = Array.isArray(parsed)
+        ? parsed
+        : (parsed as { items?: unknown[] })?.items
+      if (!Array.isArray(items) || items.length === 0) {
+        toast.error('JSON 格式不正确：需要技能数组或 { items: [...] }')
+        return
+      }
+      if (items.length > 200) {
+        toast.error(`单次最多导入 200 条（当前 ${items.length} 条）`)
+        return
+      }
+      const invalid = items.findIndex(
+        (it) =>
+          typeof it !== 'object' || it == null ||
+          typeof (it as { title?: unknown }).title !== 'string' || !(it as { title: string }).title.trim() ||
+          typeof (it as { code?: unknown }).code !== 'string' || !(it as { code: string }).code.trim(),
+      )
+      if (invalid >= 0) {
+        toast.error(`第 ${invalid + 1} 条缺少 title 或 code`)
+        return
+      }
+      importMut.mutate({ items: items as never })
+    } catch {
+      toast.error('文件不是有效的 JSON')
+    }
+  }
+
   const openCreate = () => {
     setEditingId(null)
     setEditorInitial(EMPTY_FORM)
@@ -272,6 +339,30 @@ export default function SkillsPanel() {
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
+        <button
+          type="button"
+          onClick={doExport}
+          className="flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[12.5px] font-medium text-ink-soft transition-colors duration-150 hover:border-bench hover:text-bench"
+        >
+          <Download className="h-3.5 w-3.5" />
+          导出
+        </button>
+        <button
+          type="button"
+          onClick={() => importInputRef.current?.click()}
+          disabled={importMut.isPending}
+          className="flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[12.5px] font-medium text-ink-soft transition-colors duration-150 hover:border-bench hover:text-bench disabled:opacity-60"
+        >
+          {importMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+          导入
+        </button>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={(e) => void pickImport(e.target.files)}
+        />
         <button
           type="button"
           onClick={openCreate}

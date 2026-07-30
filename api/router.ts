@@ -2,7 +2,7 @@ import { authRouter } from "./auth-router";
 import { createRouter, publicQuery } from "./middleware";
 import { projectRouter, tagRouter } from "./metaRouter";
 import { protocolRouter } from "./protocolRouter";
-import { recordRouter, imageRouter } from "./recordRouter";
+import { recordRouter, imageRouter, attachmentRouter } from "./recordRouter";
 import { flowRouter, todoRouter } from "./scheduleRouter";
 import { searchRouter, exportLogRouter } from "./searchRouter";
 import { libraryRouter } from "./libraryRouter";
@@ -19,6 +19,7 @@ export const appRouter = createRouter({
   protocol: protocolRouter,
   record: recordRouter,
   image: imageRouter,
+  attachment: attachmentRouter,
   flow: flowRouter,
   todo: todoRouter,
   search: searchRouter,

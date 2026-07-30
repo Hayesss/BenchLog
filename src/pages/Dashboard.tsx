@@ -8,11 +8,13 @@ import {
   CalendarDays,
   Camera,
   ChevronDown,
+  CircleCheck,
   FlaskConical,
   FolderPlus,
   NotebookPen,
   Plus,
   SquareTerminal,
+  X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { trpc } from '@/providers/trpc'
@@ -421,6 +423,97 @@ function FlowsCard({ flows }: { flows: FlowRow[] }) {
 }
 
 /** 区块 4：快捷新建 */
+/** 新手引导卡：三步上手（项目 → 方法 → 第一条记录），全部完成或手动关闭后消失 */
+const ONBOARD_KEY = 'benchlog-onboarding-dismissed'
+
+function OnboardingCard() {
+  const projectsQ = trpc.project.list.useQuery()
+  const recordsQ = trpc.record.list.useQuery()
+  const protocolsQ = trpc.protocol.list.useQuery()
+  const [dismissed, setDismissed] = useState(() => localStorage.getItem(ONBOARD_KEY) === '1')
+  if (dismissed || !projectsQ.data || !recordsQ.data || !protocolsQ.data) return null
+
+  const steps = [
+    {
+      done: projectsQ.data.length > 0,
+      label: '建一个项目',
+      hint: '右侧「新建项目」方块',
+      to: null as string | null,
+    },
+    {
+      done: protocolsQ.data.length > 0,
+      label: '准备一个实验方法',
+      hint: '去实验方法页挑选或自建',
+      to: '/protocols',
+    },
+    {
+      done: recordsQ.data.length > 0,
+      label: '记第一条湿实验记录',
+      hint: '关联项目与方法版本',
+      to: '/records/new',
+    },
+  ]
+  if (steps.every((s) => s.done)) return null
+  const doneCount = steps.filter((s) => s.done).length
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: EASE }}
+      className="mb-8 rounded-xl border border-bench/30 bg-bench-wash/40 p-5"
+    >
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="font-display text-[15px] font-semibold text-ink">
+            三步上手 BenchLog <span className="ml-1 text-[12px] font-normal text-ink-mute">{doneCount}/3</span>
+          </p>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {steps.map((s, i) => (
+              <div
+                key={s.label}
+                className={cn(
+                  'flex items-center gap-2.5 rounded-lg border px-3 py-2.5',
+                  s.done ? 'border-bench/40 bg-bench-wash' : 'border-line bg-surface',
+                )}
+              >
+                {s.done ? (
+                  <CircleCheck className="h-4 w-4 shrink-0 text-bench" />
+                ) : (
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-line-strong text-[10px] font-semibold text-ink-mute">
+                    {i + 1}
+                  </span>
+                )}
+                <div className="min-w-0">
+                  <p className={cn('text-[12.5px] font-medium', s.done ? 'text-bench-ink' : 'text-ink')}>{s.label}</p>
+                  {!s.done && s.to ? (
+                    <Link to={s.to} className="text-[11px] font-medium text-bench hover:underline">
+                      {s.hint} →
+                    </Link>
+                  ) : (
+                    <p className="text-[11px] text-ink-mute">{s.hint}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <button
+          type="button"
+          aria-label="关闭新手引导"
+          onClick={() => {
+            localStorage.setItem(ONBOARD_KEY, '1')
+            setDismissed(true)
+          }}
+          className="shrink-0 rounded-md p-1 text-ink-mute transition-colors duration-150 hover:text-ink"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    </motion.section>
+  )
+}
+
 function QuickCreate() {
   const [projectDialogOpen, setProjectDialogOpen] = useState(false)
   const items = [
@@ -745,6 +838,7 @@ export default function Dashboard() {
       </section>
 
       {/* 区块 2-5：左 2/3 + 右 1/3 */}
+      <OnboardingCard />
       <div className="mb-10 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
           <TodoCard

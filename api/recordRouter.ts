@@ -3,7 +3,15 @@ import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { records, recordImages, projects, protocols } from "@db/schema";
+import {
+  records,
+  recordImages,
+  recordAttachments,
+  recordVersions,
+  projects,
+  protocols,
+} from "@db/schema";
+import type { RecordSnapshot } from "@db/schema";
 import { dateStr, deviationSchema, recordStatusSchema } from "./zodSchemas";
 
 const recordFieldsInput = {
@@ -34,6 +42,40 @@ async function attachMeta(userId: number, rows: (typeof records.$inferSelect)[])
     project: r.projectId ? (pMap.get(r.projectId) ?? null) : null,
     protocol: r.protocolId ? (prMap.get(r.protocolId) ?? null) : null,
   }));
+}
+
+/** 取记录行的快照（版本历史只留核心字段子集） */
+function snapshotOf(r: typeof records.$inferSelect): RecordSnapshot {
+  return {
+    title: r.title,
+    recordDate: r.recordDate,
+    projectId: r.projectId ?? null,
+    protocolId: r.protocolId ?? null,
+    protocolVersion: r.protocolVersion ?? null,
+    purpose: r.purpose ?? null,
+    deviations: r.deviations ?? [],
+    resultMd: r.resultMd ?? null,
+    conclusion: r.conclusion ?? null,
+    nextStep: r.nextStep ?? null,
+    status: r.status,
+    tags: r.tags ?? [],
+  };
+}
+
+/** 覆盖保存/恢复前留「上一版」快照；记录不存在或非本人时不留（由调用方继续抛错或静默） */
+async function snapshotCurrent(userId: number, recordId: number) {
+  const db = getDb();
+  const cur = await db
+    .select()
+    .from(records)
+    .where(and(eq(records.id, recordId), eq(records.userId, userId)));
+  if (!cur[0]) return false;
+  await db.insert(recordVersions).values({
+    userId,
+    recordId,
+    snapshot: snapshotOf(cur[0]),
+  });
+  return true;
 }
 
 export const recordRouter = createRouter({
@@ -95,6 +137,8 @@ export const recordRouter = createRouter({
     .input(z.object({ id: z.number(), ...recordFieldsInput }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
+      // 保存前先把当前行快照进版本历史（留下「上一版」）
+      await snapshotCurrent(ctx.user.id, id);
       const res = await getDb()
         .update(records)
         .set({
@@ -106,6 +150,54 @@ export const recordRouter = createRouter({
         .where(and(eq(records.id, id), eq(records.userId, ctx.user.id)));
       void res;
       return { ok: true };
+    }),
+
+  /** 版本历史（新→旧），snapshot 含 resultMd 便于回看 */
+  versions: authedQuery
+    .input(z.object({ recordId: z.number() }))
+    .query(({ ctx, input }) =>
+      getDb()
+        .select()
+        .from(recordVersions)
+        .where(
+          and(eq(recordVersions.recordId, input.recordId), eq(recordVersions.userId, ctx.user.id)),
+        )
+        .orderBy(desc(recordVersions.savedAt), desc(recordVersions.id)),
+    ),
+
+  /** 恢复某版本：先把当前行同样快照，再把快照字段写回 records */
+  restoreVersion: authedQuery
+    .input(z.object({ versionId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const vs = await db
+        .select()
+        .from(recordVersions)
+        .where(and(eq(recordVersions.id, input.versionId), eq(recordVersions.userId, ctx.user.id)));
+      const version = vs[0];
+      if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "版本不存在" });
+      const snap = version.snapshot;
+      // 恢复前的当前行也先留一版，保证可反悔
+      const owned = await snapshotCurrent(ctx.user.id, version.recordId);
+      if (!owned) throw new TRPCError({ code: "NOT_FOUND", message: "记录不存在" });
+      await db
+        .update(records)
+        .set({
+          title: snap.title,
+          recordDate: snap.recordDate,
+          projectId: snap.projectId ?? null,
+          protocolId: snap.protocolId ?? null,
+          protocolVersion: snap.protocolVersion ?? null,
+          purpose: snap.purpose ?? null,
+          deviations: snap.deviations ?? [],
+          resultMd: snap.resultMd ?? null,
+          conclusion: snap.conclusion ?? null,
+          nextStep: snap.nextStep ?? null,
+          status: snap.status,
+          tags: snap.tags ?? [],
+        })
+        .where(and(eq(records.id, version.recordId), eq(records.userId, ctx.user.id)));
+      return { ok: true, recordId: version.recordId };
     }),
 
   updateStatus: authedQuery
@@ -122,6 +214,14 @@ export const recordRouter = createRouter({
     await getDb()
       .delete(recordImages)
       .where(and(eq(recordImages.recordId, input.id), eq(recordImages.userId, ctx.user.id)));
+    await getDb()
+      .delete(recordAttachments)
+      .where(
+        and(eq(recordAttachments.recordId, input.id), eq(recordAttachments.userId, ctx.user.id)),
+      );
+    await getDb()
+      .delete(recordVersions)
+      .where(and(eq(recordVersions.recordId, input.id), eq(recordVersions.userId, ctx.user.id)));
     await getDb()
       .delete(records)
       .where(and(eq(records.id, input.id), eq(records.userId, ctx.user.id)));
@@ -195,5 +295,88 @@ export const imageRouter = createRouter({
       .delete(recordImages)
       .where(and(eq(recordImages.id, input.id), eq(recordImages.userId, ctx.user.id)));
     return { ok: true };
+  }),
+});
+
+const ATTACHMENT_MAX_BYTES = 2 * 1024 * 1024; // 单文件 2MB 上限
+
+/** 记录附件（Excel / PDF / fcs 等原始数据文件，base64 存库） */
+export const attachmentRouter = createRouter({
+  /** 附件元信息列表（不返回 data 本体） */
+  listByRecord: authedQuery
+    .input(z.object({ recordId: z.number() }))
+    .query(({ ctx, input }) =>
+      getDb()
+        .select({
+          id: recordAttachments.id,
+          recordId: recordAttachments.recordId,
+          name: recordAttachments.name,
+          mime: recordAttachments.mime,
+          size: recordAttachments.size,
+          createdAt: recordAttachments.createdAt,
+        })
+        .from(recordAttachments)
+        .where(
+          and(
+            eq(recordAttachments.recordId, input.recordId),
+            eq(recordAttachments.userId, ctx.user.id),
+          ),
+        )
+        .orderBy(recordAttachments.createdAt),
+    ),
+
+  add: authedQuery
+    .input(
+      z.object({
+        recordId: z.number(),
+        name: z.string().min(1).max(255),
+        mime: z.string().min(1).max(64),
+        size: z.number().int().positive(),
+        dataBase64: z.string().max(3_000_000), // 2MB 二进制 ≈ 2.8MB base64
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.size > ATTACHMENT_MAX_BYTES) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "附件超过 2MB 上限" });
+      }
+      // 归属校验：记录必须属于当前用户
+      const rec = await getDb()
+        .select({ id: records.id })
+        .from(records)
+        .where(and(eq(records.id, input.recordId), eq(records.userId, ctx.user.id)));
+      if (!rec[0]) throw new TRPCError({ code: "NOT_FOUND", message: "记录不存在" });
+      const [{ id }] = await getDb()
+        .insert(recordAttachments)
+        .values({
+          userId: ctx.user.id,
+          recordId: input.recordId,
+          name: input.name,
+          mime: input.mime,
+          size: input.size,
+          data: input.dataBase64,
+        })
+        .$returningId();
+      return { id };
+    }),
+
+  remove: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    await getDb()
+      .delete(recordAttachments)
+      .where(and(eq(recordAttachments.id, input.id), eq(recordAttachments.userId, ctx.user.id)));
+    return { ok: true };
+  }),
+
+  /** 下载：取回 base64 本体 */
+  getData: authedQuery.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
+    const rows = await getDb()
+      .select({
+        name: recordAttachments.name,
+        mime: recordAttachments.mime,
+        data: recordAttachments.data,
+      })
+      .from(recordAttachments)
+      .where(and(eq(recordAttachments.id, input.id), eq(recordAttachments.userId, ctx.user.id)));
+    if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "附件不存在" });
+    return { name: rows[0].name, mime: rows[0].mime, dataBase64: rows[0].data };
   }),
 });
