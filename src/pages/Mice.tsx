@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
+import { format } from 'date-fns'
 import {
   AlertTriangle,
+  Baby,
+  Check,
+  ClipboardList,
+  FlaskConical,
   Layers,
   LayoutGrid,
   Minus,
@@ -108,6 +113,7 @@ function StrainDialog({
       toast.success(existing ? '品系已更新' : '品系已创建')
       void utils.mouse.listStrains.invalidate()
       void utils.mouse.overview.invalidate()
+      void utils.mouse.taskSuggestions.invalidate()
       onOpenChange(false)
     },
     onError: (e: { message: string }) => toast.error(`保存失败：${e.message}`),
@@ -238,6 +244,7 @@ function MouseDialog({
       void utils.mouse.listStrains.invalidate()
       void utils.mouse.listCages.invalidate()
       void utils.mouse.overview.invalidate()
+      void utils.mouse.taskSuggestions.invalidate()
       onOpenChange(false)
     },
     onError: (e: { message: string }) => toast.error(`保存失败：${e.message}`),
@@ -484,6 +491,7 @@ function BatchMouseDialog({
       void utils.mouse.listStrains.invalidate()
       void utils.mouse.listCages.invalidate()
       void utils.mouse.overview.invalidate()
+      void utils.mouse.taskSuggestions.invalidate()
       onOpenChange(false)
     },
     onError: (e) => toast.error(`批量登记失败：${e.message}`),
@@ -652,6 +660,7 @@ function StatusDialog({
       void utils.mouse.listStrains.invalidate()
       void utils.mouse.listCages.invalidate()
       void utils.mouse.overview.invalidate()
+      void utils.mouse.taskSuggestions.invalidate()
       onClose()
     },
     onError: (e) => toast.error(`更新失败：${e.message}`),
@@ -719,6 +728,148 @@ function StatusDialog({
 }
 
 /* ------------------------------------------------------------------ */
+/* 小鼠任务卡：系统建议（扩繁/鉴定/断奶）+ 今日小鼠待办                     */
+/* 复用全局 todos（text 前缀【小鼠】），Dashboard 今日待办同步可见          */
+/* ------------------------------------------------------------------ */
+const MOUSE_TODO_PREFIX = '【小鼠】'
+
+function MouseTasksCard() {
+  const utils = trpc.useUtils()
+  const today = format(new Date(), 'yyyy-MM-dd')
+  const sugQ = trpc.mouse.taskSuggestions.useQuery()
+  const todosQ = trpc.todo.listByRange.useQuery({ from: today, to: today })
+  const [text, setText] = useState('')
+  const [date, setDate] = useState(today)
+
+  const invalidate = () => {
+    void utils.todo.listByRange.invalidate()
+    void utils.todo.today.invalidate()
+  }
+  const createMut = trpc.todo.create.useMutation({
+    onSuccess: invalidate,
+    onError: (e) => toast.error(`添加失败：${e.message}`),
+  })
+  const toggleMut = trpc.todo.toggle.useMutation({ onSuccess: invalidate })
+
+  const mouseTodos = (todosQ.data ?? []).filter((t) => t.text.startsWith(MOUSE_TODO_PREFIX))
+  const pendingTexts = new Set(mouseTodos.filter((t) => !t.done).map((t) => t.text))
+  const pendingCount = mouseTodos.filter((t) => !t.done).length
+  const suggestions = sugQ.data ?? []
+
+  const KIND_META = {
+    alert: { icon: AlertTriangle, color: 'text-danger' },
+    ungenotyped: { icon: FlaskConical, color: 'text-warning' },
+    wean: { icon: Baby, color: 'text-info' },
+  } as const
+
+  const addSuggestion = (s: { text: string }) => {
+    const full = `${MOUSE_TODO_PREFIX}${s.text}`.slice(0, 500)
+    if (pendingTexts.has(full)) return
+    createMut.mutate({ todoDate: today, text: full })
+  }
+  const addManual = () => {
+    const t = text.trim()
+    if (!t || !date) return
+    createMut.mutate({ todoDate: date, text: `${MOUSE_TODO_PREFIX}${t}`.slice(0, 500) })
+    setText('')
+  }
+
+  return (
+    <div className="mt-4 rounded-xl border border-line bg-surface p-4 shadow-card">
+      <div className="flex items-center justify-between">
+        <p className="caption-en">小鼠任务 MOUSE TASKS</p>
+        {pendingCount > 0 && <span className="text-[11.5px] text-ink-mute">今日 {pendingCount} 项待办</span>}
+      </div>
+
+      {/* 系统建议（实时从库存派生） */}
+      {sugQ.isLoading ? (
+        <p className="mt-2 text-[12px] text-ink-mute">分析库存中…</p>
+      ) : suggestions.length > 0 ? (
+        <div className="mt-2.5 flex flex-col gap-1.5">
+          {suggestions.map((s) => {
+            const meta = KIND_META[s.kind as keyof typeof KIND_META] ?? { icon: ClipboardList, color: 'text-ink-mute' }
+            const Icon = meta.icon
+            const added = pendingTexts.has(`${MOUSE_TODO_PREFIX}${s.text}`)
+            return (
+              <div key={s.text} className="flex items-center gap-2 rounded-lg bg-paper px-2.5 py-2">
+                <Icon className={cn('h-3.5 w-3.5 shrink-0', meta.color)} />
+                <span className="flex-1 text-[12.5px] leading-[18px] text-ink">{s.text}</span>
+                <button
+                  type="button"
+                  disabled={added || createMut.isPending}
+                  onClick={() => addSuggestion(s)}
+                  className={cn(
+                    'flex h-6 shrink-0 items-center gap-1 rounded-md px-2 text-[11.5px] font-medium transition-colors',
+                    added ? 'text-success' : 'bg-bench-wash text-bench-ink hover:bg-bench hover:text-white',
+                  )}
+                >
+                  {added ? (
+                    <>
+                      <Check className="h-3 w-3" /> 已加入
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-3 w-3" /> 待办
+                    </>
+                  )}
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <p className="mt-2 text-[12px] text-ink-mute">库存健康，暂无系统建议。</p>
+      )}
+
+      {/* 今日小鼠待办（勾选同步全局待办） */}
+      {mouseTodos.length > 0 && (
+        <div className="mt-2.5 flex flex-col gap-0.5 border-t border-line-soft pt-2.5">
+          {mouseTodos.map((t) => (
+            <label key={t.id} className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 transition-colors hover:bg-paper">
+              <input
+                type="checkbox"
+                checked={t.done}
+                onChange={(e) => toggleMut.mutate({ id: t.id, done: e.target.checked })}
+                className="h-3.5 w-3.5 shrink-0 accent-[#3E7C6B]"
+              />
+              <span className={cn('text-[12.5px] leading-[18px]', t.done ? 'text-ink-mute line-through' : 'text-ink')}>
+                {t.text.slice(MOUSE_TODO_PREFIX.length)}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
+
+      {/* 手动添加小鼠待办 */}
+      <div className="mt-2.5 flex items-center gap-1.5 border-t border-line-soft pt-2.5">
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && addManual()}
+          placeholder="添加小鼠待办，如：给 A 笼换垫料…"
+          className="h-8 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 text-[12.5px] text-ink outline-none placeholder:text-ink-mute focus:border-bench"
+        />
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          aria-label="待办日期"
+          className="h-8 w-[126px] shrink-0 rounded-lg border border-line bg-surface px-2 text-[12px] text-ink-soft outline-none focus:border-bench"
+        />
+        <button
+          type="button"
+          disabled={!text.trim() || createMut.isPending}
+          onClick={addManual}
+          className="flex h-8 shrink-0 items-center gap-1 rounded-lg bg-bench px-2.5 text-[12px] font-medium text-white transition-colors hover:bg-bench-deep disabled:opacity-50"
+        >
+          <Plus className="h-3.5 w-3.5" /> 添加
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /* Tab 1：库存看板                                                        */
 /* ------------------------------------------------------------------ */
 function BoardTab({
@@ -767,6 +918,8 @@ function BoardTab({
           </div>
         </div>
       )}
+
+      <MouseTasksCard />
 
       <div className="mb-2 mt-6 flex items-center justify-between">
         <p className="caption-en">品系库存 STRAINS</p>
@@ -1233,6 +1386,7 @@ export default function Mice() {
       void utils.mouse.listMice.invalidate()
       void utils.mouse.listStrains.invalidate()
       void utils.mouse.overview.invalidate()
+      void utils.mouse.taskSuggestions.invalidate()
     },
     onError: (e) => toast.error(`删除失败：${e.message}`),
   })

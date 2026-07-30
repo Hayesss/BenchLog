@@ -526,6 +526,59 @@ export const mouseRouter = createRouter({
     }),
 
   /** 总览：存活总数/品系数/笼位数/占用笼数/扩繁预警列表 */
+  /**
+   * 小鼠任务建议：从库存数据派生可执行事项（不入库，实时计算）
+   * - alert：存活低于品系预警阈值 → 安排扩繁
+   * - ungenotyped：存活但基因型为空 → 待鉴定（按品系聚合）
+   * - wean：21-35 日龄且未分笼 → 断奶分笼
+   * 前端一键转为全局待办（todos，text 前缀「【小鼠】」）
+   */
+  taskSuggestions: authedQuery.query(async ({ ctx }) => {
+    const db = getDb();
+    const strains = await db.select().from(mouseStrains).where(eq(mouseStrains.userId, ctx.user.id));
+    const alive = await db
+      .select({ strainId: mice.strainId, genotype: mice.genotype, birthDate: mice.birthDate, cageId: mice.cageId })
+      .from(mice)
+      .where(and(eq(mice.userId, ctx.user.id), eq(mice.status, "alive")));
+
+    const byStrain = new Map<number, { alive: number; ungenotyped: number }>();
+    let weanCount = 0;
+    const nowMs = Date.now();
+    for (const m of alive) {
+      const e = byStrain.get(m.strainId) ?? { alive: 0, ungenotyped: 0 };
+      e.alive++;
+      if (!m.genotype) e.ungenotyped++;
+      byStrain.set(m.strainId, e);
+      if (m.birthDate && m.cageId == null) {
+        const days = Math.floor((nowMs - new Date(`${m.birthDate}T00:00:00`).getTime()) / 86400000);
+        if (days >= 21 && days <= 35) weanCount++;
+      }
+    }
+
+    const suggestions: { kind: "alert" | "ungenotyped" | "wean"; text: string; count: number }[] = [];
+    for (const s of strains) {
+      const e = byStrain.get(s.id) ?? { alive: 0, ungenotyped: 0 };
+      if (s.lowStockThreshold > 0 && e.alive < s.lowStockThreshold) {
+        suggestions.push({
+          kind: "alert",
+          text: `${s.name} 库存不足（存活 ${e.alive}/阈值 ${s.lowStockThreshold}），安排扩繁`,
+          count: s.lowStockThreshold - e.alive,
+        });
+      }
+      if (e.ungenotyped > 0) {
+        suggestions.push({
+          kind: "ungenotyped",
+          text: `${s.name} 有 ${e.ungenotyped} 只小鼠待鉴定基因型`,
+          count: e.ungenotyped,
+        });
+      }
+    }
+    if (weanCount > 0) {
+      suggestions.push({ kind: "wean", text: `${weanCount} 只小鼠到断奶周龄（3-5 周）且未分笼`, count: weanCount });
+    }
+    return suggestions;
+  }),
+
   overview: authedQuery.query(async ({ ctx }) => {
     const db = getDb();
     const strains = await db
