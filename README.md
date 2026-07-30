@@ -1,6 +1,6 @@
 # BenchLog 实验记录平台
 
-BenchLog 是一套面向生物实验室的数字化记录平台，把「湿实验」（wet-lab）与「生信分析」（dry-lab）两条工作线放进同一个系统：实验方法沉淀、实验记录、跨天流程安排、生信分析的可复现性锚定（内置 Git 仓库）、代码片段技能库、方法知识库与汇报导出，一站式完成。
+BenchLog 是一套面向生物实验室的数字化记录平台，把「湿实验」（wet-lab）与「生信分析」（dry-lab）两条工作线放进同一个系统：实验方法沉淀、实验记录、跨天流程安排、小鼠种群与样本库存管理、生信分析的可复现性锚定（内置 Git 仓库）、代码片段技能库、方法知识库、AI 副驾与汇报导出，一站式完成。
 
 ## 目录
 
@@ -12,10 +12,14 @@ BenchLog 是一套面向生物实验室的数字化记录平台，把「湿实�
   - [2. 实验方法（Protocols）](#2-实验方法protocols)
   - [3. 方法库（Library）](#3-方法库library)
   - [4. 湿实验记录（Records）](#4-湿实验记录records)
-  - [5. 实验安排（Schedule）](#5-实验安排schedule)
-  - [6. 生信分析（Bioinfo）](#6-生信分析bioinfo)
-  - [7. 汇报导出（Export）](#7-汇报导出export)
-  - [8. 命令面板与全局搜索](#8-命令面板与全局搜索)
+  - [5. 实验安排（Schedule）与待办整理](#5-实验安排schedule与待办整理)
+  - [6. 小鼠管理（Mice）](#6-小鼠管理mice)
+  - [7. 样本库（Samples）](#7-样本库samples)
+  - [8. 生信分析（Bioinfo）](#8-生信分析bioinfo)
+  - [9. AI 助手（Assistant）](#9-ai-助手assistant)
+  - [10. 收集箱与回收站](#10-收集箱与回收站)
+  - [11. 汇报导出（Export）](#11-汇报导出export)
+  - [12. 命令面板与全局搜索](#12-命令面板与全局搜索)
 - [站内 Git 仓库架构说明](#站内-git-仓库架构说明)
 - [项目结构](#项目结构)
 - [数据库表一览](#数据库表一览)
@@ -27,13 +31,18 @@ BenchLog 是一套面向生物实验室的数字化记录平台，把「湿实�
 - 干湿实验并列：湿实验记录与生信分析记录在导航中平级呈现，统一归属项目。
 - 实验方法管理：方法（Protocol）支持材料清单、分组步骤、参数模板、分类与标签；每次迭代自动留存版本快照，记录页可精确引用「方法 + 版本」。
 - 常用方法手动钉选：工作台「常用方法」默认按使用次数排序，可在任意方法卡片上点亮星标手动置顶，置顶项优先展示，其余按使用次数补齐。
-- 湿实验记录：关联项目与方法版本，自动比对参数偏差（默认值 vs 实际值），支持结果图片（WB 条带、流式图、显微镜照片等，base64 直接入库）、Markdown 结果摘要、结论与下一步计划。
-- 实验安排：跨天流程（如 铺板 → 转染 → 收样）以节点时间线管理，配合单点待办 checklist 按日归集。
+- 湿实验记录：关联项目与方法版本，自动比对参数偏差（默认值 vs 实际值），支持结果图片（WB 条带、流式图、显微镜照片等，base64 直接入库）、附件、Markdown 结果摘要、结论与下一步计划；每次保存自动留存版本历史，可回看/回滚。
+- 实验安排：跨天流程（如 铺板 → 转染 → 收样）以节点时间线管理，配合单点待办 checklist 按日归集；**完成的待办可一键并入当日实验记录**（有记录追加「今日完成」段，无记录自动新建）。
+- 小鼠管理：品系库存看板（♂/♀/未鉴定统计、低库存预警）、个体台账（耳号唯一、组合筛选、日龄计算、状态流转）、笼位视图、配种管理（配种对/幼崽登记/孟德尔遗传计算器）、基因型鉴定工作台、按公母数量批量登记（耳号自动连号避让）、任务建议一键转待办。
+- 样本库：多规格冻存盒（96/81/100/48/24 孔预设）、孔位网格登记样本、孔位可关联实验记录（白点标记直达）。
 - 生信分析专区：
-  - 分析记录：登记 pipeline 类型、输入数据（SRA/GEO 编号等）、运行环境锁定、运行命令、结果摘要，并以 commit 哈希锚定代码版本，保证可复现。
+  - 分析记录：登记 pipeline 类型、输入数据（SRA/GEO 编号等）、**原始数据/结果存储路径**、运行环境锁定、运行命令、结果摘要，并以 commit 哈希锚定代码版本，保证可复现。
   - 站内 Git 仓库：代码无需离开网站，直接上传文件或粘贴代码即可在站内建仓、提交 commit、浏览历史与文件树，commit 可一键锚定到分析记录；SHA-1 与真实 git 完全兼容。
   - 技能库：沉淀常用代码片段（Bash/R/Python/Nextflow/Snakemake），按分类与语言筛选、关键词搜索、一键复制。
   - 学习指南：内置 BioML Guide（生物机器学习学习指南）静态站点，随开随学，无需外网跳转。
+- AI 助手：自配 OpenAI 兼容 LLM（默认 Moonshot/Kimi），自动携带项目/记录/方法/收集箱/待办/小鼠/生信数据快照作为上下文；支持流式输出、@ 引用具体记录全文、操作模式（AI 提议创建待办/收集箱，确认卡确认后才落库）。
+- 收集箱：临时想法与快速结果随手记（idea/result），AI 回复可一键存入，稍后转正为正式记录。
+- 回收站：记录与方法软删除，误删可恢复，彻底删除有二次确认。
 - 汇报导出：按时间范围与项目把实验记录导出为 Markdown / 表格 / PDF 周报月报，保留导出历史。
 - 全局体验：命令面板（Ctrl/Cmd + K）直达全部页面与动作，全局搜索跨模块检索，活跃日历可视化每日工作量。
 
@@ -42,10 +51,11 @@ BenchLog 是一套面向生物实验室的数字化记录平台，把「湿实�
 | 层 | 技术 |
 | --- | --- |
 | 前端 | React 19、TypeScript、Vite、Tailwind CSS、Radix UI（shadcn 风格组件）、TanStack Query |
-| 后端 | Hono（Node）、tRPC（端到端类型安全）、zod 校验、superjson 序列化 |
+| 后端 | Hono（Node）、tRPC（端到端类型安全）、zod 校验、superjson 序列化；AI 流式为原生 SSE 端点 |
 | 数据库 | MySQL + Drizzle ORM（schema 即文档，`db/schema.ts`） |
 | 认证 | Kimi OAuth 登录（JWT 会话），首个 OWNER_UNION_ID 用户自动获得 admin 角色 |
 | 站内 Git | 自研 content-addressed 对象库（MySQL 持久化），SHA-1 算法与 git 二进制交叉验证一致 |
+| AI | OpenAI 兼容 chat/completions（流式 SSE + function calling 确认卡），服务端转发不执行写操作 |
 
 ## 快速开始
 
@@ -87,7 +97,7 @@ KIMI_OPEN_URL=            # Kimi 开放平台地址
 OWNER_UNION_ID=           # 创建者的 Union ID，该用户首次登录即为 admin
 ```
 
-注意：`.env` 已在 `.gitignore` 中，请勿提交任何真实密钥。
+注意：`.env` 已在 `.gitignore` 中，请勿提交任何真实密钥。AI 助手的 LLM API Key 无需写在环境变量中，登录后在「AI 助手 → 设置」页自行配置（仅存服务端）。
 
 ### 3. 初始化数据库
 
@@ -99,7 +109,7 @@ npm run db:push
 npx tsx scripts/seed-library.ts
 ```
 
-仓库另有若干幂等建表/补列脚本（`scripts/create-*.ts`、`scripts/alter-*.ts`），在新部署或升级时按需执行一次即可，重复执行不会产生副作用。
+仓库另有若干幂等建表/补列脚本（`scripts/create-*.ts`、`scripts/add-*.ts`、`scripts/alter-*.ts`），在新部署或升级时按需执行一次即可，重复执行不会产生副作用。
 
 ### 4. 启动
 
@@ -134,15 +144,17 @@ npm start         # NODE_ENV=production node dist/boot.js
 3. 版本管理：每次保存迭代生成新版本并留存旧版快照（`protocol_versions`），详情页可回看任意历史版本。
 4. 钉选星标：卡片右上角与详情页头部均有星标开关；点亮后该方法进入工作台「常用方法」前排。
 5. 模板方法：内置模板不可钉选、不可随意改动，可另存为自己的方法再编辑。
+6. 删除的方法进入回收站（`/trash`），可恢复。
 
 ### 3. 方法库（Library）
 
-路径：`/library`，全局共享的方法知识库（无用户隔离，由种子脚本维护）。
+路径：`/library`，方法知识库 = 全局预置条目 + 你的自建条目。
 
-- 12 个章节、213 条条目，覆盖：核酸提取/PCR/分子克隆、CRISPR 基因编辑、蛋白质技术、细胞培养/转染/病毒包装、流式细胞术、显微成像、单细胞组学、空间组学、表观与互作组学、类器官/干细胞/疾病模型、免疫学与动物实验、微生物与微生物组。
+- 12 个章节、213 条预置条目，覆盖：核酸提取/PCR/分子克隆、CRISPR 基因编辑、蛋白质技术、细胞培养/转染/病毒包装、流式细胞术、显微成像、单细胞组学、空间组学、表观与互作组学、类器官/干细胞/疾病模型、免疫学与动物实验、微生物与微生物组。
 - 条目分两类：`full`（完整方案，含目的、原理、步骤）与 `pointer`（跨章指引）。
-- 条目附来源信息（期刊、年份、DOI），详情页可逐步骤查阅。
-- 更新方法库：替换 `api/seed/methods.json` 后重新执行 `npx tsx scripts/seed-library.ts`（脚本会重建 `method_chapters` / `method_entries` 两表）。
+- 条目附来源信息（期刊、年份、DOI），详情页可逐步骤查阅；`full` 条目可一键「存为 Protocol」。
+- **添加自建方法**：页头「添加方法」按钮打开对话框，可填章节、小节、中英文名、类型、期刊/年份/DOI、来源、目的、原理与核心步骤（每行一步）。自建条目仅本人可见（蓝色「自建」徽标），同样支持存为 Protocol；详情页可删除（预置条目不可删）。
+- 更新预置库：替换 `api/seed/methods.json` 后重新执行 `npx tsx scripts/seed-library.ts`（脚本会重建 `method_chapters` / `method_entries` 两表）。
 
 ### 4. 湿实验记录（Records）
 
@@ -150,32 +162,55 @@ npm start         # NODE_ENV=production node dist/boot.js
 
 1. 新建记录：工作台方块或列表页按钮进入，选择项目、关联方法及其版本，填写标题、日期与实验目的。
 2. 参数偏差：关联方法版本后，页面自动列出参数默认值；填入实际值后偏差项自动高亮，可补充偏差原因。
-3. 结果与图片：结果摘要支持 Markdown；结果图片（WB 条带、流式图、显微镜照片等）直接粘贴/上传，以 base64 存入数据库，跨版本、跨部署不丢失；每张图可标注类型与说明。
+3. 结果与图片：结果摘要支持 Markdown；结果图片（WB 条带、流式图、显微镜照片等）直接粘贴/上传，以 base64 存入数据库，跨版本、跨部署不丢失；每张图可标注类型与说明；支持附件上传。
 4. 结论与下一步：分别填写结论（conclusion）与下一步计划（nextStep），导出汇报时自动汇总。
 5. 状态流转：进行中 / 已完成 / 已失败（ongoing / done / failed），列表页按状态、项目、标签筛选。
+6. 版本历史：每次保存自动把上一版快照进 `record_versions`，详情页可回看。
+7. 删除进回收站（`/trash`）可恢复；彻底删除有二次确认。
 
-### 5. 实验安排（Schedule）
+### 5. 实验安排（Schedule）与待办整理
 
 路径：`/schedule`，管理跨天流程与每日待办。
 
 - 跨天流程（Flow）：如「铺板 → 转染 → 收样」，创建流程后逐日添加节点（日期 + 节点名），时间线视图直观呈现每个流程进行到哪一天；可关联项目与方法。
 - 单点待办（Todo）：按日期归集的 checklist，可勾选完成，也可关联到具体实验记录。
 - 日历视图汇总流程节点与待办，方便安排每日实验量。
+- **整理为记录**：选中日面板待办区出现「整理为记录（N）」按钮（N = 已完成且未整理过的条数），点击后把完成事项并入当日实验记录——当日已有记录则追加到「今日完成」段落（追加前自动留版本快照，多次整理在段内逐行合并），当日没有记录则自动新建一条；已整理过的待办通过关联回写防重复计入。
 
-### 6. 生信分析（Bioinfo）
+### 6. 小鼠管理（Mice）
+
+路径：`/mice`，小鼠种群全生命周期管理，四个页签。
+
+- 看板：品系库存卡片（在群 ♂/♀/未鉴定统计、低库存预警阈值）、「批量」快速登记、「小鼠任务」卡。
+- 台账：个体列表（品系/性别/状态/笼位组合筛选、日龄自动计算、状态流转：在群/处死/死亡/淘汰）；「未鉴定」筛选 chip + 「鉴定登记」工作台（按品系聚合未鉴定鼠，行内基因型快捷登记）。
+- 笼位：笼位占用视图，直观看到每笼住了谁。
+- 配种：配种对卡片（♂×♀、合笼日期、已配天数、胎次），建对时同品系/性别匹配/双方存活三重校验；「幼崽登记」按公母数量批量入册（默认沿用配种笼、来源「自繁」、自动累加胎次）；孟德尔遗传计算器（亲本基因型 → 后代期望比可视化）。
+- 批量登记：看板品系卡「批量」或台账「按数量」入口，按公母数量一次创建多只，耳号按「前缀 + 起始编号」自动连号并避让已占用编号。
+- 任务建议（实时派生，不入库）：库存低于阈值、基因型鉴定积压（按品系聚合）、21-35 日龄未分笼（断奶提醒）、配种对合笼 ≥ 25 天 0 胎、亲本 ≥ 40 周龄；一键转为全局待办（文本自动带「【小鼠】」前缀），下方附今日待办清单可直接勾选。
+
+### 7. 样本库（Samples)
+
+路径：`/samples`，冻存样本的盒-孔两级管理。
+
+- 盒子列表：名称/位置/规格一览；「新建盒子」支持五种规格预设：96 孔（8×12）、81 孔（9×9）、100 孔（10×10）、48 孔（6×8）、24 孔（4×6）。
+- 盒详情（`/samples/:boxId`）：孔位网格（行列坐标 A1 式命名），点击孔位登记/编辑样本信息。
+- 孔位关联实验记录：下拉选择记录（按日期+标题检索）建立关联，关联孔位在网格上显示白点标记，悬停可见记录标题，对话框内一键「查看」直达记录详情；解除关联选择「不关联」即可。
+
+### 8. 生信分析（Bioinfo）
 
 路径：`/bioinfo`，生信侧的工作台，含三个页签：分析记录、技能库、学习指南。
 
-#### 6.1 新建分析（一步完成建仓）
+#### 8.1 新建分析（一步完成建仓）
 
 1. 进入 `/bioinfo/new`，先选择项目、填写分析名称与日期。
 2. 「代码仓库」区块紧随其后：可直接上传代码文件（单文件不超过 512 KB）或粘贴代码，暂存多个文件（单次最多 50 个），并填写首条提交信息。
 3. 点击创建后系统一次完成：创建分析记录 → 站内建仓 → 提交首个 commit → 自动把该 commit 锚定为分析的代码版本。
 4. 若你使用外部仓库（GitHub/GitLab/Gitee），在仓库地址栏填写链接即可，系统不会覆盖为站内仓库。
 
-#### 6.2 分析详情与可复现性
+#### 8.2 分析详情与可复现性
 
 - 基本信息：pipeline 类型（Nextflow / Snakemake / WDL / 手动脚本 / R / Python / Galaxy / 其他）、状态（running / done / failed）。
+- **数据存储路径**：基本信息区「输入数据」下方可登记原始数据路径（dataPath）与结果路径（resultPath），均带一键复制按钮；列表卡片以路径 chip 摘要展示；两个字段同步进入 AI 助手上下文与全部导出渠道（Markdown/表格/Word/网页）。
 - 代码仓库：详情页内嵌仓库面板，含「文件」与「提交历史」两个页签：
   - 文件页签：浏览任一 commit 的文件树，点击查看代码全文，支持复制；
   - 提交历史：时间线展示每次 commit 的变更统计（新增/修改/删除文件数）、提交信息与时间；HEAD 与已锚定的 commit 有专属徽章；任意历史 commit 可「锚定此 commit」更新分析的代码版本。
@@ -183,7 +218,7 @@ npm start         # NODE_ENV=production node dist/boot.js
 - 结果区块：Markdown 结果摘要、结论与下一步。
 - 使用站内仓库时仓库地址显示为「站内」，锚定 commit 以短哈希徽章展示。
 
-#### 6.3 技能库
+#### 8.3 技能库
 
 页签「技能库」（直达链接 `/bioinfo?tab=skills`）：
 
@@ -193,18 +228,34 @@ npm start         # NODE_ENV=production node dist/boot.js
 - 支持分类/语言双筛选与关键词搜索（匹配标题、说明与代码），卡片预览前 4 行代码，一键复制完整代码。
 - 查看对话框内可直接编辑或删除（删除有二次确认）。
 
-#### 6.4 学习指南
+#### 8.4 学习指南
 
 页签「学习指南」（直达链接 `/bioinfo?tab=guide`）：内置 BioML Guide（源自开源仓库 Hayesss/bioml-guide）编译产物，静态自托管于 `/guide/`，iframe 同源嵌入，离线可浏览；页面顶部保留源仓库归属与外链。
 
-### 7. 汇报导出（Export）
+### 9. AI 助手（Assistant）
+
+路径：`/assistant`，按「项目 → 会话 → 对话」三栏组织的 AI 副驾。
+
+- 配置：首次使用点右上角设置，填写 OpenAI 兼容接口（默认 Moonshot/Kimi，模型 kimi-k2-0711-preview）的 Base URL、模型与 API Key；Key 仅存服务端，接口只回脱敏预览。
+- 上下文：发送时自动携带你的数据快照（项目、近期记录、方法、收集箱、待办、小鼠库存、生信分析，总长 ≤ 12000 字符），无需手动粘贴背景。
+- 流式输出（默认）：回复逐字流式呈现；发送即见，无需长时间等待。
+- @ 引用记录：输入框键入 `@` 弹出记录面板（最近 30 条、支持过滤），选中后该记录全文注入本轮上下文（最多 3 条），AI 可针对具体记录讨论。
+- 操作模式：头部「操作模式」开关。开启后 AI 可提议写操作（创建待办 / 存入收集箱），服务端只转发提议、绝不自动执行——前端弹出确认卡展示内容，你点「确认执行」才真正落库；模型不支持 function calling 时自动降级为纯文本。
+- 实用动作：任意 AI 回复可一键「存入收集箱」；会话空标题时按首条消息自动命名。
+
+### 10. 收集箱与回收站
+
+- 收集箱（`/inbox`）：临时想法（idea）与快速结果（result）的暂存区，随手记、稍后整理；可补归属项目，可转正/追加到正式记录（转正后回写关联，状态 inbox → done）；AI 助手的回复也可一键存入。
+- 回收站（`/trash`）：湿实验记录与实验方法均为软删除，删除后进入回收站，可一键恢复或彻底删除（彻底删除有二次确认，失败记录删除时另有警示）。
+
+### 11. 汇报导出（Export）
 
 路径：`/export`。
 
 - 选择时间范围与项目范围，把湿实验记录（含目的、偏差、结果、结论、下一步）汇总导出。
 - 支持格式：Markdown、表格、PDF；导出内容存档于 `export_logs`，可在历史列表回看与再次下载。
 
-### 8. 命令面板与全局搜索
+### 12. 命令面板与全局搜索
 
 - 任意页面按 Ctrl/Cmd + K 唤起命令面板：直达所有页面（含「生信技能库」「生信学习指南」深链接）与常用新建动作。
 - 全局搜索跨模块检索记录、方法、生信分析与方法库条目。
@@ -223,9 +274,10 @@ npm start         # NODE_ENV=production node dist/boot.js
 
 ```
 ├── api/                  # 后端：Hono + tRPC
-│   ├── boot.ts           # 生产入口（静态服务 + API）
+│   ├── boot.ts           # 生产入口（静态服务 + API + AI 流式端点挂载）
 │   ├── router.ts         # tRPC 根路由（聚合各模块路由）
-│   ├── *Router.ts        # 各业务路由（protocol/record/bioinfo/git/...）
+│   ├── *Router.ts        # 各业务路由（protocol/record/schedule/library/mouse/sample/ai/...）
+│   ├── ai/stream.ts      # AI 流式聊天 SSE 端点（/api/ai/stream）
 │   ├── lib/gitstore.ts   # 站内 Git 对象库引擎
 │   └── seed/methods.json # 方法库种子数据（12 章 213 条）
 ├── db/
@@ -233,8 +285,8 @@ npm start         # NODE_ENV=production node dist/boot.js
 │   └── relations.ts      # 表关系定义
 ├── scripts/              # 建表/补列/种子脚本（npx tsx 执行，幂等）
 ├── src/
-│   ├── pages/            # 页面（Dashboard/Protocols/Records/Schedule/Bioinfo/...）
-│   ├── components/       # 组件（含 bioinfo/ 下的 RepoPanel/SkillsPanel/GuidePanel）
+│   ├── pages/            # 页面（Dashboard/Protocols/Records/Schedule/Mice/Samples/Bioinfo/Assistant/...）
+│   ├── components/       # 组件（含 bioinfo/、schedule/ 等功能子目录）
 │   └── App.tsx           # 前端路由表
 ├── public/guide/         # BioML Guide 编译产物（静态自托管）
 └── contracts/            # 前后端共享类型
@@ -247,12 +299,16 @@ npm start         # NODE_ENV=production node dist/boot.js
 | users | 用户与角色 |
 | projects / tags | 项目与标签 |
 | protocols / protocol_versions | 实验方法与版本快照 |
-| records / record_images | 湿实验记录与结果图片（base64） |
-| flows / todos | 跨天流程与每日待办 |
-| bioinfo_analyses | 生信分析记录（可复现性锚点） |
+| records / record_images / record_attachments / record_versions | 湿实验记录、结果图片（base64）、附件、版本历史 |
+| flows / todos | 跨天流程与每日待办（todos.recordId 关联记录） |
+| mouse_strains / mice / mouse_cages / mouse_breeding | 小鼠品系、个体、笼位、配种对 |
+| sample_boxes / samples | 冻存盒与孔位样本（samples.recordId 关联记录） |
+| bioinfo_analyses | 生信分析记录（含数据/结果路径与可复现性锚点） |
 | git_blobs / git_trees / git_commits / git_refs | 站内 Git 对象库 |
 | bioinfo_skills | 生信技能库（代码片段） |
-| method_chapters / method_entries | 方法库章节与条目（全局共享） |
+| method_chapters / method_entries | 方法库章节与条目（method_entries.userId null=全局预置，非 null=用户自建） |
+| ai_settings / ai_conversations / ai_messages | AI 助手设置、会话与消息 |
+| quick_notes | 收集箱（idea/result，可转正到记录） |
 | user_activity | 活跃日历打点 |
 | export_logs | 汇报导出历史 |
 
@@ -262,7 +318,7 @@ npm start         # NODE_ENV=production node dist/boot.js
 npm run dev          # 开发模式（前后端同端口 :3000，热更新）
 npm run build        # 生产构建（前端 dist/public + 后端 dist/boot.js）
 npm start            # 生产启动
-npm run check        # TypeScript 类型检查（tsc -b）
+npm run check        # TypeScript 类型检查（tsc -b，project references 全量）
 npm run lint         # ESLint
 npm run test         # Vitest
 npm run db:push      # 推送数据库表结构
@@ -274,8 +330,8 @@ npx tsx scripts/seed-library.ts   # 重建方法库种子数据
 1. 准备 MySQL 数据库并配置 `.env`（见上文环境变量表）。
 2. 执行 `npm run db:push` 与种子脚本完成建表与初始化数据。
 3. `npm run build && npm start`，服务默认监听 3000 端口（可用 `PORT` 环境变量覆盖）。
-4. 生产模式由 `dist/boot.js` 统一服务前端静态资源与 `/api` 接口，前端路由自动回退到 `index.html`，无需额外配置 nginx rewrite。
-5. 结果图片与站内 Git 对象均存数据库，备份数据库即完成全量数据备份。
+4. 生产模式由 `dist/boot.js` 统一服务前端静态资源与 `/api` 接口（含 tRPC 与 AI 流式 SSE），前端路由自动回退到 `index.html`，无需额外配置 nginx rewrite。
+5. 结果图片、附件与站内 Git 对象均存数据库，备份数据库即完成全量数据备份。
 
 ---
 
