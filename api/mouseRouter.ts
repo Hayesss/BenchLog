@@ -284,6 +284,77 @@ export const mouseRouter = createRouter({
       return { id };
     }),
 
+  /**
+   * 按公母数量批量登记：一次登记 N 公 M 母（如购入一批/一窝分笼）。
+   * 耳号按「前缀 + 数字」自动连号生成：服务端扫描该品系下同前缀已占用的纯数字编号，
+   * 从 earStart（缺省 1）起跳过已用号码分配，杜绝唯一索引冲突。
+   */
+  batchCreateMice: authedQuery
+    .input(
+      z.object({
+        strainId: z.number(),
+        maleCount: z.number().int().min(0).max(200),
+        femaleCount: z.number().int().min(0).max(200),
+        earPrefix: z.string().max(32).optional(),
+        earStart: z.number().int().min(1).max(999999).optional(),
+        birthDate: dateStr.nullish(),
+        genotype: z.string().max(40).optional(),
+        cageId: z.number().optional(),
+        source: z.string().max(24).optional(),
+        notes: z.string().max(500).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const total = input.maleCount + input.femaleCount;
+      if (total <= 0) throw new TRPCError({ code: "BAD_REQUEST", message: "公 / 母数量至少填一个" });
+      await getOwnedStrain(ctx.user.id, input.strainId);
+      if (input.cageId != null) await getOwnedCage(ctx.user.id, input.cageId);
+
+      const prefix = (input.earPrefix ?? "").trim();
+      const rows = await getDb()
+        .select({ earNo: mice.earNo })
+        .from(mice)
+        .where(and(eq(mice.userId, ctx.user.id), eq(mice.strainId, input.strainId)));
+      // 只统计「前缀 + 纯数字」形态的已用编号；其它形态的手动耳号不参与连号
+      const usedNums = new Set<number>();
+      for (const r of rows) {
+        if (prefix && !r.earNo.startsWith(prefix)) continue;
+        const rest = prefix ? r.earNo.slice(prefix.length) : r.earNo;
+        if (/^\d{1,6}$/.test(rest)) usedNums.add(Number(rest));
+      }
+      let next = input.earStart ?? 1;
+      const alloc = (n: number): string[] => {
+        const out: string[] = [];
+        while (out.length < n) {
+          if (!usedNums.has(next)) {
+            usedNums.add(next);
+            out.push(`${prefix}${next}`);
+          }
+          next++;
+        }
+        return out;
+      };
+      const maleEarNos = alloc(input.maleCount);
+      const femaleEarNos = alloc(input.femaleCount);
+
+      const common = {
+        userId: ctx.user.id,
+        strainId: input.strainId,
+        birthDate: input.birthDate ?? null,
+        genotype: input.genotype ?? null,
+        cageId: input.cageId ?? null,
+        source: input.source ?? null,
+        notes: input.notes ?? null,
+      };
+      await getDb()
+        .insert(mice)
+        .values([
+          ...maleEarNos.map((earNo) => ({ ...common, earNo, gender: "male" })),
+          ...femaleEarNos.map((earNo) => ({ ...common, earNo, gender: "female" })),
+        ]);
+      return { created: total, maleEarNos, femaleEarNos };
+    }),
+
   /** 更新小鼠：createMouse 全字段可选版；耳号唯一冲突同样拦截 */
   updateMouse: authedQuery
     .input(

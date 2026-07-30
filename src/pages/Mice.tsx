@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import {
   AlertTriangle,
+  Layers,
   LayoutGrid,
+  Minus,
   Pencil,
   Plus,
   Rat,
@@ -382,6 +384,245 @@ function MouseDialog({
 }
 
 /* ------------------------------------------------------------------ */
+/* 按数量批量登记对话框（公 X 只 / 母 Y 只，耳号自动连号）                     */
+/* ------------------------------------------------------------------ */
+function QtyStepper({
+  label,
+  color,
+  value,
+  onChange,
+}: {
+  label: string
+  color: string
+  value: number
+  onChange: (n: number) => void
+}) {
+  const clamp = (n: number) => Math.max(0, Math.min(200, Number.isFinite(n) ? n : 0))
+  return (
+    <div className="flex items-center justify-between rounded-lg border border-line bg-surface px-3 py-1.5">
+      <span className="flex items-center gap-1.5 text-[13px] font-semibold" style={{ color }}>
+        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+        {label}
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          aria-label={`${label}减一`}
+          disabled={value <= 0}
+          onClick={() => onChange(clamp(value - 1))}
+          className="flex h-7 w-7 items-center justify-center rounded-md border border-line text-ink-soft transition-colors hover:bg-paper disabled:opacity-40"
+        >
+          <Minus className="h-3.5 w-3.5" />
+        </button>
+        <input
+          type="number"
+          min={0}
+          max={200}
+          value={value}
+          onChange={(e) => onChange(clamp(Number(e.target.value)))}
+          className="h-8 w-14 rounded-md border border-line bg-paper text-center font-mono text-[13px] font-semibold text-ink outline-none focus:border-bench"
+        />
+        <button
+          type="button"
+          aria-label={`${label}加一`}
+          onClick={() => onChange(clamp(value + 1))}
+          className="flex h-7 w-7 items-center justify-center rounded-md border border-line text-ink-soft transition-colors hover:bg-paper"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function BatchMouseDialog({
+  open,
+  onOpenChange,
+  strains,
+  defaultStrainId,
+}: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  strains: StrainRow[]
+  defaultStrainId: number | null
+}) {
+  const utils = trpc.useUtils()
+  const cagesQ = trpc.mouse.listCages.useQuery(undefined, { enabled: open })
+  const [strainId, setStrainId] = useState<number | null>(null)
+  const [male, setMale] = useState(0)
+  const [female, setFemale] = useState(0)
+  const [prefix, setPrefix] = useState('')
+  const [start, setStart] = useState('')
+  const [birthDate, setBirthDate] = useState('')
+  const [genotype, setGenotype] = useState('')
+  const [cageId, setCageId] = useState<number | null>(null)
+  const [source, setSource] = useState('')
+
+  useEffect(() => {
+    if (open) {
+      setStrainId(defaultStrainId ?? strains[0]?.id ?? null)
+      setMale(0)
+      setFemale(0)
+      setPrefix('')
+      setStart('')
+      setBirthDate('')
+      setGenotype('')
+      setCageId(null)
+      setSource('')
+    }
+  }, [open, defaultStrainId, strains])
+
+  const batchMut = trpc.mouse.batchCreateMice.useMutation({
+    onSuccess: (r) => {
+      const fmt = (arr: string[]) => (arr.length > 3 ? `${arr[0]}…${arr[arr.length - 1]}` : arr.join('、'))
+      const parts = [
+        r.maleEarNos.length ? `公 ${r.maleEarNos.length} 只（${fmt(r.maleEarNos)}）` : '',
+        r.femaleEarNos.length ? `母 ${r.femaleEarNos.length} 只（${fmt(r.femaleEarNos)}）` : '',
+      ].filter(Boolean)
+      toast.success(`已批量登记 ${r.created} 只：${parts.join('，')}`)
+      void utils.mouse.listMice.invalidate()
+      void utils.mouse.listStrains.invalidate()
+      void utils.mouse.listCages.invalidate()
+      void utils.mouse.overview.invalidate()
+      onOpenChange(false)
+    },
+    onError: (e) => toast.error(`批量登记失败：${e.message}`),
+  })
+
+  const total = male + female
+  const submit = () => {
+    if (strainId == null || total <= 0) return
+    batchMut.mutate({
+      strainId,
+      maleCount: male,
+      femaleCount: female,
+      earPrefix: prefix.trim() || undefined,
+      earStart: start.trim() === '' ? undefined : Number(start),
+      birthDate: birthDate || undefined,
+      genotype: genotype.trim() || undefined,
+      cageId: cageId ?? undefined,
+      source: source || undefined,
+    })
+  }
+
+  const cages = cagesQ.data ?? []
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[460px]">
+        <DialogHeader>
+          <DialogTitle className="font-display text-[16px]">按数量批量登记</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          <div>
+            <span className="caption-en mb-1.5 block">品系 STRAIN</span>
+            <div className="flex flex-wrap gap-1.5">
+              {strains.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setStrainId(s.id)}
+                  className={cn(
+                    'flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-medium transition-colors duration-150',
+                    strainId === s.id ? 'border-bench bg-bench-wash text-bench-ink' : 'border-line text-ink-soft hover:border-line-strong',
+                  )}
+                >
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <QtyStepper label="公 ♂" color={GENDER_META.male.color} value={male} onChange={setMale} />
+            <QtyStepper label="母 ♀" color={GENDER_META.female.color} value={female} onChange={setFemale} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col gap-1.5">
+              <span className="caption-en">编号前缀（可空）</span>
+              <input value={prefix} onChange={(e) => setPrefix(e.target.value)} placeholder="如 C57-" className={cn(inputCls, 'font-mono')} />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="caption-en">起始编号</span>
+              <input type="number" min={1} value={start} onChange={(e) => setStart(e.target.value)} placeholder="留空自动接续" className={cn(inputCls, 'font-mono')} />
+            </label>
+          </div>
+          <p className="-mt-1 text-[11.5px] leading-[17px] text-ink-mute">
+            耳号按「前缀 + 数字」自动连号生成，自动跳过该品系下已占用的编号；登记后可逐只编辑改号。
+          </p>
+
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col gap-1.5">
+              <span className="caption-en">出生日期</span>
+              <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} className={inputCls} />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="caption-en">基因型</span>
+              <input value={genotype} onChange={(e) => setGenotype(e.target.value)} placeholder="留空=未鉴定" className={inputCls} />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col gap-1.5">
+              <span className="caption-en">笼位</span>
+              <select
+                value={cageId ?? ''}
+                onChange={(e) => setCageId(e.target.value === '' ? null : Number(e.target.value))}
+                className={inputCls}
+              >
+                <option value="">未分配</option>
+                {cages.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.cageNo}{c.room ? `（${c.room}）` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div>
+              <span className="caption-en mb-1.5 block">来源</span>
+              <div className="flex gap-1.5">
+                {SOURCES.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setSource(source === s ? '' : s)}
+                    className={cn(
+                      'flex h-9 flex-1 items-center justify-center rounded-lg border text-[12.5px] font-medium transition-colors duration-150',
+                      source === s ? 'border-bench bg-bench-wash text-bench-ink' : 'border-line text-ink-soft hover:border-line-strong',
+                    )}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {total > 0 && (
+            <p className="rounded-lg bg-bench-wash/60 px-3 py-2 text-[12.5px] leading-[18px] text-bench-ink">
+              将登记 <b>{total}</b> 只（公 {male} · 母 {female}），编号 {prefix || '（无前缀）'}
+              {start.trim() || '自动'} 起连号。
+            </p>
+          )}
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            disabled={batchMut.isPending || strainId == null || total <= 0}
+            onClick={submit}
+            className="flex h-9 items-center rounded-lg bg-bench px-4 text-[13px] font-medium text-white shadow-card transition-colors duration-150 hover:bg-bench-deep disabled:opacity-50"
+          >
+            {batchMut.isPending ? '登记中…' : `批量登记 ${total > 0 ? total : ''} 只`}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /* 状态流转对话框（处死/死亡/淘汰/恢复存活）                                */
 /* ------------------------------------------------------------------ */
 function StatusDialog({
@@ -485,11 +726,13 @@ function BoardTab({
   onNewStrain,
   onEditStrain,
   onNewMouse,
+  onBatchMouse,
 }: {
   strains: StrainRow[]
   onNewStrain: () => void
   onEditStrain: (s: StrainRow) => void
   onNewMouse: (strainId: number) => void
+  onBatchMouse: (strainId: number) => void
 }) {
   const overviewQ = trpc.mouse.overview.useQuery()
   const ov = overviewQ.data
@@ -583,13 +826,23 @@ function BoardTab({
                   {s.ungenotyped > 0 ? `未鉴定 ${s.ungenotyped} 只` : '基因型已鉴定完'}
                   {s.lowStockThreshold > 0 && ` · 阈值 ${s.lowStockThreshold}`}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => onNewMouse(s.id)}
-                  className="flex h-7 items-center gap-1 rounded-md bg-bench-wash px-2 text-[12px] font-medium text-bench-ink transition-colors hover:bg-bench hover:text-white"
-                >
-                  <Plus className="h-3 w-3" /> 登记
-                </button>
+                <span className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label={`${s.name} 按数量批量登记`}
+                    onClick={() => onBatchMouse(s.id)}
+                    className="flex h-7 items-center gap-1 rounded-md border border-line px-2 text-[12px] font-medium text-ink-soft transition-colors hover:border-bench hover:text-bench"
+                  >
+                    <Layers className="h-3 w-3" /> 批量
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onNewMouse(s.id)}
+                    className="flex h-7 items-center gap-1 rounded-md bg-bench-wash px-2 text-[12px] font-medium text-bench-ink transition-colors hover:bg-bench hover:text-white"
+                  >
+                    <Plus className="h-3 w-3" /> 登记
+                  </button>
+                </span>
               </div>
             </div>
           ))}
@@ -605,12 +858,14 @@ function BoardTab({
 function MiceTab({
   strains,
   onNewMouse,
+  onBatchMouse,
   onEditMouse,
   onStatusMouse,
   onAskRemove,
 }: {
   strains: StrainRow[]
   onNewMouse: () => void
+  onBatchMouse: () => void
   onEditMouse: (m: MouseRow) => void
   onStatusMouse: (m: MouseRow) => void
   onAskRemove: (m: MouseRow) => void
@@ -690,6 +945,13 @@ function MiceTab({
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-mute" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜编号/基因型/备注…" className="h-9 w-full rounded-lg border border-line bg-surface pl-8 pr-3 text-[12.5px] text-ink outline-none focus:border-bench" />
         </div>
+        <button
+          type="button"
+          onClick={onBatchMouse}
+          className="flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[12.5px] font-medium text-ink-soft transition-colors hover:border-bench hover:text-bench"
+        >
+          <Layers className="h-4 w-4" /> 按数量
+        </button>
         <button
           type="button"
           onClick={onNewMouse}
@@ -960,6 +1222,7 @@ export default function Mice() {
 
   const [strainDialog, setStrainDialog] = useState<{ open: boolean; existing: StrainRow | null }>({ open: false, existing: null })
   const [mouseDialog, setMouseDialog] = useState<{ open: boolean; existing: MouseRow | null; strainId: number | null }>({ open: false, existing: null, strainId: null })
+  const [batchDialog, setBatchDialog] = useState<{ open: boolean; strainId: number | null }>({ open: false, strainId: null })
   const [statusMouse, setStatusMouse] = useState<MouseRow | null>(null)
   const [removeMouse, setRemoveMouse] = useState<MouseRow | null>(null)
 
@@ -1029,12 +1292,14 @@ export default function Mice() {
           onNewStrain={() => setStrainDialog({ open: true, existing: null })}
           onEditStrain={(s) => setStrainDialog({ open: true, existing: s })}
           onNewMouse={(sid) => setMouseDialog({ open: true, existing: null, strainId: sid })}
+          onBatchMouse={(sid) => setBatchDialog({ open: true, strainId: sid })}
         />
       )}
       {tab === 'mice' && (
         <MiceTab
           strains={strains}
           onNewMouse={() => setMouseDialog({ open: true, existing: null, strainId: null })}
+          onBatchMouse={() => setBatchDialog({ open: true, strainId: null })}
           onEditMouse={(m) => setMouseDialog({ open: true, existing: m, strainId: null })}
           onStatusMouse={setStatusMouse}
           onAskRemove={setRemoveMouse}
@@ -1049,6 +1314,12 @@ export default function Mice() {
         strains={strains}
         defaultStrainId={mouseDialog.strainId}
         onOpenChange={(v) => setMouseDialog((s) => ({ ...s, open: v }))}
+      />
+      <BatchMouseDialog
+        open={batchDialog.open}
+        strains={strains}
+        defaultStrainId={batchDialog.strainId}
+        onOpenChange={(v) => setBatchDialog((s) => ({ ...s, open: v }))}
       />
       <StatusDialog mouse={statusMouse} onClose={() => setStatusMouse(null)} />
 
