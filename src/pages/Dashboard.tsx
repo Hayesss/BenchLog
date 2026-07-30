@@ -448,19 +448,19 @@ function OnboardingCard() {
 
   const steps = [
     {
-      done: projectsQ.data.length > 0,
+      done: projectsQ.data.some((p) => !p.isDemo),
       label: '建一个项目',
       hint: '右侧「新建项目」方块',
       to: null as string | null,
     },
     {
-      done: protocolsQ.data.length > 0,
+      done: protocolsQ.data.some((p) => !p.isDemo),
       label: '准备一个实验方法',
       hint: '去实验方法页挑选或自建',
       to: '/protocols',
     },
     {
-      done: recordsQ.data.length > 0,
+      done: recordsQ.data.some((r) => !r.isDemo),
       label: '记第一条湿实验记录',
       hint: '关联项目与方法版本',
       to: '/records/new',
@@ -647,30 +647,36 @@ function DemoCard() {
 function QuickCreate() {
   const [projectDialogOpen, setProjectDialogOpen] = useState(false)
   const items = [
-    { label: '新建记录', icon: NotebookPen, to: '/records/new' },
+    { label: '新建项目', icon: FolderPlus, action: () => setProjectDialogOpen(true) },
     { label: '新建方法', icon: FlaskConical, to: '/protocols' },
+    { label: '新建记录', icon: NotebookPen, to: '/records/new' },
+    { label: '新建分析', icon: SquareTerminal, to: '/bioinfo/new' },
     { label: '安排实验', icon: CalendarDays, to: '/schedule' },
     { label: '拍照上传', icon: Camera, to: '/records/new' },
-    { label: '新建分析', icon: SquareTerminal, to: '/bioinfo/new' },
   ]
   const tileClass =
     'group flex h-28 flex-col items-center justify-center gap-2.5 rounded-lg border border-line bg-surface shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover'
+  const inner = (Icon: typeof FolderPlus, label: string) => (
+    <>
+      <span className="flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-200 group-hover:bg-bench-wash">
+        <Icon className="h-5 w-5 text-ink-soft transition-colors duration-200 group-hover:text-bench" strokeWidth={1.8} />
+      </span>
+      <span className="text-[13px] font-medium text-ink">{label}</span>
+    </>
+  )
   return (
     <section className="grid grid-cols-2 gap-3">
-      {items.map(({ label, icon: Icon, to }) => (
-        <Link key={label} to={to} className={tileClass}>
-          <span className="flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-200 group-hover:bg-bench-wash">
-            <Icon className="h-5 w-5 text-ink-soft transition-colors duration-200 group-hover:text-bench" strokeWidth={1.8} />
-          </span>
-          <span className="text-[13px] font-medium text-ink">{label}</span>
-        </Link>
-      ))}
-      <button type="button" onClick={() => setProjectDialogOpen(true)} className={tileClass}>
-        <span className="flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-200 group-hover:bg-bench-wash">
-          <FolderPlus className="h-5 w-5 text-ink-soft transition-colors duration-200 group-hover:text-bench" strokeWidth={1.8} />
-        </span>
-        <span className="text-[13px] font-medium text-ink">新建项目</span>
-      </button>
+      {items.map(({ label, icon: Icon, to, action }) =>
+        to ? (
+          <Link key={label} to={to} className={tileClass}>
+            {inner(Icon, label)}
+          </Link>
+        ) : (
+          <button key={label} type="button" onClick={action} className={tileClass}>
+            {inner(Icon, label)}
+          </button>
+        ),
+      )}
       <RecordProjectDialog open={projectDialogOpen} onOpenChange={setProjectDialogOpen} />
     </section>
   )
