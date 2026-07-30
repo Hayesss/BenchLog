@@ -424,6 +424,23 @@ export const userActivity = mysqlTable(
 );
 export type UserActivity = typeof userActivity.$inferSelect;
 
+/** 临时想法与快速结果收集箱：随手记的灵感（idea）/ 初步结果（result），先收后进（转正为待办/正式记录） */
+export const quickNotes = mysqlTable(
+  "quick_notes",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+    kind: varchar("kind", { length: 8 }).notNull(), // idea | result
+    content: text("content").notNull(),
+    projectId: bigint("projectId", { mode: "number", unsigned: true }), // 可空：先随手记，后补归属
+    recordId: bigint("recordId", { mode: "number", unsigned: true }), // 可空：转正/追加到记录后回写
+    status: varchar("status", { length: 12 }).notNull().default("inbox"), // inbox | done
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => [index("quick_notes_user_status_idx").on(t.userId, t.status)],
+);
+export type QuickNote = typeof quickNotes.$inferSelect;
+
 export const methodChapters = mysqlTable("method_chapters", {
   id: serial("id").primaryKey(),
   chapterNo: int("chapterNo").notNull().unique(),

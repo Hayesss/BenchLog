@@ -12,11 +12,14 @@ import {
   Eraser,
   FlaskConical,
   FolderPlus,
+  Inbox,
+  Lightbulb,
   NotebookPen,
   Plus,
   Sparkles,
   SquareTerminal,
   X,
+  Zap,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -528,6 +531,103 @@ function OnboardingCard() {
 }
 
 /** 示例数据卡：新手引导关闭/完成且无任何数据时提示一键填充；有示例数据时提供一键清除 */
+/** 区块 2b：收集箱 — 临时想法与快速结果的速记入口 + 最近几条预览 */
+function InboxCard() {
+  const utils = trpc.useUtils()
+  const inboxQ = trpc.quickNote.list.useQuery({ status: 'inbox', kind: 'all' })
+  const [kind, setKind] = useState<'idea' | 'result'>('idea')
+  const [text, setText] = useState('')
+
+  const createMut = trpc.quickNote.create.useMutation({
+    onSuccess: () => {
+      setText('')
+      void utils.quickNote.list.invalidate()
+    },
+    onError: (e) => toast.error(`保存失败：${e.message}`),
+  })
+
+  const submit = () => {
+    const v = text.trim()
+    if (!v) return
+    createMut.mutate({ kind, content: v })
+  }
+
+  const items = (inboxQ.data ?? []).slice(0, 4)
+  const total = inboxQ.data?.length ?? 0
+
+  return (
+    <section className="rounded-lg border border-line bg-surface p-5 shadow-card">
+      <div className="mb-3 flex items-baseline justify-between">
+        <h3 className="flex items-center gap-2 text-[15px] font-semibold leading-[22px] tracking-[0.01em] text-ink">
+          <Inbox className="h-4 w-4 text-ink-soft" strokeWidth={1.8} />
+          收集箱
+          {total > 0 && (
+            <span className="rounded-full bg-bench-wash px-2 py-0.5 font-mono text-[11px] font-medium text-bench-ink">
+              {total}
+            </span>
+          )}
+        </h3>
+        <Link to="/inbox" className="text-[12.5px] text-bench hover:text-bench-deep">
+          全部 →
+        </Link>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setKind((k) => (k === 'idea' ? 'result' : 'idea'))}
+          title="点击切换 想法/结果"
+          className={cn(
+            'flex h-9 shrink-0 items-center gap-1 rounded-lg border px-2.5 text-[12px] font-medium transition-colors duration-150',
+            kind === 'idea'
+              ? 'border-warning/40 bg-warning/10 text-warning'
+              : 'border-info/40 bg-info/10 text-info',
+          )}
+        >
+          {kind === 'idea' ? <Lightbulb className="h-3.5 w-3.5" /> : <Zap className="h-3.5 w-3.5" />}
+          {kind === 'idea' ? '想法' : '结果'}
+        </button>
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing) submit()
+          }}
+          placeholder={kind === 'idea' ? '想法速记，回车存入…' : '初步结果速记，回车存入…'}
+          className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 text-[13px] text-ink outline-none transition-colors duration-150 placeholder:text-ink-mute focus:border-bench"
+        />
+      </div>
+
+      {items.length > 0 && (
+        <ul className="mt-3 flex flex-col divide-y divide-line-soft">
+          {items.map((n) => (
+            <li key={n.id}>
+              <Link to="/inbox" className="group flex items-center gap-2.5 py-2">
+                {n.kind === 'result' ? (
+                  <Zap className="h-3.5 w-3.5 shrink-0 text-info" strokeWidth={1.8} />
+                ) : (
+                  <Lightbulb className="h-3.5 w-3.5 shrink-0 text-warning" strokeWidth={1.8} />
+                )}
+                <span className="min-w-0 flex-1 truncate text-[13px] text-ink-soft transition-colors duration-150 group-hover:text-ink">
+                  {n.content}
+                </span>
+                <span className="shrink-0 font-mono text-[10.5px] text-ink-mute">
+                  {format(new Date(n.createdAt), 'MM-dd HH:mm')}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      {items.length === 0 && !inboxQ.isLoading && (
+        <p className="mt-3 text-[12.5px] text-ink-mute">
+          实验中的灵感与初步结果先丢进来，空闲时再转正为记录或待办。
+        </p>
+      )}
+    </section>
+  )
+}
+
 function DemoCard() {
   const utils = trpc.useUtils()
   const projectsQ = trpc.project.list.useQuery()
@@ -983,6 +1083,7 @@ export default function Dashboard() {
             onToggle={(id, done) => toggleTodo.mutate({ id, done })}
             onAdd={(text) => createTodo.mutate({ todoDate: todayStr, text })}
           />
+          <InboxCard />
           <FlowsCard flows={flows} />
         </div>
         <div className="flex flex-col gap-4">

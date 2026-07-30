@@ -23,6 +23,7 @@ const ROUTE_LABELS: Array<[RegExp, string[]]> = [
   [/^\/guide/, ['学习指南']],
   [/^\/export/, ['汇报导出']],
   [/^\/trash/, ['最近删除']],
+  [/^\/inbox/, ['收集箱']],
 ]
 
 function useBreadcrumb(): string[] {

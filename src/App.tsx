@@ -14,6 +14,7 @@ import Bioinfo from './pages/Bioinfo'
 import BioinfoDetail from './pages/BioinfoDetail'
 import Guide from './pages/Guide'
 import Trash from './pages/Trash'
+import Inbox from './pages/Inbox'
 import Projects from './pages/Projects'
 
 export default function App() {
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="guide" element={<Guide />} />
         <Route path="export" element={<Export />} />
         <Route path="trash" element={<Trash />} />
+        <Route path="inbox" element={<Inbox />} />
       </Route>
     </Routes>
   )

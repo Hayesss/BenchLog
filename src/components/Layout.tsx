@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Link, NavLink, Outlet, useLocation } from 'react-router'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { motion } from 'framer-motion'
 import Lenis from 'lenis'
 import {
   BookMarked,
   BookOpen,
   CalendarDays,
+  Camera,
   ChevronDown,
   FileDown,
   FlaskConical,
+  Inbox,
   LayoutDashboard,
+  Lightbulb,
   Menu,
   NotebookPen,
   Plus,
@@ -19,6 +22,7 @@ import {
   Tag,
   Trash2,
   X,
+  Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Navbar from '@/components/Navbar'
@@ -26,6 +30,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { trpc } from '@/providers/trpc'
 import { LOGIN_PATH } from '@/const'
 import CommandPalette, { openCommandPalette } from '@/components/CommandPalette'
+import QuickCapture, { openQuickCapture } from '@/components/QuickCapture'
 import RecordProjectDialog from '@/components/records/RecordProjectDialog'
 
 const NAV_ITEMS = [
@@ -33,6 +38,7 @@ const NAV_ITEMS = [
   { to: '/protocols', label: '实验方法', en: 'Methods', icon: FlaskConical },
   { to: '/library', label: '方法库', en: 'Library', icon: BookMarked },
   { to: '/records', label: '湿实验记录', en: 'Wet Lab', icon: NotebookPen },
+  { to: '/inbox', label: '收集箱', en: 'Inbox', icon: Inbox },
   { to: '/bioinfo', label: '生信分析', en: 'Bioinfo', icon: SquareTerminal },
   { to: '/guide', label: '学习指南', en: 'Guide', icon: BookOpen },
   { to: '/schedule', label: '实验安排', en: 'Schedule', icon: CalendarDays },
@@ -225,9 +231,23 @@ function Sidebar() {
 function MobileChrome() {
   const { user, isAuthenticated, isLoading } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [actionOpen, setActionOpen] = useState(false)
   const { pathname } = useLocation()
-  // 路由切换后自动收起抽屉
-  useEffect(() => setMenuOpen(false), [pathname])
+  const navigate = useNavigate()
+  // 路由切换后自动收起抽屉与动作面板
+  useEffect(() => {
+    setMenuOpen(false)
+    setActionOpen(false)
+  }, [pathname])
+
+  const QUICK_ACTIONS = [
+    { label: '新建记录', hint: '开始一条正式湿实验记录', icon: NotebookPen, run: () => navigate('/records/new') },
+    { label: '快速想法', hint: '灵感速记，先存进收集箱', icon: Lightbulb, run: () => openQuickCapture('idea') },
+    { label: '快速结果', hint: '初步结果先记一笔，回头转正', icon: Zap, run: () => openQuickCapture('result') },
+    { label: '拍照上传', hint: '拍条带、平板、细胞照片', icon: Camera, run: () => navigate('/records/new') },
+    { label: '新建分析', hint: '开始一项生信分析', icon: SquareTerminal, run: () => navigate('/bioinfo/new') },
+  ]
+
   return (
     <>
       <header className="sticky top-0 z-50 flex h-12 items-center gap-3 border-b border-line bg-paper/90 px-4 backdrop-blur md:hidden">
@@ -326,17 +346,58 @@ function MobileChrome() {
         <MobileTab to="/" icon={LayoutDashboard} label="工作台" end />
         <MobileTab to="/protocols" icon={FlaskConical} label="方法" />
         <div className="relative flex flex-1 items-start justify-center">
-          <Link
-            to="/records/new"
+          <button
+            type="button"
             aria-label="快捷新建"
+            onClick={() => setActionOpen(true)}
             className="absolute -top-5 flex h-12 w-12 items-center justify-center rounded-full bg-bench text-white shadow-overlay transition-transform duration-150 active:scale-95"
           >
             <Plus className="h-6 w-6" />
-          </Link>
+          </button>
         </div>
         <MobileTab to="/records" icon={NotebookPen} label="记录" />
         <MobileTab to="/schedule" icon={CalendarDays} label="日历" />
       </nav>
+
+      {/* 移动端快捷动作面板：中央 + 唤起，含快速想法/快速结果捕获 */}
+      {actionOpen && (
+        <div className="fixed inset-0 z-[70] md:hidden">
+          <div
+            className="absolute inset-0 bg-ink/30 backdrop-blur-[2px]"
+            onClick={() => setActionOpen(false)}
+          />
+          <motion.div
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-line bg-surface px-4 pb-8 pt-3"
+          >
+            <div className="mx-auto mb-3 h-1 w-9 rounded-full bg-line-strong" />
+            <p className="caption-en mb-2 px-1">快速开始 QUICK ACTIONS</p>
+            <div className="flex flex-col gap-1">
+              {QUICK_ACTIONS.map(({ label, hint, icon: Icon, run }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => {
+                    setActionOpen(false)
+                    run()
+                  }}
+                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors duration-150 hover:bg-bench-wash/60 active:bg-bench-wash"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bench-wash">
+                    <Icon className="h-[18px] w-[18px] text-bench" strokeWidth={1.8} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[14px] font-medium text-ink">{label}</span>
+                    <span className="block text-[11.5px] text-ink-mute">{hint}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      )}
     </>
   )
 }
@@ -412,6 +473,7 @@ export default function Layout() {
         </main>
       </div>
       <CommandPalette />
+      <QuickCapture />
     </div>
   )
 }
