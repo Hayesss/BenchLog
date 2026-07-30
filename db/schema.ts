@@ -565,6 +565,7 @@ export const samples = mysqlTable(
     volume: varchar("volume", { length: 40 }),
     sampleDate: varchar("sampleDate", { length: 10 }), // YYYY-MM-DD 存入日期
     notes: varchar("notes", { length: 500 }),
+    recordId: bigint("recordId", { mode: "number", unsigned: true }), // 关联实验记录（可空）
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (t) => [

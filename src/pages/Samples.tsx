@@ -41,6 +41,16 @@ function NewBoxDialog({
   const [name, setName] = useState('')
   const [location, setLocation] = useState('')
   const [projectId, setProjectId] = useState<number | null>(defaultProjectId)
+  const [preset, setPreset] = useState(0) // BOX_PRESETS 下标
+
+  // 常用冻存盒规格（行 × 列）
+  const BOX_PRESETS = [
+    { label: '96 孔', rows: 8, cols: 12, hint: '标准 96 孔板盒（A1–H12）' },
+    { label: '81 孔', rows: 9, cols: 9, hint: '9×9 冻存盒（A1–J9）' },
+    { label: '100 孔', rows: 10, cols: 10, hint: '10×10 冻存盒（A1–J10）' },
+    { label: '48 孔', rows: 6, cols: 8, hint: '48 孔板盒（A1–F8）' },
+    { label: '24 孔', rows: 4, cols: 6, hint: '24 孔板盒（A1–D6）' },
+  ] as const
 
   const createMut = trpc.sample.createBox.useMutation({
     onSuccess: () => {
@@ -102,13 +112,44 @@ function NewBoxDialog({
               ))}
             </div>
           </label>
-          <p className="text-[11.5px] text-ink-mute">规格：96 孔（8 行 × 12 列，A1–H12 坐标）</p>
+          <div className="flex flex-col gap-1.5">
+            <span className="caption-en">盒子规格 SIZE</span>
+            <div className="flex flex-wrap gap-1.5">
+              {BOX_PRESETS.map((p, i) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => setPreset(i)}
+                  className={cn(
+                    'flex h-8 items-center rounded-full border px-3 text-[12.5px] font-medium transition-colors duration-150',
+                    preset === i
+                      ? 'border-bench bg-bench-wash text-bench-ink'
+                      : 'border-line text-ink-soft hover:border-line-strong',
+                  )}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11.5px] text-ink-mute">
+              {BOX_PRESETS[preset].hint}（{BOX_PRESETS[preset].rows} 行 × {BOX_PRESETS[preset].cols} 列）
+            </p>
+          </div>
         </div>
         <div className="mt-4 flex justify-end">
           <button
             type="button"
             disabled={createMut.isPending || name.trim() === '' || pid == null}
-            onClick={() => pid != null && createMut.mutate({ projectId: pid, name: name.trim(), location: location.trim() || undefined })}
+            onClick={() =>
+              pid != null &&
+              createMut.mutate({
+                projectId: pid,
+                name: name.trim(),
+                location: location.trim() || undefined,
+                rows: BOX_PRESETS[preset].rows,
+                cols: BOX_PRESETS[preset].cols,
+              })
+            }
             className="flex h-9 items-center rounded-lg bg-bench px-4 text-[13px] font-medium text-white shadow-card transition-colors duration-150 hover:bg-bench-deep disabled:opacity-50"
           >
             {createMut.isPending ? '创建中…' : '创建盒子'}
@@ -156,7 +197,7 @@ export default function Samples() {
         <div>
           <h1 className="font-display text-[22px] font-bold leading-[30px] text-ink">样本库</h1>
           <p className="mt-1 text-[13px] leading-[20px] text-ink-mute">
-            96 孔冻存盒（8×12，A1–H12 坐标）——按项目分盒管理，点孔位存取样本。
+            冻存盒可视化管理（96/81/100/48/24 孔多规格）——按项目分盒，点孔位存取样本。
           </p>
         </div>
         <button
@@ -258,7 +299,7 @@ export default function Samples() {
           className="flex w-full flex-col items-center gap-2.5 rounded-xl border border-dashed border-line-strong py-14 transition-colors duration-150 hover:border-bench hover:bg-bench-wash/30"
         >
           <Box className="h-8 w-8 text-ink-mute" strokeWidth={1.5} />
-          <p className="text-[13px] text-ink-mute">还没有样本盒 — 点击新建一个 96 孔盒</p>
+          <p className="text-[13px] text-ink-mute">还没有样本盒 — 点击新建一个冻存盒</p>
         </button>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">

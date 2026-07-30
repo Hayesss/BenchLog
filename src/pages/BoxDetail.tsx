@@ -33,6 +33,8 @@ type Well = {
   volume: string | null
   sampleDate: string | null
   notes: string | null
+  recordId: number | null
+  recordTitle: string | null
 }
 
 /* ------------------------------------------------------------------ */
@@ -56,6 +58,7 @@ function WellDialog({
   const [volume, setVolume] = useState('')
   const [sampleDate, setSampleDate] = useState('')
   const [notes, setNotes] = useState('')
+  const [recordId, setRecordId] = useState<number | null>(null)
 
   useEffect(() => {
     if (wellPos) {
@@ -65,8 +68,12 @@ function WellDialog({
       setVolume(existing?.volume ?? '')
       setSampleDate(existing?.sampleDate ?? '')
       setNotes(existing?.notes ?? '')
+      setRecordId(existing?.recordId ?? null)
     }
   }, [wellPos, existing])
+
+  const recordsQ = trpc.record.list.useQuery(undefined, { enabled: wellPos != null })
+  const recordOptions = useMemo(() => (recordsQ.data ?? []).slice(0, 30), [recordsQ.data])
 
   const saveMut = trpc.sample.setSample.useMutation({
     onSuccess: () => {
@@ -165,6 +172,35 @@ function WellDialog({
               className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2.5 text-[13.5px] leading-[20px] text-ink outline-none transition-colors focus:border-bench"
             />
           </label>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="caption-en">关联实验记录</span>
+            <div className="flex items-center gap-2">
+              <select
+                value={recordId ?? ''}
+                onChange={(e) => setRecordId(e.target.value === '' ? null : Number(e.target.value))}
+                className={cn(inputCls, 'flex-1 appearance-none')}
+              >
+                <option value="">不关联</option>
+                {recordOptions.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.recordDate} · {r.title}
+                  </option>
+                ))}
+                {recordId != null && !recordOptions.some((r) => r.id === recordId) && (
+                  <option value={recordId}>{existing?.recordTitle ?? `记录 #${recordId}`}</option>
+                )}
+              </select>
+              {recordId != null && (
+                <Link
+                  to={`/records/${recordId}`}
+                  className="flex h-10 shrink-0 items-center rounded-lg border border-line px-2.5 text-[12px] font-medium text-bench transition-colors hover:bg-bench-wash"
+                >
+                  查看
+                </Link>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="mt-4 flex items-center gap-2">
@@ -192,6 +228,7 @@ function WellDialog({
                 volume: volume.trim() || undefined,
                 sampleDate: sampleDate || undefined,
                 notes: notes.trim() || undefined,
+                recordId,
               })
             }
             className="ml-auto flex h-9 items-center rounded-lg bg-bench px-4 text-[13px] font-medium text-white shadow-card transition-colors duration-150 hover:bg-bench-deep disabled:opacity-50"
@@ -393,9 +430,9 @@ export default function BoxDetail() {
                     key={c}
                     type="button"
                     onClick={() => setWellPos({ row: r, col: c })}
-                    title={w ? `${wellLabel(r, c)} · ${w.name}（${w.type}）` : `${wellLabel(r, c)} 空孔`}
+                    title={w ? `${wellLabel(r, c)} · ${w.name}（${w.type}）${w.recordTitle ? `\n关联记录：${w.recordTitle}` : ''}` : `${wellLabel(r, c)} 空孔`}
                     className={cn(
-                      'flex h-11 items-center justify-center rounded-md border text-[11px] font-semibold transition-all duration-150',
+                      'relative flex h-11 items-center justify-center rounded-md border text-[11px] font-semibold transition-all duration-150',
                       w
                         ? 'border-transparent text-white shadow-sm hover:scale-[1.06]'
                         : 'border-dashed border-line-strong bg-paper text-ink-mute hover:border-bench hover:bg-bench-wash/40',
@@ -405,6 +442,9 @@ export default function BoxDetail() {
                     style={w ? { backgroundColor: TYPE_COLOR[w.type] ?? '#8A9099' } : undefined}
                   >
                     {w ? w.name.slice(0, 3) : ''}
+                    {w?.recordId != null && (
+                      <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-white/90 ring-1 ring-black/10" aria-label="已关联实验记录" />
+                    )}
                   </button>
                 )
               })}

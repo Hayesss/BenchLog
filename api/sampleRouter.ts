@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { sampleBoxes, samples, projects } from "@db/schema";
+import { sampleBoxes, samples, projects, records } from "@db/schema";
 import { dateStr } from "./zodSchemas";
 
 // 样本类型：9 种固定取值
@@ -140,8 +140,11 @@ export const sampleRouter = createRouter({
           volume: samples.volume,
           sampleDate: samples.sampleDate,
           notes: samples.notes,
+          recordId: samples.recordId,
+          recordTitle: records.title,
         })
         .from(samples)
+        .leftJoin(records, and(eq(records.id, samples.recordId), isNull(records.deletedAt)))
         .where(eq(samples.boxId, box.id))
         .orderBy(asc(samples.row), asc(samples.col));
       return { ...box, wells };
@@ -160,6 +163,7 @@ export const sampleRouter = createRouter({
         volume: z.string().max(40).optional(),
         sampleDate: dateStr.nullish(),
         notes: z.string().max(500).optional(),
+        recordId: z.number().nullable().optional(), // 关联实验记录；undefined=保持不变，null=解除关联
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -171,6 +175,14 @@ export const sampleRouter = createRouter({
           message: `孔位超出盒子范围（该盒 ${box.rows} 行 × ${box.cols} 列）`,
         });
       }
+      // 关联记录归属校验（且排除软删除）
+      if (input.recordId != null) {
+        const rec = await db
+          .select({ id: records.id })
+          .from(records)
+          .where(and(eq(records.id, input.recordId), eq(records.userId, ctx.user.id), isNull(records.deletedAt)));
+        if (!rec[0]) throw new TRPCError({ code: "BAD_REQUEST", message: "关联的实验记录不存在" });
+      }
       const values = {
         name: input.name,
         type: input.type,
@@ -178,6 +190,7 @@ export const sampleRouter = createRouter({
         volume: input.volume ?? null,
         sampleDate: input.sampleDate ?? null,
         notes: input.notes ?? null,
+        ...(input.recordId !== undefined ? { recordId: input.recordId } : {}),
       };
       const existing = await db
         .select()
