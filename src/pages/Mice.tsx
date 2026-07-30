@@ -8,6 +8,7 @@ import {
   ClipboardList,
   FlaskConical,
   Heart,
+  Hourglass,
   Layers,
   LayoutGrid,
   Minus,
@@ -761,6 +762,8 @@ function MouseTasksCard() {
     alert: { icon: AlertTriangle, color: 'text-danger' },
     ungenotyped: { icon: FlaskConical, color: 'text-warning' },
     wean: { icon: Baby, color: 'text-info' },
+    pairOverdue: { icon: Heart, color: 'text-warning' },
+    pairAging: { icon: Hourglass, color: 'text-danger' },
   } as const
 
   const addSuggestion = (s: { text: string }) => {
@@ -1529,6 +1532,132 @@ function BoardTab({
 }
 
 /* ------------------------------------------------------------------ */
+/* 基因型鉴定工作台：待鉴定列表 → 逐行登记结果 → 自动分流（出列）            */
+/* ------------------------------------------------------------------ */
+const GENO_QUICK = ['+/+', '+/-', '-/-', 'Tg+']
+
+function GenoRow({ m, onSaved }: { m: MouseRow & { ageWeeks?: number | null }; onSaved: () => void }) {
+  const [value, setValue] = useState('')
+  const saveMut = trpc.mouse.updateMouse.useMutation({
+    onSuccess: () => {
+      toast.success(`#${m.earNo} 基因型已登记`)
+      onSaved()
+    },
+    onError: (e) => toast.error(`保存失败：${e.message}`),
+  })
+  const v = value.trim()
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line-soft bg-paper px-2.5 py-2">
+      <span className="flex min-w-[110px] items-center gap-1.5 font-mono text-[12.5px] font-medium text-ink">
+        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: GENDER_META[m.gender as keyof typeof GENDER_META]?.color ?? '#8A9099' }} />
+        #{m.earNo}
+        <span className="text-[11px] font-normal text-ink-mute">{m.birthDate ? ageLabel(m.birthDate) : ''}</span>
+      </span>
+      <div className="flex items-center gap-1">
+        {GENO_QUICK.map((g) => (
+          <button
+            key={g}
+            type="button"
+            onClick={() => setValue(g)}
+            className={cn(
+              'h-7 rounded-md border px-1.5 font-mono text-[11.5px] transition-colors',
+              v === g ? 'border-bench bg-bench-wash text-bench-ink' : 'border-line text-ink-soft hover:border-line-strong',
+            )}
+          >
+            {g}
+          </button>
+        ))}
+      </div>
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="或自定义…"
+        className="h-7 w-24 rounded-md border border-line bg-surface px-2 font-mono text-[11.5px] text-ink outline-none focus:border-bench"
+      />
+      <button
+        type="button"
+        disabled={!v || saveMut.isPending}
+        onClick={() => saveMut.mutate({ id: m.id, genotype: v })}
+        className="ml-auto flex h-7 items-center gap-1 rounded-md bg-bench px-2.5 text-[11.5px] font-medium text-white transition-colors hover:bg-bench-deep disabled:opacity-50"
+      >
+        <Check className="h-3 w-3" /> 保存
+      </button>
+    </div>
+  )
+}
+
+function GenotypingDialog({
+  open,
+  onOpenChange,
+  strains,
+}: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  strains: StrainRow[]
+}) {
+  const utils = trpc.useUtils()
+  const pending = strains.filter((s) => s.ungenotyped > 0)
+  const [strainId, setStrainId] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (open) setStrainId(pending[0]?.id ?? strains[0]?.id ?? null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  const listQ = trpc.mouse.listMice.useQuery(
+    { strainId: strainId ?? undefined, status: 'alive', ungenotyped: true },
+    { enabled: open && strainId != null },
+  )
+  const rows = (listQ.data ?? []) as (MouseRow & { ageWeeks?: number | null })[]
+
+  const onSaved = () => {
+    void utils.mouse.listMice.invalidate()
+    void utils.mouse.listStrains.invalidate()
+    void utils.mouse.overview.invalidate()
+    void utils.mouse.taskSuggestions.invalidate()
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[560px]">
+        <DialogHeader>
+          <DialogTitle className="font-display text-[16px]">基因型鉴定登记</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-wrap gap-1.5">
+          {strains.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setStrainId(s.id)}
+              className={cn(
+                'flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-medium transition-colors duration-150',
+                strainId === s.id ? 'border-bench bg-bench-wash text-bench-ink' : 'border-line text-ink-soft hover:border-line-strong',
+              )}
+            >
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
+              {s.name}
+              {s.ungenotyped > 0 && <span className="rounded-full bg-warning/15 px-1.5 text-[10.5px] text-warning">{s.ungenotyped}</span>}
+            </button>
+          ))}
+        </div>
+        <div className="mt-1 flex max-h-[46vh] flex-col gap-1.5 overflow-y-auto pr-0.5">
+          {listQ.isLoading ? (
+            <p className="py-8 text-center text-[12.5px] text-ink-mute">载入中…</p>
+          ) : rows.length === 0 ? (
+            <p className="py-8 text-center text-[12.5px] text-ink-mute">
+              {strainId == null ? '请先选择品系' : '该品系没有待鉴定的存活小鼠'}
+            </p>
+          ) : (
+            rows.map((m) => <GenoRow key={m.id} m={m} onSaved={onSaved} />)
+          )}
+        </div>
+        <p className="text-[11.5px] leading-[17px] text-ink-mute">保存后立即从待鉴定列表移除；库存看板的鉴定建议同步重算。</p>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /* Tab 2：个体台账                                                        */
 /* ------------------------------------------------------------------ */
 function MiceTab({
@@ -1549,9 +1678,11 @@ function MiceTab({
   const [strainId, setStrainId] = useState<number | null>(null)
   const [gender, setGender] = useState<string>('all')
   const [status, setStatus] = useState<string>('alive')
+  const [ungenotypedOnly, setUngenotypedOnly] = useState(false)
   const [minAge, setMinAge] = useState('')
   const [maxAge, setMaxAge] = useState('')
   const [q, setQ] = useState('')
+  const [genoOpen, setGenoOpen] = useState(false)
 
   const listQ = trpc.mouse.listMice.useQuery({
     strainId: strainId ?? undefined,
@@ -1560,6 +1691,7 @@ function MiceTab({
     q: q.trim() || undefined,
     minAgeWeeks: minAge === '' ? undefined : Number(minAge),
     maxAgeWeeks: maxAge === '' ? undefined : Number(maxAge),
+    ungenotyped: ungenotypedOnly || undefined,
   })
   const rows = (listQ.data ?? []) as MouseRow[]
 
@@ -1617,10 +1749,27 @@ function MiceTab({
           <input type="number" min={0} value={maxAge} onChange={(e) => setMaxAge(e.target.value)} placeholder="最大" className="h-8 w-16 rounded-lg border border-line bg-surface px-2 text-[12px] text-ink outline-none focus:border-bench" />
           <span>周</span>
         </div>
+        <button
+          type="button"
+          onClick={() => setUngenotypedOnly((v) => !v)}
+          className={cn(
+            'flex h-8 items-center gap-1 rounded-full border px-2.5 text-[12px] font-medium transition-colors',
+            ungenotypedOnly ? 'border-warning bg-warning/10 text-warning' : 'border-line text-ink-soft hover:border-line-strong',
+          )}
+        >
+          <FlaskConical className="h-3 w-3" /> 未鉴定
+        </button>
         <div className="relative min-w-[160px] flex-1 sm:max-w-56">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-mute" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜编号/基因型/备注…" className="h-9 w-full rounded-lg border border-line bg-surface pl-8 pr-3 text-[12.5px] text-ink outline-none focus:border-bench" />
         </div>
+        <button
+          type="button"
+          onClick={() => setGenoOpen(true)}
+          className="flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[12.5px] font-medium text-ink-soft transition-colors hover:border-bench hover:text-bench"
+        >
+          <FlaskConical className="h-4 w-4" /> 鉴定登记
+        </button>
         <button
           type="button"
           onClick={onBatchMouse}
@@ -1717,6 +1866,8 @@ function MiceTab({
           </div>
         </>
       )}
+
+      <GenotypingDialog open={genoOpen} onOpenChange={setGenoOpen} strains={strains} />
     </div>
   )
 }

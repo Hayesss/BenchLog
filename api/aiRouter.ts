@@ -8,6 +8,8 @@ import {
   aiMessages,
   aiSettings,
   bioinfoAnalyses,
+  mice,
+  mouseStrains,
   projects,
   protocols,
   quickNotes,
@@ -136,6 +138,28 @@ async function buildContext(userId: number, projectId: number | null): Promise<s
     .from(todos)
     .where(and(eq(todos.userId, userId), eq(todos.done, false)));
 
+  // 小鼠库存：品系级汇总（品系名/存活/公/母/未鉴定），轻量注入便于讨论动物实验安排
+  const strainRows = await db
+    .select({ id: mouseStrains.id, name: mouseStrains.name })
+    .from(mouseStrains)
+    .where(eq(mouseStrains.userId, userId));
+  const aliveMouseRows = strainRows.length
+    ? await db
+        .select({ strainId: mice.strainId, gender: mice.gender, genotype: mice.genotype })
+        .from(mice)
+        .where(and(eq(mice.userId, userId), eq(mice.status, "alive")))
+    : [];
+  const mouseSummary = strainRows.map((s) => {
+    const mine = aliveMouseRows.filter((m) => m.strainId === s.id);
+    return {
+      strain: s.name,
+      alive: mine.length,
+      male: mine.filter((m) => m.gender === "male").length,
+      female: mine.filter((m) => m.gender === "female").length,
+      ungenotyped: mine.filter((m) => !m.genotype).length,
+    };
+  });
+
   const snapshot: Record<string, unknown> = {
     projects: projectList,
     records: recordList,
@@ -143,6 +167,7 @@ async function buildContext(userId: number, projectId: number | null): Promise<s
     protocols: protocolRows,
     quickNotesInbox: noteList,
     todosPending: todoRows,
+    mouseStrains: mouseSummary,
   };
 
   // 总长控制：单字段已截断，仍超限则按比例缩减各数组条数（保留头部较新数据）

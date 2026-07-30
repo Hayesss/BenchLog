@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
@@ -252,6 +252,7 @@ export const mouseRouter = createRouter({
           q: z.string().optional(),
           minAgeWeeks: z.number().int().min(0).max(200).optional(),
           maxAgeWeeks: z.number().int().min(0).max(200).optional(),
+          ungenotyped: z.boolean().optional(), // true=仅存活未鉴定（基因型为空）
         })
         .optional(),
     )
@@ -261,6 +262,7 @@ export const mouseRouter = createRouter({
       if (input?.cageId != null) conds.push(eq(mice.cageId, input.cageId));
       if (input?.gender && input.gender !== "all") conds.push(eq(mice.gender, input.gender));
       if (input?.status && input.status !== "all") conds.push(eq(mice.status, input.status));
+      if (input?.ungenotyped) conds.push(isNull(mice.genotype));
       if (input?.q) {
         const pattern = `%${input.q.toLowerCase()}%`;
         conds.push(sql`(
@@ -731,7 +733,11 @@ export const mouseRouter = createRouter({
       }
     }
 
-    const suggestions: { kind: "alert" | "ungenotyped" | "wean"; text: string; count: number }[] = [];
+    const suggestions: {
+      kind: "alert" | "ungenotyped" | "wean" | "pairOverdue" | "pairAging";
+      text: string;
+      count: number;
+    }[] = [];
     for (const s of strains) {
       const e = byStrain.get(s.id) ?? { alive: 0, ungenotyped: 0 };
       if (s.lowStockThreshold > 0 && e.alive < s.lowStockThreshold) {
@@ -751,6 +757,34 @@ export const mouseRouter = createRouter({
     }
     if (weanCount > 0) {
       suggestions.push({ kind: "wean", text: `${weanCount} 只小鼠到断奶周龄（3-5 周）且未分笼`, count: weanCount });
+    }
+
+    // 配种提醒：合笼超期未产（≥25 天且 0 胎）；老龄繁殖对（亲本任一方 ≥40 周龄）
+    const activePairs = await db
+      .select()
+      .from(mouseBreeding)
+      .where(and(eq(mouseBreeding.userId, ctx.user.id), eq(mouseBreeding.status, "active")));
+    if (activePairs.length > 0) {
+      const parentIds = [...new Set(activePairs.flatMap((p) => [p.maleId, p.femaleId]))];
+      const parents = await db
+        .select({ id: mice.id, earNo: mice.earNo, birthDate: mice.birthDate })
+        .from(mice)
+        .where(and(eq(mice.userId, ctx.user.id), inArray(mice.id, parentIds)));
+      const pMap = new Map(parents.map((m) => [m.id, m]));
+      const ageWeeksOf = (birthDate: string | null) =>
+        birthDate ? Math.floor((nowMs - new Date(`${birthDate}T00:00:00`).getTime()) / (7 * 86400000)) : null;
+      for (const p of activePairs) {
+        const days = Math.floor((nowMs - new Date(`${p.startDate}T00:00:00`).getTime()) / 86400000);
+        const label = `♂#${pMap.get(p.maleId)?.earNo ?? "?"} × ♀#${pMap.get(p.femaleId)?.earNo ?? "?"}`;
+        if (p.litters === 0 && days >= 25) {
+          suggestions.push({ kind: "pairOverdue", text: `配种对（${label}）合笼 ${days} 天未产仔，检查或更换`, count: 1 });
+        }
+        const ages = [ageWeeksOf(pMap.get(p.maleId)?.birthDate ?? null), ageWeeksOf(pMap.get(p.femaleId)?.birthDate ?? null)];
+        const maxAge = Math.max(ages[0] ?? 0, ages[1] ?? 0);
+        if (maxAge >= 40) {
+          suggestions.push({ kind: "pairAging", text: `配种对（${label}）亲本已 ${maxAge} 周龄，建议安排更换繁殖对`, count: 1 });
+        }
+      }
     }
     return suggestions;
   }),
