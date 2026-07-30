@@ -6,6 +6,7 @@ import {
   Copy,
   Eye,
   FileCode2,
+  FileDown,
   FolderGit2,
   GitCommitHorizontal,
   History,
@@ -67,6 +68,21 @@ export default function RepoPanel({
     onError: (e) => toast.error(`提交失败：${e.message}`),
   })
 
+  /** 导出当前浏览版本（viewingSha）的全部文件为 ZIP */
+  const exportMut = trpc.git.exportZip.useMutation({
+    onSuccess: ({ base64, filename, fileCount, short }) => {
+      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/zip' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success(`已导出 ${fileCount} 个文件（commit ${short}）`)
+    },
+    onError: (e) => toast.error(`导出失败：${e.message}`),
+  })
+
   const initialized = statusQ.data?.initialized === true
   const headSha = statusQ.data?.headSha ?? null
   const viewingSha = ref ?? headSha
@@ -94,6 +110,16 @@ export default function RepoPanel({
                 HEAD {statusQ.data?.short}
               </span>
               <span className="text-[11.5px] text-ink-mute">{statusQ.data?.commitCount} 次提交</span>
+              <button
+                type="button"
+                onClick={() => viewingSha && exportMut.mutate({ analysisId, ref: viewingSha })}
+                disabled={exportMut.isPending}
+                title={`打包下载当前浏览版本（${viewingSha?.slice(0, 7)}）的全部文件`}
+                className="flex h-6 items-center gap-1 rounded-md border border-line bg-surface px-2 text-[11.5px] font-medium text-ink-soft transition-colors duration-150 hover:border-bench hover:text-bench disabled:opacity-60"
+              >
+                {exportMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileDown className="h-3 w-3" />}
+                导出 ZIP
+              </button>
             </>
           ) : (
             <span className="text-[11.5px] text-ink-mute">首次提交即自动建仓</span>

@@ -13,6 +13,41 @@ import { cn } from '@/lib/utils'
 const MAX_FILE_BYTES = 512 * 1024
 const MAX_NEW_FILES = 50
 
+/** 常见二进制扩展名：站内仓库仅保存文本代码，二进制入库即损坏，直接拦截 */
+const BINARY_EXTS = new Set([
+  'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'ico', 'tif', 'tiff',
+  'pdf', 'zip', 'gz', 'tar', 'tgz', 'bz2', 'xz', '7z', 'rar',
+  'rdata', 'rds', 'rda', 'xlsx', 'xls', 'docx', 'doc', 'pptx', 'ppt',
+  'bam', 'bai', 'sam', 'cram', 'bcf', 'vcf.gz', 'bigwig', 'bw', 'bedgraph',
+  'h5', 'h5ad', 'hdf5', 'parquet', 'feather', 'pkl', 'pickle', 'npy', 'npz',
+  'mp3', 'mp4', 'mov', 'wav', 'avi', 'exe', 'dll', 'so', 'dylib', 'jar', 'class',
+  'db', 'sqlite', 'sqlite3', 'wdl.zip',
+])
+
+const extOf = (name: string) => {
+  const n = name.toLowerCase()
+  // 兼容 xxx.fastq.gz / xxx.vcf.gz 双扩展
+  if (n.endsWith('.gz')) {
+    const base = n.slice(0, -3)
+    const i = base.lastIndexOf('.')
+    if (i >= 0) return `${base.slice(i + 1)}.gz`
+  }
+  const i = n.lastIndexOf('.')
+  return i >= 0 ? n.slice(i + 1) : ''
+}
+
+/** 文本嗅探：前 8KB 出现 NUL 或控制字符占比过高 → 判定二进制 */
+const looksBinary = (text: string) => {
+  const sample = text.slice(0, 8192)
+  if (sample.includes('\u0000')) return true
+  let ctrl = 0
+  for (let i = 0; i < sample.length; i++) {
+    const c = sample.charCodeAt(i)
+    if (c < 9 || (c > 13 && c < 32)) ctrl++
+  }
+  return sample.length > 0 && ctrl / sample.length > 0.02
+}
+
 export type StagedFile = { path: string; content: string }
 
 const fmtSize = (n: number) =>
@@ -65,7 +100,16 @@ export default function RepoStaging({
         toast.error(`「${file.name}」超过 512KB 上限，已跳过`)
         continue
       }
+      const ext = extOf(file.name)
+      if (BINARY_EXTS.has(ext)) {
+        toast.error(`「${file.name}」是二进制文件（.${ext}），站内仓库仅保存文本代码，已跳过`)
+        continue
+      }
       const content = await file.text()
+      if (looksBinary(content)) {
+        toast.error(`「${file.name}」内容疑似二进制，站内仓库仅保存文本代码，已跳过`)
+        continue
+      }
       out.push({ path: file.name, content })
     }
     if (out.length) {
@@ -122,7 +166,7 @@ export default function RepoStaging({
           <FilePlus2 className="h-3.5 w-3.5" />
           粘贴代码
         </button>
-        <span className="text-[11px] text-ink-mute">单文件 ≤512KB · 单次 ≤{MAX_NEW_FILES} 个</span>
+        <span className="text-[11px] text-ink-mute">单文件 ≤512KB · 单次 ≤{MAX_NEW_FILES} 个 · 仅文本代码</span>
       </div>
 
       {/* 粘贴表单 */}

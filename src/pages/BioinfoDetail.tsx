@@ -34,6 +34,7 @@ import {
 import RecordMarkdownEditor from '@/components/records/RecordMarkdownEditor'
 import RepoPanel from '@/components/bioinfo/RepoPanel'
 import RepoStaging, { type StagedFile } from '@/components/bioinfo/RepoStaging'
+import { useUnsavedGuard } from '@/hooks/useUnsavedGuard'
 import { BioStatusBadge, PIPELINE_OPTIONS } from '@/pages/Bioinfo'
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
@@ -114,6 +115,9 @@ export default function BioinfoDetail() {
   // 新建草稿：暂存代码 + 提交信息（创建时自动建仓、提交首个 commit 并锚定）
   const [draftFiles, setDraftFiles] = useState<StagedFile[]>([])
   const [draftMessage, setDraftMessage] = useState('')
+  // 未保存保护：任一字段/草稿变更置位，保存成功后清除（刷新/关闭标签页时拦截）
+  const [dirty, setDirty] = useState(false)
+  useUnsavedGuard(dirty)
 
   useEffect(() => {
     if (analysisId != null && detailQ.data && !loaded) {
@@ -137,7 +141,19 @@ export default function BioinfoDetail() {
     }
   }, [analysisId, detailQ.data, loaded])
 
-  const patch = (p: Partial<Form>) => setForm((f) => ({ ...f, ...p }))
+  const patch = (p: Partial<Form>) => {
+    setDirty(true)
+    setForm((f) => ({ ...f, ...p }))
+  }
+  // 草稿暂存变更同样计入未保存
+  const patchDraftFiles: React.Dispatch<React.SetStateAction<StagedFile[]>> = (v) => {
+    setDirty(true)
+    setDraftFiles(v)
+  }
+  const patchDraftMessage = (m: string) => {
+    setDirty(true)
+    setDraftMessage(m)
+  }
 
   const invalidate = async () => {
     await Promise.all([utils.bioinfo.list.invalidate(), analysisId != null && utils.bioinfo.byId.invalidate({ id: analysisId })])
@@ -147,6 +163,7 @@ export default function BioinfoDetail() {
   const silentUpdateMut = trpc.bioinfo.update.useMutation()
   const createMut = trpc.bioinfo.create.useMutation({
     onSuccess: async ({ id: newId }) => {
+      setDirty(false)
       await utils.bioinfo.list.invalidate()
       if (draftFiles.length > 0) {
         // 创建时自动建仓：提交暂存代码为首个 commit，并锚定（未填外部仓库时）
@@ -184,6 +201,7 @@ export default function BioinfoDetail() {
   })
   const updateMut = trpc.bioinfo.update.useMutation({
     onSuccess: async () => {
+      setDirty(false)
       await invalidate()
       toast.success('已保存')
     },
@@ -377,9 +395,9 @@ export default function BioinfoDetail() {
             </p>
             <RepoStaging
               staged={draftFiles}
-              onStagedChange={setDraftFiles}
+              onStagedChange={patchDraftFiles}
               message={draftMessage}
-              onMessageChange={setDraftMessage}
+              onMessageChange={patchDraftMessage}
               footer={
                 draftFiles.length > 0 ? (
                   <span className="shrink-0 text-[11.5px] text-ink-mute">

@@ -10,7 +10,7 @@
  *   commit = sha1("commit {size}\\0{标准 commit 文本}")
  */
 import { createHash } from "crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "../queries/connection";
 import { gitBlobs, gitTrees, gitCommits, gitRefs, type GitTreeEntry } from "@db/schema";
 
@@ -303,4 +303,14 @@ export async function readFileAt(userId: number, commitSha: string, path: string
     .where(and(eq(gitBlobs.sha, entry.sha), eq(gitBlobs.userId, userId)));
   if (!rows[0]) return null;
   return { path, sha: entry.sha, size: entry.size, content: rows[0].content };
+}
+
+/** 批量读取 blob 内容（仓库导出用），返回 sha → content */
+export async function readBlobs(userId: number, shas: string[]): Promise<Map<string, string>> {
+  if (shas.length === 0) return new Map();
+  const rows = await getDb()
+    .select({ sha: gitBlobs.sha, content: gitBlobs.content })
+    .from(gitBlobs)
+    .where(and(eq(gitBlobs.userId, userId), inArray(gitBlobs.sha, shas)));
+  return new Map(rows.map((r) => [r.sha, r.content]));
 }

@@ -10,11 +10,13 @@ import {
   getHead,
   getCommit,
   readTreeEntries,
+  readBlobs,
   commitFiles,
   listCommits,
   changedFilesOf,
   readFileAt,
 } from "./lib/gitstore";
+import JSZip from "jszip";
 
 /** 校验生信分析归属当前用户 */
 async function assertAnalysis(userId: number, analysisId: number) {
@@ -111,6 +113,13 @@ export const gitRouter = createRouter({
             message: `文件「${p}」超过 ${Math.round(GIT_LIMITS.maxFileBytes / 1024)}KB 上限`,
           });
         }
+        // 站内仓库仅保存文本代码：NUL 字符是二进制内容的明确信号
+        if (f.content.includes("\u0000")) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `文件「${p}」疑似二进制内容，站内仓库仅支持文本代码文件`,
+          });
+        }
       }
       for (const p of input.deletePaths ?? []) {
         const err = validatePath(p);
@@ -147,5 +156,40 @@ export const gitRouter = createRouter({
         })),
       );
       return { headSha: head?.headSha ?? null, commitCount: head?.commitCount ?? 0, items };
+    }),
+
+  /** 导出仓库为 ZIP：打包指定 commit（默认 HEAD）的全部文件，base64 返回 */
+  exportZip: authedQuery
+    .input(
+      z.object({
+        analysisId: z.number(),
+        ref: z.string().regex(/^[0-9a-f]{40}$/).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const analysis = await assertAnalysis(ctx.user.id, input.analysisId);
+      const head = await getHead(ctx.user.id, input.analysisId);
+      if (!head) throw new TRPCError({ code: "NOT_FOUND", message: "仓库尚未初始化" });
+      const sha = input.ref ?? head.headSha;
+      const commit = await getCommit(ctx.user.id, sha);
+      if (!commit || commit.analysisId !== input.analysisId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "commit 不存在或不属于该分析" });
+      }
+      const entries = await readTreeEntries(ctx.user.id, commit.treeSha);
+      if (entries.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "此版本没有文件可导出" });
+      }
+      const blobs = await readBlobs(ctx.user.id, entries.map((e) => e.sha));
+      const zip = new JSZip();
+      for (const e of entries) zip.file(e.path, blobs.get(e.sha) ?? "");
+      const base64 = await zip.generateAsync({ type: "base64", compression: "DEFLATE" });
+      const safeName = analysis.name.replace(/[\\/:*?"<>|\s]+/g, "-").slice(0, 40) || "repo";
+      return {
+        base64,
+        fileCount: entries.length,
+        ref: sha,
+        short: sha.slice(0, 7),
+        filename: `${safeName}-${sha.slice(0, 7)}.zip`,
+      };
     }),
 });

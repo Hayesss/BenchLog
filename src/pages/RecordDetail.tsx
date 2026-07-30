@@ -44,6 +44,7 @@ import RecordPropertiesPanel, {
 } from '@/components/records/RecordPropertiesPanel'
 import type { ProtocolParamLike } from '@/components/records/RecordPropertiesPanel'
 import RecordStatusMenu from '@/components/records/RecordStatusMenu'
+import { useUnsavedGuard } from '@/hooks/useUnsavedGuard'
 import { EASE_OUT, recordCode, todayStr } from '@/components/records/record-types'
 import type {
   Deviation,
@@ -217,6 +218,8 @@ export default function RecordDetail() {
   }, [form, isNew, initKey])
 
   const dirty = useMemo(() => JSON.stringify(form) !== snapshot, [form, snapshot])
+  // 刷新/关闭标签页时拦截未保存修改（新建模式另有 localStorage 草稿兜底）
+  useUnsavedGuard(dirty)
 
   const patch = useCallback((p: Partial<FormState>) => {
     setForm((f) => ({ ...f, ...p }))
