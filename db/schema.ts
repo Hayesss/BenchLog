@@ -642,3 +642,26 @@ export const mice = mysqlTable(
 );
 export type Mouse = typeof mice.$inferSelect;
 export type InsertMouse = typeof mice.$inferInsert;
+
+/** 配种对：一♂一♀同品系；status active/ended；litters 为已登记胎次（幼崽登记时 +1） */
+export const mouseBreeding = mysqlTable(
+  "mouse_breeding",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+    strainId: bigint("strainId", { mode: "number", unsigned: true }).notNull(),
+    maleId: bigint("maleId", { mode: "number", unsigned: true }).notNull(),
+    femaleId: bigint("femaleId", { mode: "number", unsigned: true }).notNull(),
+    cageId: bigint("cageId", { mode: "number", unsigned: true }), // 配种笼位
+    startDate: varchar("startDate", { length: 10 }).notNull(), // YYYY-MM-DD
+    status: varchar("status", { length: 12 }).notNull().default("active"), // active/ended
+    endDate: varchar("endDate", { length: 10 }),
+    endReason: varchar("endReason", { length: 200 }),
+    litters: int("litters").notNull().default(0), // 已登记胎次
+    notes: varchar("notes", { length: 500 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => [index("breeding_user_idx").on(t.userId), index("breeding_strain_idx").on(t.strainId)],
+);
+export type MouseBreeding = typeof mouseBreeding.$inferSelect;
+export type InsertMouseBreeding = typeof mouseBreeding.$inferInsert;

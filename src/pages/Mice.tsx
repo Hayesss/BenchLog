@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { format } from 'date-fns'
 import {
@@ -7,6 +7,7 @@ import {
   Check,
   ClipboardList,
   FlaskConical,
+  Heart,
   Layers,
   LayoutGrid,
   Minus,
@@ -870,6 +871,528 @@ function MouseTasksCard() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Tab 4：配种（配种对 / 幼崽登记 / 孟德尔计算器）                          */
+/* ------------------------------------------------------------------ */
+type PairRow = {
+  id: number
+  strainId: number
+  maleId: number
+  femaleId: number
+  cageId: number | null
+  startDate: string
+  status: string
+  endDate: string | null
+  endReason: string | null
+  litters: number
+  notes: string | null
+  strain: { id: number; name: string; color: string } | null
+  male: { id: number; earNo: string; status: string } | null
+  female: { id: number; earNo: string; status: string } | null
+  cage: { id: number; cageNo: string } | null
+}
+
+const daysSince = (dateStr: string) => Math.max(0, Math.floor((Date.now() - new Date(`${dateStr}T00:00:00`).getTime()) / 86400000))
+
+/** 新建配种对：品系 → 存活♂/♀ 下拉 → 日期/笼位 */
+function PairDialog({
+  open,
+  onOpenChange,
+  strains,
+}: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  strains: StrainRow[]
+}) {
+  const utils = trpc.useUtils()
+  const cagesQ = trpc.mouse.listCages.useQuery(undefined, { enabled: open })
+  const [strainId, setStrainId] = useState<number | null>(null)
+  const [maleId, setMaleId] = useState<number | null>(null)
+  const [femaleId, setFemaleId] = useState<number | null>(null)
+  const [cageId, setCageId] = useState<number | null>(null)
+  const [startDate, setStartDate] = useState('')
+  const [notes, setNotes] = useState('')
+
+  useEffect(() => {
+    if (open) {
+      setStrainId(strains[0]?.id ?? null)
+      setMaleId(null)
+      setFemaleId(null)
+      setCageId(null)
+      setStartDate(format(new Date(), 'yyyy-MM-dd'))
+      setNotes('')
+    }
+  }, [open, strains])
+
+  const malesQ = trpc.mouse.listMice.useQuery(
+    { strainId: strainId ?? undefined, gender: 'male', status: 'alive' },
+    { enabled: open && strainId != null },
+  )
+  const femalesQ = trpc.mouse.listMice.useQuery(
+    { strainId: strainId ?? undefined, gender: 'female', status: 'alive' },
+    { enabled: open && strainId != null },
+  )
+
+  const createMut = trpc.mouse.createPair.useMutation({
+    onSuccess: () => {
+      toast.success('配种对已建立')
+      void utils.mouse.listPairs.invalidate()
+      onOpenChange(false)
+    },
+    onError: (e) => toast.error(`建立失败：${e.message}`),
+  })
+
+  const males = malesQ.data ?? []
+  const females = femalesQ.data ?? []
+  const cages = cagesQ.data ?? []
+
+  const mouseOptions = (rows: typeof males) =>
+    rows.map((m) => (
+      <option key={m.id} value={m.id}>
+        #{m.earNo}{m.genotype ? `（${m.genotype}）` : ''}
+      </option>
+    ))
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[460px]">
+        <DialogHeader>
+          <DialogTitle className="font-display text-[16px]">新建配种对</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          <div>
+            <span className="caption-en mb-1.5 block">品系 STRAIN</span>
+            <div className="flex flex-wrap gap-1.5">
+              {strains.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => {
+                    setStrainId(s.id)
+                    setMaleId(null)
+                    setFemaleId(null)
+                  }}
+                  className={cn(
+                    'flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-medium transition-colors duration-150',
+                    strainId === s.id ? 'border-bench bg-bench-wash text-bench-ink' : 'border-line text-ink-soft hover:border-line-strong',
+                  )}
+                >
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col gap-1.5">
+              <span className="caption-en">公鼠 ♂</span>
+              <select value={maleId ?? ''} onChange={(e) => setMaleId(e.target.value === '' ? null : Number(e.target.value))} className={inputCls}>
+                <option value="">选择存活公鼠…</option>
+                {mouseOptions(males)}
+              </select>
+              {strainId != null && !malesQ.isLoading && males.length === 0 && (
+                <span className="text-[11px] text-warning">该品系暂无存活公鼠</span>
+              )}
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="caption-en">母鼠 ♀</span>
+              <select value={femaleId ?? ''} onChange={(e) => setFemaleId(e.target.value === '' ? null : Number(e.target.value))} className={inputCls}>
+                <option value="">选择存活母鼠…</option>
+                {mouseOptions(females)}
+              </select>
+              {strainId != null && !femalesQ.isLoading && females.length === 0 && (
+                <span className="text-[11px] text-warning">该品系暂无存活母鼠</span>
+              )}
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col gap-1.5">
+              <span className="caption-en">合笼日期</span>
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputCls} />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="caption-en">配种笼位</span>
+              <select value={cageId ?? ''} onChange={(e) => setCageId(e.target.value === '' ? null : Number(e.target.value))} className={inputCls}>
+                <option value="">未分配</option>
+                {cages.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.cageNo}{c.room ? `（${c.room}）` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="caption-en">备注</span>
+            <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="繁殖用途、特殊要求…" className={inputCls} />
+          </label>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            disabled={createMut.isPending || strainId == null || maleId == null || femaleId == null || !startDate}
+            onClick={() =>
+              createMut.mutate({
+                strainId: strainId!,
+                maleId: maleId!,
+                femaleId: femaleId!,
+                cageId: cageId ?? undefined,
+                startDate,
+                notes: notes.trim() || undefined,
+              })
+            }
+            className="flex h-9 items-center rounded-lg bg-bench px-4 text-[13px] font-medium text-white shadow-card transition-colors duration-150 hover:bg-bench-deep disabled:opacity-50"
+          >
+            {createMut.isPending ? '建立中…' : '建立配种对'}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** 幼崽批量登记（一胎）：品系/笼位继承配种对，耳号连号，胎次 +1 */
+function LitterDialog({ pair, onClose }: { pair: PairRow | null; onClose: () => void }) {
+  const utils = trpc.useUtils()
+  const cagesQ = trpc.mouse.listCages.useQuery(undefined, { enabled: pair != null })
+  const [male, setMale] = useState(0)
+  const [female, setFemale] = useState(0)
+  const [birthDate, setBirthDate] = useState('')
+  const [prefix, setPrefix] = useState('')
+  const [start, setStart] = useState('')
+  const [cageId, setCageId] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (pair) {
+      setMale(0)
+      setFemale(0)
+      setBirthDate(format(new Date(), 'yyyy-MM-dd'))
+      setPrefix('')
+      setStart('')
+      setCageId(pair.cageId)
+    }
+  }, [pair])
+
+  const litterMut = trpc.mouse.registerLitter.useMutation({
+    onSuccess: (r) => {
+      const fmt = (arr: string[]) => (arr.length > 3 ? `${arr[0]}…${arr[arr.length - 1]}` : arr.join('、'))
+      const parts = [
+        r.maleEarNos.length ? `公 ${r.maleEarNos.length} 只（${fmt(r.maleEarNos)}）` : '',
+        r.femaleEarNos.length ? `母 ${r.femaleEarNos.length} 只（${fmt(r.femaleEarNos)}）` : '',
+      ].filter(Boolean)
+      toast.success(`第 ${r.litterNo} 胎已登记 ${r.created} 只：${parts.join('，')}`)
+      void utils.mouse.listPairs.invalidate()
+      void utils.mouse.listMice.invalidate()
+      void utils.mouse.listStrains.invalidate()
+      void utils.mouse.listCages.invalidate()
+      void utils.mouse.overview.invalidate()
+      void utils.mouse.taskSuggestions.invalidate()
+      onClose()
+    },
+    onError: (e) => toast.error(`登记失败：${e.message}`),
+  })
+
+  const total = male + female
+  const cages = cagesQ.data ?? []
+
+  return (
+    <Dialog open={pair != null} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-[460px]">
+        <DialogHeader>
+          <DialogTitle className="font-display text-[16px]">
+            幼崽登记 — {pair?.strain?.name}（#{pair?.male?.earNo} × #{pair?.female?.earNo}）
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-2">
+            <QtyStepper label="公 ♂" color={GENDER_META.male.color} value={male} onChange={setMale} />
+            <QtyStepper label="母 ♀" color={GENDER_META.female.color} value={female} onChange={setFemale} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col gap-1.5">
+              <span className="caption-en">出生日期</span>
+              <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} className={inputCls} />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="caption-en">分笼笼位</span>
+              <select value={cageId ?? ''} onChange={(e) => setCageId(e.target.value === '' ? null : Number(e.target.value))} className={inputCls}>
+                <option value="">未分配</option>
+                {cages.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.cageNo}{c.room ? `（${c.room}）` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col gap-1.5">
+              <span className="caption-en">编号前缀（可空）</span>
+              <input value={prefix} onChange={(e) => setPrefix(e.target.value)} placeholder="如 C57-" className={cn(inputCls, 'font-mono')} />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="caption-en">起始编号</span>
+              <input type="number" min={1} value={start} onChange={(e) => setStart(e.target.value)} placeholder="留空自动接续" className={cn(inputCls, 'font-mono')} />
+            </label>
+          </div>
+          {total > 0 && (
+            <p className="rounded-lg bg-bench-wash/60 px-3 py-2 text-[12.5px] leading-[18px] text-bench-ink">
+              将登记第 <b>{(pair?.litters ?? 0) + 1}</b> 胎 <b>{total}</b> 只（公 {male} · 母 {female}），
+              品系沿用 {pair?.strain?.name}，来源「自繁」。
+            </p>
+          )}
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            disabled={litterMut.isPending || total <= 0 || !birthDate}
+            onClick={() =>
+              pair &&
+              litterMut.mutate({
+                pairId: pair.id,
+                maleCount: male,
+                femaleCount: female,
+                birthDate,
+                earPrefix: prefix.trim() || undefined,
+                earStart: start.trim() === '' ? undefined : Number(start),
+                cageId: cageId ?? undefined,
+              })
+            }
+            className="flex h-9 items-center rounded-lg bg-bench px-4 text-[13px] font-medium text-white shadow-card transition-colors duration-150 hover:bg-bench-deep disabled:opacity-50"
+          >
+            {litterMut.isPending ? '登记中…' : `登记 ${total > 0 ? total : ''} 只幼崽`}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** 孟德尔遗传计算器：单基因座亲本基因型 → 后代期望比例 */
+function MendelCard() {
+  const GENOS = ['+/+', '+/-', '-/-'] as const
+  const [sire, setSire] = useState<string>('+/-')
+  const [dam, setDam] = useState<string>('+/-')
+
+  const result = useMemo(() => {
+    const alleles = (g: string) => (g === '+/+' ? ['+', '+'] : g === '+/-' ? ['+', '-'] : ['-', '-'])
+    const counts: Record<string, number> = { '+/+': 0, '+/-': 0, '-/-': 0 }
+    for (const x of alleles(sire))
+      for (const y of alleles(dam)) {
+        const g = x === y ? (x === '+' ? '+/+' : '-/-') : '+/-'
+        counts[g]++
+      }
+    return GENOS.map((g) => ({ g, pct: (counts[g] / 4) * 100 }))
+  }, [sire, dam])
+
+  const BAR_COLORS: Record<string, string> = { '+/+': '#4C8C6B', '+/-': '#B98A3E', '-/-': '#B4564E' }
+
+  return (
+    <div className="mt-4 rounded-xl border border-line bg-surface p-4 shadow-card">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="caption-en">孟德尔遗传计算 MENDEL</p>
+        <span className="text-[11px] text-ink-mute">单基因座期望比例，实际胎次存在随机波动</span>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-[12.5px] text-ink-soft">亲本</span>
+        <select value={sire} onChange={(e) => setSire(e.target.value)} className="h-8 rounded-lg border border-line bg-surface px-2 font-mono text-[12.5px] text-ink outline-none focus:border-bench">
+          {GENOS.map((g) => (
+            <option key={g} value={g}>♂ {g}</option>
+          ))}
+        </select>
+        <span className="text-ink-mute">×</span>
+        <select value={dam} onChange={(e) => setDam(e.target.value)} className="h-8 rounded-lg border border-line bg-surface px-2 font-mono text-[12.5px] text-ink outline-none focus:border-bench">
+          {GENOS.map((g) => (
+            <option key={g} value={g}>♀ {g}</option>
+          ))}
+        </select>
+      </div>
+      <div className="mt-3 flex flex-col gap-1.5">
+        {result.map((r) => (
+          <div key={r.g} className="flex items-center gap-2">
+            <span className="w-10 shrink-0 font-mono text-[12px] text-ink-soft">{r.g}</span>
+            <div className="h-4 flex-1 overflow-hidden rounded bg-paper">
+              <div className="h-full rounded transition-all duration-300" style={{ width: `${r.pct}%`, backgroundColor: BAR_COLORS[r.g] }} />
+            </div>
+            <span className="w-12 shrink-0 text-right font-mono text-[12px] font-medium text-ink">{r.pct}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function BreedingTab({ strains }: { strains: StrainRow[] }) {
+  const utils = trpc.useUtils()
+  const pairsQ = trpc.mouse.listPairs.useQuery()
+  const [pairDialog, setPairDialog] = useState(false)
+  const [litterPair, setLitterPair] = useState<PairRow | null>(null)
+  const [removePair, setRemovePair] = useState<PairRow | null>(null)
+  const [showEnded, setShowEnded] = useState(false)
+
+  const endMut = trpc.mouse.endPair.useMutation({
+    onSuccess: () => {
+      toast.success('配种已结束')
+      void utils.mouse.listPairs.invalidate()
+    },
+    onError: (e) => toast.error(`操作失败：${e.message}`),
+  })
+  const removeMut = trpc.mouse.removePair.useMutation({
+    onSuccess: () => {
+      toast.success('已删除')
+      setRemovePair(null)
+      void utils.mouse.listPairs.invalidate()
+    },
+    onError: (e) => toast.error(`删除失败：${e.message}`),
+  })
+
+  const pairs = (pairsQ.data ?? []) as PairRow[]
+  const active = pairs.filter((p) => p.status === 'active')
+  const ended = pairs.filter((p) => p.status === 'ended')
+
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between">
+        <p className="caption-en">配种对 BREEDING PAIRS</p>
+        <button
+          type="button"
+          onClick={() => setPairDialog(true)}
+          className="flex h-8 items-center gap-1 rounded-md px-2 text-[12.5px] font-medium text-bench transition-colors hover:bg-bench-wash"
+        >
+          <Plus className="h-3.5 w-3.5" /> 新建配种对
+        </button>
+      </div>
+
+      {pairsQ.isLoading ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {[0, 1].map((i) => (
+            <div key={i} className="h-[140px] animate-pulse rounded-xl border border-line bg-surface" />
+          ))}
+        </div>
+      ) : active.length === 0 ? (
+        <button
+          type="button"
+          onClick={() => setPairDialog(true)}
+          className="flex w-full flex-col items-center gap-2.5 rounded-xl border border-dashed border-line-strong py-12 transition-colors duration-150 hover:border-bench hover:bg-bench-wash/30"
+        >
+          <Heart className="h-8 w-8 text-ink-mute" strokeWidth={1.5} />
+          <p className="text-[13px] text-ink-mute">还没有进行中的配种 — 点击建立第一个配种对</p>
+        </button>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {active.map((p) => {
+            const parentGone = (p.male && p.male.status !== 'alive') || (p.female && p.female.status !== 'alive')
+            return (
+              <div key={p.id} className="rounded-xl border border-line bg-surface p-4 shadow-card">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="flex min-w-0 items-center gap-2 text-[13px] font-medium text-ink">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: p.strain?.color ?? '#8A9099' }} />
+                    <span className="truncate">{p.strain?.name ?? '—'}</span>
+                  </p>
+                  <span className="shrink-0 rounded-full bg-bench-wash px-2 py-0.5 text-[11px] font-medium text-bench-ink">
+                    已配 {daysSince(p.startDate)} 天
+                  </span>
+                </div>
+                <p className="mt-2.5 font-display text-[16px] font-semibold leading-[22px] text-ink">
+                  <span style={{ color: GENDER_META.male.color }}>♂ #{p.male?.earNo ?? '?'}</span>
+                  <span className="mx-2 text-ink-mute">×</span>
+                  <span style={{ color: GENDER_META.female.color }}>♀ #{p.female?.earNo ?? '?'}</span>
+                </p>
+                <p className="mt-1 text-[11.5px] leading-[17px] text-ink-mute">
+                  合笼 {p.startDate} · 已产 {p.litters} 胎{p.cage ? ` · ${p.cage.cageNo}` : ''}
+                  {parentGone && <span className="ml-1 text-warning">亲本已非存活，建议结束</span>}
+                </p>
+                <div className="mt-3 flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setLitterPair(p)}
+                    className="flex h-8 flex-1 items-center justify-center gap-1 rounded-lg bg-bench-wash text-[12.5px] font-medium text-bench-ink transition-colors hover:bg-bench hover:text-white"
+                  >
+                    <Baby className="h-3.5 w-3.5" /> 幼崽登记
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => endMut.mutate({ id: p.id, endDate: format(new Date(), 'yyyy-MM-dd') })}
+                    className="flex h-8 items-center rounded-lg border border-line px-2.5 text-[12px] font-medium text-ink-soft transition-colors hover:border-line-strong"
+                  >
+                    结束
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="删除配种对"
+                    onClick={() => setRemovePair(p)}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-mute transition-colors hover:bg-paper hover:text-danger"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {ended.length > 0 && (
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => setShowEnded((v) => !v)}
+            className="text-[12px] font-medium text-ink-mute transition-colors hover:text-ink"
+          >
+            {showEnded ? '▾' : '▸'} 已结束的配种（{ended.length}）
+          </button>
+          {showEnded && (
+            <div className="mt-2 flex flex-col gap-1.5">
+              {ended.map((p) => (
+                <div key={p.id} className="flex items-center gap-2 rounded-lg border border-line-soft bg-paper px-3 py-2 text-[12.5px] text-ink-soft">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.strain?.color ?? '#8A9099' }} />
+                  <span className="font-mono">♂ #{p.male?.earNo} × ♀ #{p.female?.earNo}</span>
+                  <span className="text-ink-mute">
+                    {p.startDate} ~ {p.endDate ?? ''} · {p.litters} 胎{p.endReason ? ` · ${p.endReason}` : ''}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="删除配种记录"
+                    onClick={() => setRemovePair(p)}
+                    className="ml-auto flex h-6 w-6 items-center justify-center rounded text-ink-mute transition-colors hover:text-danger"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <MendelCard />
+
+      <PairDialog open={pairDialog} onOpenChange={setPairDialog} strains={strains} />
+      <LitterDialog pair={litterPair} onClose={() => setLitterPair(null)} />
+
+      <AlertDialog open={removePair != null} onOpenChange={(v) => !v && setRemovePair(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除该配种记录？</AlertDialogTitle>
+            <AlertDialogDescription>
+              仅删除配种对记录（♂ #{removePair?.male?.earNo} × ♀ #{removePair?.female?.earNo}），小鼠台账与已登记幼崽不受影响。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={() => removePair && removeMut.mutate({ id: removePair.id })} className="bg-danger text-white hover:bg-danger/90">
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /* Tab 1：库存看板                                                        */
 /* ------------------------------------------------------------------ */
 function BoardTab({
@@ -1396,6 +1919,7 @@ export default function Mice() {
   const TABS = [
     { key: 'board', label: '库存看板', icon: LayoutGrid },
     { key: 'mice', label: '个体台账', icon: Table2 },
+    { key: 'breeding', label: '配种', icon: Heart },
   ] as const
 
   return (
@@ -1459,6 +1983,7 @@ export default function Mice() {
           onAskRemove={setRemoveMouse}
         />
       )}
+      {tab === 'breeding' && <BreedingTab strains={strains} />}
       {tab === 'cages' && <CagesTab />}
 
       <StrainDialog open={strainDialog.open} existing={strainDialog.existing} onOpenChange={(v) => setStrainDialog((s) => ({ ...s, open: v }))} />

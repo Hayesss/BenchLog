@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { mouseStrains, mouseCages, mice } from "@db/schema";
+import { mouseStrains, mouseCages, mice, mouseBreeding } from "@db/schema";
 import { dateStr } from "./zodSchemas";
 
 // 性别：male/female/unknown
@@ -57,6 +57,51 @@ async function assertEarNoUnique(userId: number, strainId: number, earNo: string
   if (rows.some((r) => r.id !== excludeId)) {
     throw new TRPCError({ code: "BAD_REQUEST", message: `该品系下耳号 ${earNo} 已存在` });
   }
+}
+
+/**
+ * 耳号连号分配：扫描该品系下「前缀 + 纯数字」形态的已用编号，
+ * 从 earStart（缺省 1）起跳过已用号码，一次返回 n 个可用耳号（批次内也不会重复）。
+ */
+async function allocateEarNos(
+  userId: number,
+  strainId: number,
+  prefix: string,
+  earStart: number | undefined,
+  n: number,
+): Promise<string[]> {
+  const rows = await getDb()
+    .select({ earNo: mice.earNo })
+    .from(mice)
+    .where(and(eq(mice.userId, userId), eq(mice.strainId, strainId)));
+  // 只统计「前缀 + 纯数字」形态的已用编号；其它形态的手动耳号不参与连号
+  const usedNums = new Set<number>();
+  for (const r of rows) {
+    if (prefix && !r.earNo.startsWith(prefix)) continue;
+    const rest = prefix ? r.earNo.slice(prefix.length) : r.earNo;
+    if (/^\d{1,6}$/.test(rest)) usedNums.add(Number(rest));
+  }
+  const out: string[] = [];
+  let next = earStart ?? 1;
+  while (out.length < n) {
+    if (!usedNums.has(next)) {
+      usedNums.add(next);
+      out.push(`${prefix}${next}`);
+    }
+    next++;
+  }
+  return out;
+}
+
+/** 归属校验：返回当前用户本人的配种对，否则 NOT_FOUND */
+async function getOwnedPair(userId: number, id: number) {
+  const rows = await getDb()
+    .select()
+    .from(mouseBreeding)
+    .where(and(eq(mouseBreeding.id, id), eq(mouseBreeding.userId, userId)));
+  const pair = rows[0];
+  if (!pair) throw new TRPCError({ code: "NOT_FOUND", message: "配种对不存在" });
+  return pair;
 }
 
 /** 品系统计：存活数/性别分布/未鉴定数/扩繁预警 */
@@ -311,31 +356,10 @@ export const mouseRouter = createRouter({
       if (input.cageId != null) await getOwnedCage(ctx.user.id, input.cageId);
 
       const prefix = (input.earPrefix ?? "").trim();
-      const rows = await getDb()
-        .select({ earNo: mice.earNo })
-        .from(mice)
-        .where(and(eq(mice.userId, ctx.user.id), eq(mice.strainId, input.strainId)));
-      // 只统计「前缀 + 纯数字」形态的已用编号；其它形态的手动耳号不参与连号
-      const usedNums = new Set<number>();
-      for (const r of rows) {
-        if (prefix && !r.earNo.startsWith(prefix)) continue;
-        const rest = prefix ? r.earNo.slice(prefix.length) : r.earNo;
-        if (/^\d{1,6}$/.test(rest)) usedNums.add(Number(rest));
-      }
-      let next = input.earStart ?? 1;
-      const alloc = (n: number): string[] => {
-        const out: string[] = [];
-        while (out.length < n) {
-          if (!usedNums.has(next)) {
-            usedNums.add(next);
-            out.push(`${prefix}${next}`);
-          }
-          next++;
-        }
-        return out;
-      };
-      const maleEarNos = alloc(input.maleCount);
-      const femaleEarNos = alloc(input.femaleCount);
+      // 一次分配 total 个再切分，避免公/母两次扫描互相看不见导致重号
+      const allEarNos = await allocateEarNos(ctx.user.id, input.strainId, prefix, input.earStart, total);
+      const maleEarNos = allEarNos.slice(0, input.maleCount);
+      const femaleEarNos = allEarNos.slice(input.maleCount);
 
       const common = {
         userId: ctx.user.id,
@@ -526,6 +550,158 @@ export const mouseRouter = createRouter({
     }),
 
   /** 总览：存活总数/品系数/笼位数/占用笼数/扩繁预警列表 */
+  /** 配种对列表：附品系/亲本耳号/笼位标签；active 在前，按开始日期倒序 */
+  listPairs: authedQuery.query(async ({ ctx }) => {
+    const db = getDb();
+    const pairs = await db
+      .select()
+      .from(mouseBreeding)
+      .where(eq(mouseBreeding.userId, ctx.user.id))
+      .orderBy(asc(mouseBreeding.status), desc(mouseBreeding.startDate), desc(mouseBreeding.createdAt));
+    if (pairs.length === 0) return [];
+    const strainIds = [...new Set(pairs.map((p) => p.strainId))];
+    const mouseIds = [...new Set(pairs.flatMap((p) => [p.maleId, p.femaleId]))];
+    const cageIds = [...new Set(pairs.map((p) => p.cageId).filter((v): v is number => v != null))];
+    const [strainRows, mouseRows, cageRows] = await Promise.all([
+      db.select({ id: mouseStrains.id, name: mouseStrains.name, color: mouseStrains.color })
+        .from(mouseStrains)
+        .where(and(eq(mouseStrains.userId, ctx.user.id), inArray(mouseStrains.id, strainIds))),
+      db.select({ id: mice.id, earNo: mice.earNo, status: mice.status })
+        .from(mice)
+        .where(and(eq(mice.userId, ctx.user.id), inArray(mice.id, mouseIds))),
+      cageIds.length
+        ? db.select({ id: mouseCages.id, cageNo: mouseCages.cageNo })
+            .from(mouseCages)
+            .where(and(eq(mouseCages.userId, ctx.user.id), inArray(mouseCages.id, cageIds)))
+        : Promise.resolve([] as { id: number; cageNo: string }[]),
+    ]);
+    const sMap = new Map(strainRows.map((s) => [s.id, s]));
+    const mMap = new Map(mouseRows.map((m) => [m.id, m]));
+    const cMap = new Map(cageRows.map((c) => [c.id, c]));
+    return pairs.map((p) => ({
+      ...p,
+      strain: sMap.get(p.strainId) ?? null,
+      male: mMap.get(p.maleId) ?? null,
+      female: mMap.get(p.femaleId) ?? null,
+      cage: p.cageId != null ? (cMap.get(p.cageId) ?? null) : null,
+    }));
+  }),
+
+  /** 建立配种对：同品系、♂/♀ 性别匹配、双方存活 */
+  createPair: authedQuery
+    .input(
+      z.object({
+        strainId: z.number(),
+        maleId: z.number(),
+        femaleId: z.number(),
+        cageId: z.number().optional(),
+        startDate: dateStr,
+        notes: z.string().max(500).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.maleId === input.femaleId) throw new TRPCError({ code: "BAD_REQUEST", message: "公 / 母不能是同一只" });
+      await getOwnedStrain(ctx.user.id, input.strainId);
+      if (input.cageId != null) await getOwnedCage(ctx.user.id, input.cageId);
+      const [male, female] = await Promise.all([
+        getOwnedMouse(ctx.user.id, input.maleId),
+        getOwnedMouse(ctx.user.id, input.femaleId),
+      ]);
+      if (male.strainId !== input.strainId || female.strainId !== input.strainId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "配种双方须与所选品系一致" });
+      }
+      if (male.gender !== "male") throw new TRPCError({ code: "BAD_REQUEST", message: `#${male.earNo} 不是公鼠` });
+      if (female.gender !== "female") throw new TRPCError({ code: "BAD_REQUEST", message: `#${female.earNo} 不是母鼠` });
+      if (male.status !== "alive" || female.status !== "alive") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "配种双方须为存活状态" });
+      }
+      const [{ id }] = await getDb()
+        .insert(mouseBreeding)
+        .values({
+          userId: ctx.user.id,
+          strainId: input.strainId,
+          maleId: input.maleId,
+          femaleId: input.femaleId,
+          cageId: input.cageId ?? null,
+          startDate: input.startDate,
+          notes: input.notes ?? null,
+        })
+        .$returningId();
+      return { id };
+    }),
+
+  /** 结束配种：落结束日期与原因（亲本状态不受影响） */
+  endPair: authedQuery
+    .input(z.object({ id: z.number(), endDate: dateStr, endReason: z.string().max(200).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      await getOwnedPair(ctx.user.id, input.id);
+      await getDb()
+        .update(mouseBreeding)
+        .set({ status: "ended", endDate: input.endDate, endReason: input.endReason ?? null })
+        .where(and(eq(mouseBreeding.id, input.id), eq(mouseBreeding.userId, ctx.user.id)));
+      return { ok: true };
+    }),
+
+  /** 删除配种对记录（不影响小鼠台账） */
+  removePair: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    await getDb()
+      .delete(mouseBreeding)
+      .where(and(eq(mouseBreeding.id, input.id), eq(mouseBreeding.userId, ctx.user.id)));
+    return { ok: true };
+  }),
+
+  /**
+   * 幼崽批量登记（断奶分笼）：从配种对一次登记一胎
+   * 品系沿用配种对、来源默认「自繁」、笼位缺省沿用配种笼；耳号连号避让；成功后胎次 +1
+   */
+  registerLitter: authedQuery
+    .input(
+      z.object({
+        pairId: z.number(),
+        maleCount: z.number().int().min(0).max(100),
+        femaleCount: z.number().int().min(0).max(100),
+        birthDate: dateStr,
+        earPrefix: z.string().max(32).optional(),
+        earStart: z.number().int().min(1).max(999999).optional(),
+        cageId: z.number().optional(),
+        genotype: z.string().max(40).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const total = input.maleCount + input.femaleCount;
+      if (total <= 0) throw new TRPCError({ code: "BAD_REQUEST", message: "公 / 母数量至少填一个" });
+      const pair = await getOwnedPair(ctx.user.id, input.pairId);
+      if (pair.status !== "active") throw new TRPCError({ code: "BAD_REQUEST", message: "该配种对已结束，不能登记幼崽" });
+      const cageId = input.cageId ?? pair.cageId ?? null;
+      if (cageId != null) await getOwnedCage(ctx.user.id, cageId);
+
+      const prefix = (input.earPrefix ?? "").trim();
+      const allEarNos = await allocateEarNos(ctx.user.id, pair.strainId, prefix, input.earStart, total);
+      const maleEarNos = allEarNos.slice(0, input.maleCount);
+      const femaleEarNos = allEarNos.slice(input.maleCount);
+      const litterNo = pair.litters + 1;
+      const common = {
+        userId: ctx.user.id,
+        strainId: pair.strainId,
+        birthDate: input.birthDate,
+        genotype: input.genotype ?? null,
+        cageId,
+        source: "自繁",
+        notes: `配种对 #${pair.id} 第 ${litterNo} 胎`,
+      };
+      await getDb()
+        .insert(mice)
+        .values([
+          ...maleEarNos.map((earNo) => ({ ...common, earNo, gender: "male" })),
+          ...femaleEarNos.map((earNo) => ({ ...common, earNo, gender: "female" })),
+        ]);
+      await getDb()
+        .update(mouseBreeding)
+        .set({ litters: litterNo })
+        .where(and(eq(mouseBreeding.id, pair.id), eq(mouseBreeding.userId, ctx.user.id)));
+      return { created: total, litterNo, maleEarNos, femaleEarNos };
+    }),
+
   /**
    * 小鼠任务建议：从库存数据派生可执行事项（不入库，实时计算）
    * - alert：存活低于品系预警阈值 → 安排扩繁
