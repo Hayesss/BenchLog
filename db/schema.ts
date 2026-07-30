@@ -485,7 +485,7 @@ export const aiSettings = mysqlTable("ai_settings", {
     .notNull()
     .default("https://api.moonshot.cn/v1"), // OpenAI 兼容端点，默认 Moonshot/Kimi
   apiKey: text("apiKey"), // 可空：未配置时 chat 直接报「未配置 LLM」
-  model: varchar("model", { length: 64 }).notNull().default("kimi-k2-0711-preview"),
+  model: varchar("model", { length: 64 }).notNull().default("kimi-k3"),
   updatedAt: timestamp("updatedAt")
     .defaultNow()
     .notNull()

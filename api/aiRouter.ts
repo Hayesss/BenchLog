@@ -22,7 +22,10 @@ import {
 // 安全约定：apiKey 仅存服务端，任何接口都不回传完整 key（只回 keyPreview 脱敏）。
 
 const DEFAULT_BASE_URL = "https://api.moonshot.cn/v1";
-const DEFAULT_MODEL = "kimi-k2-0711-preview";
+const DEFAULT_MODEL = "kimi-k3";
+
+/** Kimi K3 固定推理默认值，官方示例不含 temperature 等采样参数——K3 系列省略 temperature 避免报错 */
+const isK3 = (model: string) => model.startsWith("kimi-k3");
 
 /**
  * 写操作工具（function calling）：服务端只转发定义，绝不自动执行；
@@ -464,7 +467,7 @@ export const aiRouter = createRouter({
             body: JSON.stringify({
               model: setting.model,
               messages: [{ role: "system", content: system }, ...history],
-              temperature: 0.3,
+              ...(isK3(setting.model) ? {} : { temperature: 0.3 }),
               ...(useTools ? { tools: AI_TOOLS, tool_choice: "auto" } : {}),
             }),
             signal: controller.signal,

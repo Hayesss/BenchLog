@@ -4,6 +4,14 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-07-30 · AI 助手默认模型切换 Kimi K3
+
+- DEFAULT_MODEL 改为 `kimi-k3`（chat 与流式端点两处）；`ai_settings.model` 列默认值迁移为 kimi-k3（scripts/alter-ai-model-default-k3.ts，只改默认值不动已有行）；设置对话框 placeholder 同步
+- K3 适配：K3 固定推理默认值，官方请求示例不含 temperature 等采样参数——模型名以 `kimi-k3` 开头时请求体省略 temperature（isK3 判定，chat 与 stream 均生效），避免参数被拒
+- 提示：K3 需在 Kimi 开放平台充值解锁（赠送代金券不可用于 K3）；账号无权限时上游返回 404 resource_not_found_error
+
+---
+
 ## 2026-07-30 · 修复：AI 设置保存时 trim 凭据（粘贴带空格导致 401）
 
 - saveSettings 入库前对 baseUrl/model/apiKey 统一 trim：粘贴 Key 带首尾空格/换行会原样入库，调用时 Authorization 头非法被上游拒（HTTP 401 Invalid Authentication）；trim 后为空视为未提供（不动原值），apiKey 空串=清除的语义不变

@@ -13,7 +13,10 @@ import { buildContext } from "../aiRouter";
 
 const HISTORY_LIMIT = 20;
 const DEFAULT_BASE_URL = "https://api.moonshot.cn/v1";
-const DEFAULT_MODEL = "kimi-k2-0711-preview";
+const DEFAULT_MODEL = "kimi-k3";
+
+/** Kimi K3 固定推理默认值，官方示例不含 temperature 等采样参数——K3 系列省略 temperature 避免报错 */
+const isK3 = (model: string) => model.startsWith("kimi-k3");
 
 interface StreamBody {
   conversationId: number;
@@ -96,7 +99,7 @@ export async function aiStreamHandler(c: Context): Promise<Response> {
       body: JSON.stringify({
         model,
         messages: [{ role: "system", content: system }, ...history],
-        temperature: 0.3,
+        ...(isK3(model) ? {} : { temperature: 0.3 }),
         stream: true,
       }),
       signal: controller.signal,

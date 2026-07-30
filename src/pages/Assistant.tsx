@@ -105,7 +105,7 @@ function AiSettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
             <input
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              placeholder="kimi-k2-0711-preview"
+              placeholder="kimi-k3"
               className="h-10 rounded-lg border border-line bg-surface px-3 font-mono text-[13px] text-ink outline-none focus:border-bench"
             />
           </label>
