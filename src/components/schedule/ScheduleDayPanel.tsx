@@ -1,12 +1,14 @@
 import { useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowRight, CalendarPlus, Check, Plus } from 'lucide-react'
+import { ArrowRight, CalendarPlus, Check, FileText, Plus } from 'lucide-react'
+import { toast } from 'sonner'
 import TodoChecklist from './TodoChecklist'
 import { diffDays, longDayLabel, todayStr } from './scheduleDateUtils'
 import { flowColor } from './scheduleTypes'
 import type { ScheduleFlow, ScheduleTodo } from './scheduleTypes'
 import { useNodeDoneSet } from './flowNodeDone'
+import { trpc } from '@/providers/trpc'
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number]
 
@@ -96,6 +98,21 @@ export default function ScheduleDayPanel({
   onOpenFlowModal: () => void
 }) {
   const quickAddRef = useRef<HTMLInputElement | null>(null)
+  const navigate = useNavigate()
+  const utils = trpc.useUtils()
+
+  // 已完成且尚未整理进记录的待办数（>0 时显示「整理为记录」）
+  const summarizable = todos.filter((t) => t.done && t.recordId == null).length
+  const summarizeMut = trpc.todo.summarizeToRecord.useMutation({
+    onSuccess: (data) => {
+      void utils.todo.listByRange.invalidate()
+      void utils.todo.today.invalidate()
+      void utils.record.list.invalidate()
+      toast.success(`已整理 ${data.count} 项完成为当日实验记录`)
+      navigate(`/records/${data.recordId}`)
+    },
+    onError: (e) => toast.error(e.message),
+  })
 
   const dayNodes: Array<{ flow: ScheduleFlow; nodeIndex: number }> = []
   let covering: { flow: ScheduleFlow; dPlus: number } | null = null
@@ -134,7 +151,21 @@ export default function ScheduleDayPanel({
       <div className="mt-4 border-t border-line pt-3">
         <div className="mb-1 flex items-baseline justify-between px-2">
           <h4 className="text-[13px] font-semibold text-ink">待办</h4>
-          <span className="font-mono text-[11px] text-ink-mute">{todos.length} 项</span>
+          <span className="flex items-center gap-2">
+            {summarizable > 0 && (
+              <button
+                type="button"
+                onClick={() => summarizeMut.mutate({ date: day })}
+                disabled={summarizeMut.isPending}
+                title="把已完成待办整理为当日实验记录（已整理过的不会重复计入）"
+                className="flex items-center gap-1 rounded-md bg-bench-wash px-2 py-0.5 text-[11.5px] font-medium text-bench-ink transition-all duration-150 hover:bg-bench-wash/70 active:scale-[0.97] disabled:opacity-50"
+              >
+                <FileText className="h-3 w-3" />
+                整理为记录（{summarizable}）
+              </button>
+            )}
+            <span className="font-mono text-[11px] text-ink-mute">{todos.length} 项</span>
+          </span>
         </div>
         <TodoChecklist
           todos={todos}

@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { and, desc, eq, gte, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { flows, todos, projects } from "@db/schema";
+import { flows, todos, projects, records } from "@db/schema";
 import { dateStr, flowNodeSchema } from "./zodSchemas";
 
 export const flowRouter = createRouter({
@@ -155,4 +156,57 @@ export const todoRouter = createRouter({
     await getDb().delete(todos).where(and(eq(todos.id, input.id), eq(todos.userId, ctx.user.id)));
     return { ok: true };
   }),
+
+  /**
+   * 把某日「已完成且未关联记录」的待办整理为一条当日实验记录：
+   * 创建记录（完成事项清单入 resultMd）→ 回写这些待办的 recordId 建立关联。
+   * 已关联记录的待办不会重复整理。
+   */
+  summarizeToRecord: authedQuery
+    .input(z.object({ date: dateStr }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const doneTodos = await db
+        .select()
+        .from(todos)
+        .where(
+          and(
+            eq(todos.userId, ctx.user.id),
+            eq(todos.todoDate, input.date),
+            eq(todos.done, true),
+            isNull(todos.recordId),
+          ),
+        )
+        .orderBy(todos.createdAt);
+      if (doneTodos.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "没有可整理的已完成待办" });
+      }
+      const checklist = doneTodos.map((t) => `- [x] ${t.text}`).join("\n");
+      const [{ id: recordId }] = await db
+        .insert(records)
+        .values({
+          userId: ctx.user.id,
+          title: `${input.date} 实验记录`,
+          recordDate: input.date,
+          purpose: "由当日已完成待办整理生成，可继续补充细节",
+          deviations: [],
+          resultMd: `## 今日完成\n\n${checklist}\n`,
+          tags: ["待办整理"],
+          status: "done",
+        })
+        .$returningId();
+      await db
+        .update(todos)
+        .set({ recordId })
+        .where(
+          and(
+            eq(todos.userId, ctx.user.id),
+            inArray(
+              todos.id,
+              doneTodos.map((t) => t.id),
+            ),
+          ),
+        );
+      return { recordId, count: doneTodos.length };
+    }),
 });
