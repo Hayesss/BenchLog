@@ -4,6 +4,17 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-07-30 · 修复：LLM 调用方式对齐 wisp-science（根治 K3 temperature 400）
+
+- 参照 github.com/xuzhougeng/wisp-science 的 wisp-llm OpenAI provider 调用方式改造：
+  - **彻底不传 temperature**（chat 与流式端点均移除，替代此前 isK3 条件省略）——K3 仅允许 temperature=1，传任何值均 400 `invalid temperature`；不传则由服务商使用模型默认值，全模型兼容
+  - 请求体新增 `max_tokens: 8192`（对齐其 ProviderConfig 默认）
+  - 流式请求新增 `stream_options: { include_usage: true }`（对齐其 SSE 用法，usage 帧由解析层天然忽略）
+  - base_url 尾部斜杠 trim、Authorization Bearer 与其一致（原本已是）
+- 其 sanitize 机制（历史消息不回放 reasoning_content）对本项目天然成立（aiMessages 只存 content）
+
+---
+
 ## 2026-07-30 · AI 助手默认模型切换 Kimi K3
 
 - DEFAULT_MODEL 改为 `kimi-k3`（chat 与流式端点两处）；`ai_settings.model` 列默认值迁移为 kimi-k3（scripts/alter-ai-model-default-k3.ts，只改默认值不动已有行）；设置对话框 placeholder 同步

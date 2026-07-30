@@ -15,8 +15,8 @@ const HISTORY_LIMIT = 20;
 const DEFAULT_BASE_URL = "https://api.moonshot.cn/v1";
 const DEFAULT_MODEL = "kimi-k3";
 
-/** Kimi K3 固定推理默认值，官方示例不含 temperature 等采样参数——K3 系列省略 temperature 避免报错 */
-const isK3 = (model: string) => model.startsWith("kimi-k3");
+/** 单次回复 token 上限（对齐 wisp-science ProviderConfig 默认 8192） */
+const MAX_TOKENS = 8192;
 
 interface StreamBody {
   conversationId: number;
@@ -99,8 +99,12 @@ export async function aiStreamHandler(c: Context): Promise<Response> {
       body: JSON.stringify({
         model,
         messages: [{ role: "system", content: system }, ...history],
-        ...(isK3(model) ? {} : { temperature: 0.3 }),
+        // 采样参数一律不传（对齐 wisp-science build_body），由服务商使用模型默认值——
+        // K3 仅允许 temperature=1，传任何值都会 400
+        max_tokens: MAX_TOKENS,
         stream: true,
+        // 对齐 wisp-science：让 OpenAI 兼容端点在流中回传 token 用量（缺省 usage 为 0）
+        stream_options: { include_usage: true },
       }),
       signal: controller.signal,
     });
