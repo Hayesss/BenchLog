@@ -118,6 +118,8 @@ function analysisParas(
     ),
   )
   if (a.inputData) ps.push(fieldPara('输入数据', an(a.inputData)))
+  if (a.dataPath) ps.push(fieldPara('原始数据路径', an(a.dataPath)))
+  if (a.resultPath) ps.push(fieldPara('结果存储路径', an(a.resultPath)))
   if (a.environment) ps.push(fieldPara('环境锁定', an(a.environment)))
   if (a.command) ps.push(fieldPara('运行命令', an(a.command)))
   const commit = shortCommit(a.commitHash)

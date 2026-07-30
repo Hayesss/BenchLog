@@ -150,6 +150,12 @@ function AnalysisBlock({
       {a.inputData && (
         <p className="mt-1.5 text-[13px] leading-[20px] text-ink-soft">输入数据：{an(a.inputData)}</p>
       )}
+      {a.dataPath && (
+        <p className="mt-1 font-mono text-[12px] leading-[18px] text-ink-soft">原始数据路径：{an(a.dataPath)}</p>
+      )}
+      {a.resultPath && (
+        <p className="mt-1 font-mono text-[12px] leading-[18px] text-ink-soft">结果存储路径：{an(a.resultPath)}</p>
+      )}
       {a.environment && (
         <p className="mt-1 text-[13px] leading-[20px] text-ink-soft">环境锁定：{an(a.environment)}</p>
       )}

@@ -88,14 +88,22 @@ async function buildContext(userId: number, projectId: number | null): Promise<s
     conclusion: clip(r.conclusion, 200),
   }));
 
-  // 生信分析：仅指定项目时带入（name/analysisDate/命令参数截 150）
-  let bioinfoList: { name: string; analysisDate: string; command: string | null }[] = [];
+  // 生信分析：仅指定项目时带入（name/analysisDate/命令参数截 150，存储路径截 120）
+  let bioinfoList: {
+    name: string;
+    analysisDate: string;
+    command: string | null;
+    dataPath: string | null;
+    resultPath: string | null;
+  }[] = [];
   if (projectId != null) {
     const rows = await db
       .select({
         name: bioinfoAnalyses.name,
         analysisDate: bioinfoAnalyses.analysisDate,
         command: bioinfoAnalyses.command,
+        dataPath: bioinfoAnalyses.dataPath,
+        resultPath: bioinfoAnalyses.resultPath,
       })
       .from(bioinfoAnalyses)
       .where(and(eq(bioinfoAnalyses.userId, userId), eq(bioinfoAnalyses.projectId, projectId)))
@@ -104,6 +112,8 @@ async function buildContext(userId: number, projectId: number | null): Promise<s
       name: r.name,
       analysisDate: r.analysisDate,
       command: clip(r.command, 150),
+      dataPath: clip(r.dataPath, 120),
+      resultPath: clip(r.resultPath, 120),
     }));
   }
 

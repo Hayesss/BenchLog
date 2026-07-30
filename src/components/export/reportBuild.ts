@@ -177,6 +177,8 @@ export function buildGroupMarkdown(
         `- **日期**：${a.analysisDate} ｜ **项目**：${an(a.project?.name ?? '未归档')} ｜ **Pipeline**：${an(a.pipeline)} ｜ **状态**：${ANALYSIS_STATUS_LABEL[a.status]}`,
       )
       if (a.inputData) lines.push(`- **输入数据**：${an(a.inputData)}`)
+      if (a.dataPath) lines.push(`- **原始数据路径**：\`${an(a.dataPath)}\``)
+      if (a.resultPath) lines.push(`- **结果存储路径**：\`${an(a.resultPath)}\``)
       if (a.environment) lines.push(`- **环境锁定**：${an(a.environment)}`)
       if (a.command) lines.push(`- **运行命令**：${an(a.command)}`)
       const commit = shortCommit(a.commitHash)
@@ -272,6 +274,8 @@ const ANALYSIS_TABLE_COLUMNS = [
   'Pipeline',
   '状态',
   '输入数据',
+  '原始数据路径',
+  '结果存储路径',
   '环境锁定',
   '运行命令',
   'Commit',
@@ -294,6 +298,8 @@ function analysisTableRow(a: ExportAnalysis, opts: ReportOptions): string[] {
     an(a.pipeline),
     ANALYSIS_STATUS_LABEL[a.status],
     an(a.inputData),
+    an(a.dataPath),
+    an(a.resultPath),
     an(a.environment),
     an(a.command),
     shortCommit(a.commitHash),

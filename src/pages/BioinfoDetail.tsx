@@ -5,9 +5,12 @@ import { format } from 'date-fns'
 import {
   ArrowLeft,
   ChevronDown,
+  Copy,
   ExternalLink,
+  FolderOpen,
   GitBranch,
   GitCommitHorizontal,
+  HardDrive,
   Loader2,
   Save,
   Trash2,
@@ -49,6 +52,8 @@ type Form = {
   projectId: number | null
   pipeline: string
   inputData: string
+  dataPath: string
+  resultPath: string
   repoUrl: string
   commitHash: string
   environment: string
@@ -67,6 +72,8 @@ const EMPTY: Form = {
   projectId: null,
   pipeline: '手动脚本',
   inputData: '',
+  dataPath: '',
+  resultPath: '',
   repoUrl: '',
   commitHash: '',
   environment: '',
@@ -90,6 +97,58 @@ function Field({ label, en, children }: { label: string; en?: string; children: 
       </p>
       {children}
     </div>
+  )
+}
+
+/** 数据存储路径输入：mono 字体 + 图标 + 一键复制（路径通常长且需粘到终端/WinSCP） */
+function PathField({
+  label,
+  en,
+  icon: Icon,
+  placeholder,
+  value,
+  onChange,
+}: {
+  label: string
+  en?: string
+  icon: typeof HardDrive
+  placeholder: string
+  value: string
+  onChange: (v: string) => void
+}) {
+  const copy = async () => {
+    const v = value.trim()
+    if (!v) return
+    try {
+      await navigator.clipboard.writeText(v)
+      toast.success('路径已复制')
+    } catch {
+      toast.error('复制失败，请手动选择文本复制')
+    }
+  }
+  return (
+    <Field label={label} en={en}>
+      <div className="relative">
+        <Icon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-mute" />
+        <input
+          className={cn(monoCls, 'pl-9', value.trim() ? 'pr-9' : '')}
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          spellCheck={false}
+        />
+        {value.trim() && (
+          <button
+            type="button"
+            onClick={copy}
+            aria-label="复制路径"
+            className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-ink-mute transition-colors duration-150 hover:bg-paper hover:text-bench"
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+    </Field>
   )
 }
 
@@ -128,6 +187,8 @@ export default function BioinfoDetail() {
         projectId: d.projectId,
         pipeline: d.pipeline,
         inputData: d.inputData ?? '',
+        dataPath: d.dataPath ?? '',
+        resultPath: d.resultPath ?? '',
         repoUrl: d.repoUrl ?? '',
         commitHash: d.commitHash ?? '',
         environment: d.environment ?? '',
@@ -170,7 +231,7 @@ export default function BioinfoDetail() {
         try {
           const r = await gitCommitMut.mutateAsync({ analysisId: newId, files: draftFiles, message: draftMessage })
           if (!form.repoUrl.trim()) {
-            const { name, analysisDate, projectId, pipeline, inputData, environment, command, status, resultMd, conclusion, nextStep } = form
+            const { name, analysisDate, projectId, pipeline, inputData, dataPath, resultPath, environment, command, status, resultMd, conclusion, nextStep } = form
             await silentUpdateMut.mutateAsync({
               id: newId,
               name: name.trim(),
@@ -178,6 +239,8 @@ export default function BioinfoDetail() {
               projectId,
               pipeline,
               inputData,
+              dataPath,
+              resultPath,
               repoUrl: 'internal',
               commitHash: r.sha,
               environment,
@@ -369,6 +432,27 @@ export default function BioinfoDetail() {
               onChange={(e) => patch({ inputData: e.target.value })}
             />
           </Field>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <PathField
+              label="原始数据路径"
+              en="Raw Data"
+              icon={HardDrive}
+              placeholder="/data/share/projectA/fastq"
+              value={form.dataPath}
+              onChange={(v) => patch({ dataPath: v })}
+            />
+            <PathField
+              label="结果存储路径"
+              en="Results"
+              icon={FolderOpen}
+              placeholder="/data/share/projectA/rnaseq_out"
+              value={form.resultPath}
+              onChange={(v) => patch({ resultPath: v })}
+            />
+          </div>
+          <p className="-mt-1 text-[11.5px] leading-[17px] text-ink-mute">
+            大文件不进站内仓库，在这里登记服务器 / NAS / 对象存储上的实际位置；输入框右侧按钮可一键复制路径。
+          </p>
         </div>
       </motion.section>
 

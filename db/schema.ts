@@ -307,6 +307,8 @@ export const bioinfoAnalyses = mysqlTable(
     analysisDate: varchar("analysisDate", { length: 10 }).notNull(), // YYYY-MM-DD
     pipeline: varchar("pipeline", { length: 64 }).notNull().default("手动脚本"), // Nextflow/Snakemake/WDL/手动脚本/R/Python/Galaxy/其他
     inputData: text("inputData"), // 输入数据：数据集、SRA/GEO 编号、路径、校验
+    dataPath: varchar("dataPath", { length: 500 }), // 原始数据存储路径（服务器/NAS/对象存储）
+    resultPath: varchar("resultPath", { length: 500 }), // 分析结果存储路径
     repoUrl: varchar("repoUrl", { length: 500 }), // 代码仓库链接（GitHub/GitLab/Gitee）
     commitHash: varchar("commitHash", { length: 64 }), // commit 锚定（可复现性关键）
     environment: text("environment"), // 环境锁定：conda env/docker/软件版本

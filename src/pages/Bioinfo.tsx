@@ -5,6 +5,7 @@ import {
   Circle,
   CircleCheck,
   ExternalLink,
+  FolderOpen,
   GitBranch,
   Info,
   Lightbulb,
@@ -82,6 +83,13 @@ function shortHash(h?: string | null): string {
   return h ? h.slice(0, 7) : ''
 }
 
+/** 路径取末段展示（/data/share/proj/rnaseq_out → rnaseq_out），完整路径放 title */
+function shortPath(p?: string | null): string {
+  if (!p) return ''
+  const segs = p.replace(/\/+$/, '').split('/').filter(Boolean)
+  return segs[segs.length - 1] ?? p
+}
+
 function AnalysisCard({ a, index }: { a: AnalysisItem; index: number }) {
   const navigate = useNavigate()
   return (
@@ -135,6 +143,15 @@ function AnalysisCard({ a, index }: { a: AnalysisItem; index: number }) {
             {a.repoUrl === 'internal' ? `站内 ${shortHash(a.commitHash) || ''}` : shortHash(a.commitHash) || 'repo'}
           </span>
         )}
+        {(a.resultPath || a.dataPath) && (
+          <span
+            title={a.resultPath || a.dataPath || ''}
+            className="flex max-w-[200px] items-center gap-1 rounded border border-line bg-paper px-1.5 py-0.5 font-mono text-[11px] text-ink-mute"
+          >
+            <FolderOpen className="h-3 w-3 shrink-0" />
+            <span className="truncate">{shortPath(a.resultPath || a.dataPath)}</span>
+          </span>
+        )}
       </div>
 
       {a.conclusion && (
@@ -156,8 +173,8 @@ function GuideBanner() {
       <p className="flex-1 text-[12.5px] leading-[19px] text-ink-soft">
         代码可直接存进<b className="text-ink">站内内置仓库</b>（新建或详情页上传/粘贴 → 提交 commit，哈希与 git 完全兼容），
         也可登记外部 <b className="text-ink">Git 私有仓库</b>（GitHub / GitLab / Gitee）链接 + commit 哈希。
-        配合「环境锁定 + 运行命令」即可完整锚定一次分析的可复现现场。大文件数据不进仓库，记录
-        SRA/GEO 编号或存储路径。
+        配合「环境锁定 + 运行命令」即可完整锚定一次分析的可复现现场。大文件数据不进仓库，可在详情页登记
+        <b className="text-ink">原始数据 / 结果存储路径</b>（一键复制，便于粘回终端）。
       </p>
       <button
         type="button"
