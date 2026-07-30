@@ -12,6 +12,7 @@ import { bioinfoSkillRouter } from "./bioinfoSkillRouter";
 import { gitRouter } from "./gitRouter";
 import { demoRouter } from "./demoRouter";
 import { quickNoteRouter } from "./quickNoteRouter";
+import { aiRouter } from "./aiRouter";
 
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
@@ -33,6 +34,7 @@ export const appRouter = createRouter({
   git: gitRouter,
   demo: demoRouter,
   quickNote: quickNoteRouter,
+  ai: aiRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -470,3 +470,57 @@ export const methodEntries = mysqlTable(
   (t) => [index("method_entries_chapter_idx").on(t.chapterNo)],
 );
 export type MethodEntry = typeof methodEntries.$inferSelect;
+
+/* ------------------------------------------------------------------ */
+/* AI 助手（LLM 副驾）：用户自配 OpenAI 兼容 LLM，按「项目 → 多会话」组织 */
+/* ------------------------------------------------------------------ */
+
+/** AI 设置：一人一条（userId 即主键）；apiKey 服务端仅存不回传（接口只回 keyPreview 脱敏） */
+export const aiSettings = mysqlTable("ai_settings", {
+  userId: bigint("userId", { mode: "number", unsigned: true }).primaryKey(),
+  baseUrl: varchar("baseUrl", { length: 255 })
+    .notNull()
+    .default("https://api.moonshot.cn/v1"), // OpenAI 兼容端点，默认 Moonshot/Kimi
+  apiKey: text("apiKey"), // 可空：未配置时 chat 直接报「未配置 LLM」
+  model: varchar("model", { length: 64 }).notNull().default("kimi-k2-0711-preview"),
+  updatedAt: timestamp("updatedAt")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+export type AiSetting = typeof aiSettings.$inferSelect;
+export type InsertAiSetting = typeof aiSettings.$inferInsert;
+
+/** AI 会话：projectId 可空（null = 未归档/副驾快聊）；title 空串待首条消息自动生成 */
+export const aiConversations = mysqlTable(
+  "ai_conversations",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+    projectId: bigint("projectId", { mode: "number", unsigned: true }),
+    title: varchar("title", { length: 120 }).notNull().default(""),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [index("ai_conversations_user_project_idx").on(t.userId, t.projectId)],
+);
+export type AiConversation = typeof aiConversations.$inferSelect;
+export type InsertAiConversation = typeof aiConversations.$inferInsert;
+
+/** AI 消息：role 仅 user | assistant；删会话时级联删除 */
+export const aiMessages = mysqlTable(
+  "ai_messages",
+  {
+    id: serial("id").primaryKey(),
+    conversationId: bigint("conversationId", { mode: "number", unsigned: true }).notNull(),
+    role: varchar("role", { length: 12 }).notNull(),
+    content: text("content").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => [index("ai_messages_conversation_idx").on(t.conversationId)],
+);
+export type AiMessage = typeof aiMessages.$inferSelect;
+export type InsertAiMessage = typeof aiMessages.$inferInsert;

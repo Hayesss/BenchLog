@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   BookMarked,
   BookOpen,
+  Bot,
   Inbox,
   CalendarDays,
   CheckSquare,
@@ -36,6 +37,7 @@ const NAV_PAGES: Hit[] = [
   { group: '页面', icon: BookMarked, label: '方法库', to: '/library' },
   { group: '页面', icon: NotebookPen, label: '湿实验记录', to: '/records' },
   { group: '页面', icon: Inbox, label: '收集箱', to: '/inbox' },
+  { group: '页面', icon: Bot, label: 'AI 助手', to: '/assistant' },
   { group: '页面', icon: FolderKanban, label: '项目管理', to: '/projects' },
   { group: '页面', icon: SquareTerminal, label: '生信分析', to: '/bioinfo' },
   { group: '页面', icon: Lightbulb, label: '生信技能库', to: '/bioinfo?tab=skills' },
