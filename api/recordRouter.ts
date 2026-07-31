@@ -84,12 +84,14 @@ export async function snapshotCurrent(userId: number, recordId: number) {
 /** 写入前校验：记录须归属当前用户且未进回收站（已软删的记录禁止任何写入） */
 async function assertRecordWritable(userId: number, recordId: number) {
   const rows = await getDb()
-    .select({ id: records.id, deletedAt: records.deletedAt })
+    .select({ id: records.id, deletedAt: records.deletedAt, lockedAt: records.lockedAt })
     .from(records)
     .where(and(eq(records.id, recordId), eq(records.userId, userId)));
   if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "记录不存在" });
   if (rows[0].deletedAt)
     throw new TRPCError({ code: "BAD_REQUEST", message: "记录已在回收站，请先恢复再操作" });
+  if (rows[0].lockedAt)
+    throw new TRPCError({ code: "FORBIDDEN", message: "记录已签署锁定，请先解除锁定再修改" });
 }
 
 export const recordRouter = createRouter({
@@ -218,6 +220,43 @@ export const recordRouter = createRouter({
       return { ok: true, recordId: version.recordId };
     }),
 
+  /** 签署锁定：锁定后 update/updateStatus/remove/restoreVersion 均被 assertRecordWritable 拒绝 */
+  lock: authedQuery
+    .input(z.object({ id: z.number(), note: z.string().max(255).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const rows = await db
+        .select({ id: records.id, deletedAt: records.deletedAt, lockedAt: records.lockedAt })
+        .from(records)
+        .where(and(eq(records.id, input.id), eq(records.userId, ctx.user.id)));
+      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "记录不存在" });
+      if (rows[0].deletedAt)
+        throw new TRPCError({ code: "BAD_REQUEST", message: "记录已在回收站" });
+      if (rows[0].lockedAt) return { ok: true, lockedAt: rows[0].lockedAt, reused: true };
+      const now = new Date();
+      await db
+        .update(records)
+        .set({ lockedAt: now, lockedNote: input.note?.trim() || null })
+        .where(and(eq(records.id, input.id), eq(records.userId, ctx.user.id)));
+      return { ok: true, lockedAt: now, reused: false };
+    }),
+
+  /** 解除锁定（本人；锁事件本身即审计，lockedAt/lockedNote 随解锁清空） */
+  unlock: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    const db = getDb();
+    const rows = await db
+      .select({ id: records.id, lockedAt: records.lockedAt })
+      .from(records)
+      .where(and(eq(records.id, input.id), eq(records.userId, ctx.user.id)));
+    if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "记录不存在" });
+    if (!rows[0].lockedAt) throw new TRPCError({ code: "BAD_REQUEST", message: "记录未锁定" });
+    await db
+      .update(records)
+      .set({ lockedAt: null, lockedNote: null })
+      .where(and(eq(records.id, input.id), eq(records.userId, ctx.user.id)));
+    return { ok: true };
+  }),
+
   updateStatus: authedQuery
     .input(z.object({ id: z.number(), status: recordStatusSchema }))
     .mutation(async ({ ctx, input }) => {
@@ -231,6 +270,8 @@ export const recordRouter = createRouter({
 
   /** 软删除：移入回收站（images/attachments/versions 保留，恢复时完整还原） */
   remove: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    // 锁定记录不可删除（签署内容必须保留审计痕迹，先解锁再删）
+    await assertRecordWritable(ctx.user.id, input.id);
     await getDb()
       .update(records)
       .set({ deletedAt: new Date() })

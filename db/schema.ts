@@ -155,6 +155,9 @@ export const records = mysqlTable(
     resultMd: text("resultMd"),
     // Benchling 式笔记本正文（TipTap 富文本 HTML，含表格/内嵌图片，LONGTEXT）
     contentHtml: longtext("contentHtml"),
+    // 签署锁定（Benchling review lock 简化版）：锁定后全写操作拒绝，可本人解锁
+    lockedAt: timestamp("lockedAt"),
+    lockedNote: varchar("lockedNote", { length: 255 }),
     conclusion: text("conclusion"),
     nextStep: text("nextStep"),
     status: mysqlEnum("status", ["ongoing", "done", "failed"])
@@ -229,6 +232,23 @@ export type RecordSnapshot = {
 };
 
 /** 记录修改历史（覆盖保存前的旧版快照，新→旧查阅，可恢复） */
+/** 实验记录模板：新建记录时一键预填正文/目的/标签（Benchling entry template 简化版） */
+export const recordTemplates = mysqlTable(
+  "record_templates",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    contentHtml: longtext("contentHtml"),
+    purpose: text("purpose"),
+    tags: json("tags").$type<string[]>().notNull(),
+    useCount: int("useCount").notNull().default(0),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
+  },
+  (t) => [index("idx_rt_user").on(t.userId)],
+);
+
 export const recordVersions = mysqlTable(
   "record_versions",
   {

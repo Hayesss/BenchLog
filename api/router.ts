@@ -17,6 +17,7 @@ import { mouseRouter } from "./mouseRouter";
 import { aiRouter } from "./aiRouter";
 import { aiProfileRouter } from "./aiProfileRouter";
 import { shareRouter } from "./shareRouter";
+import { recordTemplateRouter } from "./recordTemplateRouter";
 
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
@@ -43,6 +44,7 @@ export const appRouter = createRouter({
   ai: aiRouter,
   aiProfile: aiProfileRouter,
   share: shareRouter,
+  recordTemplate: recordTemplateRouter,
 });
 
 export type AppRouter = typeof appRouter;

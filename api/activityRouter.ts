@@ -29,14 +29,14 @@ export const activityRouter = createRouter({
         .select()
         .from(userActivity)
         .where(and(eq(userActivity.userId, ctx.user.id), gte(userActivity.date, fromStr))),
+      // TiDB ONLY_FULL_GROUP_BY 会把 select(裸列) 与 GROUP BY(表限定列) 判为不同表达式而拒绝，
+      // 这里只取逐行日期、在 JS 侧计数（单用户年数据量极小）
       db
         .select({
           d: sql<string>`DATE_FORMAT(${records.createdAt}, '%Y-%m-%d')`,
-          c: sql<number>`COUNT(*)`,
         })
         .from(records)
-        .where(and(eq(records.userId, ctx.user.id), gte(records.createdAt, from), isNull(records.deletedAt)))
-        .groupBy(sql`DATE_FORMAT(${records.createdAt}, '%Y-%m-%d')`),
+        .where(and(eq(records.userId, ctx.user.id), gte(records.createdAt, from), isNull(records.deletedAt))),
     ]);
 
     const days = new Map<string, { date: string; records: number; protocolsUsed: number; logins: number }>();
@@ -48,10 +48,12 @@ export const activityRouter = createRouter({
         logins: Number(r.logins),
       });
     }
-    for (const r of recRows) {
-      const cur = days.get(r.d) ?? { date: r.d, records: 0, protocolsUsed: 0, logins: 0 };
-      cur.records = Number(r.c);
-      days.set(r.d, cur);
+    const recCounts = new Map<string, number>();
+    for (const r of recRows) recCounts.set(r.d, (recCounts.get(r.d) ?? 0) + 1);
+    for (const [d, c] of recCounts) {
+      const cur = days.get(d) ?? { date: d, records: 0, protocolsUsed: 0, logins: 0 };
+      cur.records = c;
+      days.set(d, cur);
     }
 
     const isActive = (d?: { records: number; protocolsUsed: number; logins: number }) =>

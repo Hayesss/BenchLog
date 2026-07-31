@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react'
 import { useNavigate } from 'react-router'
 import { motion } from 'framer-motion'
-import { AlertTriangle, RotateCcw } from 'lucide-react'
+import { AlertTriangle, Lock, RotateCcw } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import RecordTagChip from './RecordTagChip'
@@ -125,6 +125,18 @@ function RecordCard({
             >
               <Highlight text={record.title} q={q} />
             </h3>
+            {record.lockedAt != null && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center self-center rounded-full text-warning">
+                    <Lock className="h-3.5 w-3.5" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-[12px]">
+                  已签署锁定 — 内容只读
+                </TooltipContent>
+              </Tooltip>
+            )}
             {failed && (
               <Tooltip>
                 <TooltipTrigger asChild>

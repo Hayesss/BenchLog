@@ -4,6 +4,21 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-08-01 · P2 批次C：记录签署锁定 + 记录模板（附 yearly 聚合 500 修复）
+
+差异对标 P2 专项前半（⑩ 锁定签署 + ⑨ 记录模板）：
+
+- 数据层：records 新增 `lockedAt` timestamp / `lockedNote` varchar(255)（幂等迁移已执行）；新建 `record_templates` 表（id/userId/name/contentHtml longtext/purpose/tags json/useCount/双时间戳 + idx_rt_user 索引，迁移已执行）
+- 后端（锁定）：`assertRecordWritable` 统一加锁检查——锁定后 update/updateStatus/restoreVersion/remove 全部 FORBIDDEN「记录已签署锁定，请先解除锁定再修改」（remove 本次补齐写保护）；`record.lock`（幂等 reused，可附 255 字签署语）/ `record.unlock`（未锁 BAD_REQUEST，清空双列；锁事件本身即审计）
+- 后端（模板）：`recordTemplate` 路由——list（不带 contentHtml 瘦身投影，按使用次数+更新时间排序）/ byId 全字段 / create / remove / touch（`sql` 乐观自增 useCount）
+- 前端（锁定）：头部 warning 色「已锁定」徽标 + 正文上方锁定横幅（签署时间+签署语+解除锁定按钮）；锁定时 RichEditor `readOnly`（工具栏整排隐藏、setEditable(false)、粘贴插图拦截，引用片点击跳转仍可用）+ 标题/目的/结论/下一步禁用 + 属性面板/偏离表/画廊/附件 pointer-events 封印 + 状态菜单/保存按钮禁用；菜单「锁定记录…」（签署语 dialog，锁定前自动落库未保存修改）/「解除锁定」（confirm）；列表卡片标题旁小锁 Tooltip
+- 前端（模板）：新建页标题下「从模板开始」卡片区（名称/使用次数/更新日，hover × 删除带 confirm，空态引导文案）；套用即拉 byId 全量预填正文/目的/标签 + editorEpoch 强制重挂载 + touch 计数（已有正文时 confirm 覆盖确认）；任意记录菜单「存为模板…」（名称默认标题，正文为空时警示文案）
+- 顺带修复：`activity.yearly` 在 TiDB ONLY_FULL_GROUP_BY 下 500（select 裸列名 vs GROUP BY 表限定列被判为不同表达式）——改为逐行取日期 JS 侧计数，首页/记录页零 500
+- 验证：`npx tsc -b` 通过；冒烟 15 断言真实库全 PASS（lock 首锁/幂等/byId 双列/update、updateStatus、remove 三拒绝/unlock 清空/未锁报错/解锁恢复 + 模板 CRUD/list 瘦身/touch×2/删后 404，脚本跑完即删）；**playwright 生产实测 19/19**（注册→自动保存建记录→锁定横幅+签署语+contenteditable=false+工具栏隐藏+保存禁用+徽标+只读拒输入→解锁全恢复→存模板→新建页套用预填→自动建记录正文保留）；33 资产 gzip+brotli 预压缩（FUSE 掉文件改用新目录拷贝原子换名）；入包验证锁定拒绝语/模板路由/前端关键文案齐在；测试数据已清理
+- 范围：锁定为单人签署（无多级 review 流）；模板不含方法参数联动；图片标注/表格入库留批次D
+
+---
+
 ## 2026-07-31 · 紧急修复：记录详情页白屏（Suggestion 插件 key 冲突）
 
 - 事故：批次B 引入第二个 `@tiptap/suggestion`（@ 引用菜单）与斜杠菜单共用默认 PluginKey `'suggestion'`——ProseMirror 抛 `Adding different instances of a keyed plugin (suggestion$)`，编辑器初始化崩溃导致**所有记录详情页/新建页白屏**

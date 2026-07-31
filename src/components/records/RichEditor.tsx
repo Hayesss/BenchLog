@@ -534,6 +534,8 @@ const RichEditor = forwardRef<
     onChange: (html: string) => void
     onOutlineChange?: (items: OutlineItem[]) => void
     placeholder?: string
+    /** 锁定签署后的只读态：隐藏工具栏、禁止编辑（引用片点击跳转仍可用） */
+    readOnly?: boolean
   }
 >(function RichEditor(
   {
@@ -541,6 +543,7 @@ const RichEditor = forwardRef<
     onChange,
     onOutlineChange,
     placeholder = '记录实验过程、数据与观察…输入 / 插入标题、表格、图片等',
+    readOnly = false,
   },
   ref,
 ) {
@@ -584,6 +587,8 @@ const RichEditor = forwardRef<
     [utils],
   )
   const [, setTick] = useState(0) // 选区变化时强制刷新工具栏 active 态
+  const readOnlyRef = useRef(readOnly)
+  readOnlyRef.current = readOnly
 
   const openImagePicker = useCallback(() => fileRef.current?.click(), [])
 
@@ -625,6 +630,7 @@ const RichEditor = forwardRef<
       makeSlashExtension(openImagePicker),
       makeRefChipExtension(fetchRefItems),
     ],
+    editable: !readOnly,
     content: initialHtml,
     editorProps: {
       attributes: {
@@ -642,6 +648,7 @@ const RichEditor = forwardRef<
         return false
       },
       handlePaste: (_view, event) => {
+        if (readOnlyRef.current) return false
         const files = Array.from(event.clipboardData?.files ?? []).filter((f) =>
           f.type.startsWith('image/'),
         )
@@ -666,6 +673,11 @@ const RichEditor = forwardRef<
 
   // 卸载清理
   useEffect(() => () => editor?.destroy(), [editor])
+
+  // 锁定/解锁时切换可编辑态（editable 选项只在 useEditor 初始化时读取一次）
+  useEffect(() => {
+    editor?.setEditable(!readOnly)
+  }, [editor, readOnly])
 
   // 对外暴露：大纲跳转
   useImperativeHandle(
@@ -697,7 +709,8 @@ const RichEditor = forwardRef<
 
   return (
     <div>
-      {/* 工具栏（sticky 顶部，Benchling 式） */}
+      {/* 工具栏（sticky 顶部，Benchling 式）— 锁定只读时整排隐藏 */}
+      {!readOnly && (
       <div className="sticky top-12 z-30 flex flex-wrap items-center gap-0.5 border-b border-line bg-paper/95 px-2 py-1.5 backdrop-blur md:top-14">
         <ToolBtn title="撤销" disabled={!editor?.can().undo()} onClick={() => editor?.chain().focus().undo().run()}>
           <Undo2 className="h-3.5 w-3.5" />
@@ -856,12 +869,15 @@ const RichEditor = forwardRef<
           </>
         )}
       </div>
+      )}
 
       {/* 编辑区 */}
       <EditorContent editor={editor} className="rich-editor" />
-      <p className="border-t border-line-soft px-3 py-1.5 text-[11px] text-ink-mute">
-        输入 / 打开插入菜单；支持直接粘贴截图；表格内 Tab 跳格
-      </p>
+      {!readOnly && (
+        <p className="border-t border-line-soft px-3 py-1.5 text-[11px] text-ink-mute">
+          输入 / 打开插入菜单；支持直接粘贴截图；表格内 Tab 跳格
+        </p>
+      )}
 
       <input
         ref={fileRef}
