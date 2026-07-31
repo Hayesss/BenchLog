@@ -4,6 +4,15 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-07-31 · 紧急修复：记录详情页白屏（Suggestion 插件 key 冲突）
+
+- 事故：批次B 引入第二个 `@tiptap/suggestion`（@ 引用菜单）与斜杠菜单共用默认 PluginKey `'suggestion'`——ProseMirror 抛 `Adding different instances of a keyed plugin (suggestion$)`，编辑器初始化崩溃导致**所有记录详情页/新建页白屏**
+- 修复：两个 Suggestion 各自分配独立 `pluginKey`（`slashSuggestion` / `refChipSuggestion`，`@tiptap/pm/state`）
+- 验证升级（防回归）：本地 production 模式起服 + playwright 全流程实测——注册账号→造老格式记录（contentHtml NULL）→打开详情页**渲染恢复零报错**→`@` 菜单弹出真实搜索→Enter 插入 chip（`a[data-ref-chip]` 正确）→`/` 斜杠菜单回归→拼音 `xinyitian` 过滤命中「新一天」→日期段插入且**大纲收录**→自动保存入库（活动历史时间戳）；测试数据已清理
+- 范围：纯前端 1 文件 3 行
+
+---
+
 ## 2026-07-31 · Benchling 对齐批次B：@ 提及 chip + 表格合并单元格 + PDF 打印导出
 
 差异对标 P1 批次落地：

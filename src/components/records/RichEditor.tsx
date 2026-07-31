@@ -23,6 +23,7 @@ import { TextStyle } from '@tiptap/extension-text-style'
 import { Color } from '@tiptap/extension-color'
 import Suggestion from '@tiptap/suggestion'
 import type { SuggestionProps, SuggestionKeyDownProps } from '@tiptap/suggestion'
+import { PluginKey } from '@tiptap/pm/state'
 import {
   Bold,
   CheckSquare,
@@ -191,6 +192,7 @@ function makeRefChipExtension(fetchItems: (query: string) => Promise<RefItem[]>)
       return [
         Suggestion<RefItem>({
           editor,
+          pluginKey: new PluginKey('refChipSuggestion'),
           char: '@',
           items: ({ query }) => fetchItems(query.trim()),
           command: ({ editor: e, range, props }) => {
@@ -352,6 +354,9 @@ function makeSlashExtension(openImagePicker: () => void) {
       return [
         Suggestion<SlashItem>({
           editor,
+          // 关键：两个 Suggestion 共存必须各自独立 pluginKey（默认同名 'suggestion' 会抛
+          // "Adding different instances of a keyed plugin" 导致编辑器初始化崩溃白屏）
+          pluginKey: new PluginKey('slashSuggestion'),
           char: '/',
           items: ({ query }) => {
             const q = query.trim().toLowerCase()
