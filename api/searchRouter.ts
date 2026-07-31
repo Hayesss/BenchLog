@@ -2,11 +2,46 @@ import { z } from "zod";
 import { and, desc, eq, gte, isNull, lte, inArray } from "drizzle-orm";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { records, recordImages, projects, protocols, tags, flows, todos, exportLogs, bioinfoAnalyses } from "@db/schema";
+import { records, recordImages, projects, protocols, samples, tags, flows, todos, exportLogs, bioinfoAnalyses } from "@db/schema";
 import { dateStr } from "./zodSchemas";
 
 /** ⌘K 全局搜索：抗体货号 / 细胞系 / 标签 / 记录结论，跨所有实体 */
 export const searchRouter = createRouter({
+  /** 正文 @ 引用搜索：记录/方法/样本三路各 top5（q 空时取最近，Benchling 式 entity 引用） */
+  refSearch: authedQuery
+    .input(z.object({ q: z.string().default("") }))
+    .query(async ({ ctx, input }) => {
+      const db = getDb();
+      const q = input.q.trim().toLowerCase();
+      const hit = (s: unknown) => !q || String(s ?? "").toLowerCase().includes(q);
+      const SCAN = q ? 80 : 5;
+      const [rs, ps, ss] = await Promise.all([
+        db
+          .select({ id: records.id, title: records.title, recordDate: records.recordDate, status: records.status })
+          .from(records)
+          .where(and(eq(records.userId, ctx.user.id), isNull(records.deletedAt)))
+          .orderBy(desc(records.recordDate), desc(records.id))
+          .limit(SCAN),
+        db
+          .select({ id: protocols.id, name: protocols.name, version: protocols.version, category: protocols.category })
+          .from(protocols)
+          .where(and(eq(protocols.userId, ctx.user.id), isNull(protocols.deletedAt)))
+          .orderBy(desc(protocols.id))
+          .limit(SCAN),
+        db
+          .select({ id: samples.id, name: samples.name, type: samples.type })
+          .from(samples)
+          .where(eq(samples.userId, ctx.user.id))
+          .orderBy(desc(samples.id))
+          .limit(SCAN),
+      ]);
+      return {
+        records: rs.filter((r) => hit(r.title)).slice(0, 5),
+        protocols: ps.filter((p) => hit(p.name)).slice(0, 5),
+        samples: ss.filter((sm) => hit(sm.name)).slice(0, 5),
+      };
+    }),
+
   global: authedQuery.input(z.object({ q: z.string().min(1) })).query(async ({ ctx, input }) => {
     const db = getDb();
     const q = input.q.toLowerCase();

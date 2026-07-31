@@ -2,6 +2,8 @@
 // 能力：工具栏（标题/粗斜体/上下标/高亮/列表/勾选/引用/代码块/表格/图片/链接/分割线）
 //      + 斜杠命令（/）+ 图片粘贴与插入（canvas 压缩 base64 内嵌）+ 表格行列操作 + 大纲提取
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
+import { trpc } from '@/providers/trpc'
 import { Editor, EditorContent, Extension, Node, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
@@ -117,6 +119,185 @@ function compressImage(file: File): Promise<string> {
       img.src = String(reader.result)
     }
     reader.readAsDataURL(file)
+  })
+}
+
+/* ---------------- @ 引用 chip（Benchling entity chip） ---------------- */
+type RefKind = 'record' | 'protocol' | 'sample'
+type RefItem = { kind: RefKind; id: number; label: string; sub: string }
+
+const REF_KIND_LABEL: Record<RefKind, string> = { record: '记录', protocol: '方法', sample: '样本' }
+
+function refHref(kind: RefKind, id: number): string {
+  if (kind === 'protocol') return `/protocols/${id}`
+  if (kind === 'sample') return '/samples'
+  return `/records/${id}`
+}
+
+/** 内联 atom 引用片：渲染为 <a data-ref-chip>，阅读态可点击跳转 */
+const RefChip = Node.create({
+  name: 'refChip',
+  group: 'inline',
+  inline: true,
+  atom: true,
+  addAttributes() {
+    return {
+      kind: { default: 'record' },
+      refId: { default: 0 },
+      label: { default: '' },
+    }
+  },
+  parseHTML() {
+    return [
+      {
+        tag: 'a[data-ref-chip]',
+        getAttrs: (el) => {
+          const dom = el as HTMLElement
+          return {
+            kind: dom.dataset.kind ?? 'record',
+            refId: Number(dom.dataset.refId ?? 0),
+            label: dom.dataset.label ?? dom.textContent ?? '',
+          }
+        },
+      },
+    ]
+  },
+  renderHTML({ node, HTMLAttributes }) {
+    const kind = (node.attrs.kind as RefKind) ?? 'record'
+    const refId = Number(node.attrs.refId ?? 0)
+    const label = (node.attrs.label as string) ?? ''
+    return [
+      'a',
+      {
+        ...HTMLAttributes,
+        'data-ref-chip': '',
+        'data-kind': kind,
+        'data-ref-id': String(refId),
+        'data-label': label,
+        href: refHref(kind, refId),
+        class: `rich-ref-chip rich-ref-${kind}`,
+      },
+      label,
+    ]
+  },
+})
+
+/** @ 唤起引用搜索菜单（异步 items + 手写 DOM 浮层，结构同斜杠菜单） */
+function makeRefChipExtension(fetchItems: (query: string) => Promise<RefItem[]>) {
+  return Extension.create({
+    name: 'refChipSuggestion',
+    addProseMirrorPlugins() {
+      const editor = this.editor
+      return [
+        Suggestion<RefItem>({
+          editor,
+          char: '@',
+          items: ({ query }) => fetchItems(query.trim()),
+          command: ({ editor: e, range, props }) => {
+            e.chain()
+              .focus()
+              .deleteRange(range)
+              .insertContent([
+                { type: 'refChip', attrs: { kind: props.kind, refId: props.id, label: props.label } },
+                { type: 'text', text: ' ' },
+              ])
+              .run()
+          },
+          render: () => {
+            let el: HTMLDivElement | null = null
+            let state: { items: RefItem[]; index: number; command: (item: RefItem) => void } | null = null
+            const paint = () => {
+              if (!el || !state) return
+              el.innerHTML = ''
+              if (state.items.length === 0) {
+                const empty = document.createElement('div')
+                empty.className = 'rich-slash-empty'
+                empty.textContent = '无匹配的记录 / 方法 / 样本'
+                el.appendChild(empty)
+                return
+              }
+              state.items.forEach((item, i) => {
+                const btn = document.createElement('button')
+                btn.type = 'button'
+                btn.className = `rich-slash-item${i === state!.index ? ' active' : ''}`
+                const kind = document.createElement('span')
+                kind.className = `rich-ref-kind rich-ref-${item.kind}`
+                kind.textContent = REF_KIND_LABEL[item.kind]
+                const title = document.createElement('span')
+                title.className = 'rich-slash-title'
+                title.textContent = item.label
+                const sub = document.createElement('span')
+                sub.className = 'rich-slash-hint'
+                sub.textContent = item.sub
+                btn.append(kind, title, sub)
+                btn.addEventListener('mousedown', (ev) => {
+                  ev.preventDefault()
+                  state?.command(item)
+                })
+                btn.addEventListener('mouseenter', () => {
+                  if (state) {
+                    state.index = i
+                    paint()
+                  }
+                })
+                el!.appendChild(btn)
+              })
+            }
+            const place = (props: SuggestionProps<RefItem>) => {
+              if (!el) return
+              const rect = props.clientRect?.()
+              if (!rect) return
+              el.style.left = `${rect.left + window.scrollX}px`
+              el.style.top = `${rect.bottom + window.scrollY + 4}px`
+            }
+            const update = (props: SuggestionProps<RefItem>) => {
+              state = { items: props.items, index: Math.min(state?.index ?? 0, Math.max(props.items.length - 1, 0)), command: props.command }
+              paint()
+              place(props)
+            }
+            const destroy = () => {
+              el?.remove()
+              el = null
+              state = null
+            }
+            return {
+              onStart: (props) => {
+                el = document.createElement('div')
+                el.className = 'rich-slash-menu'
+                document.body.appendChild(el)
+                state = null
+                update(props)
+              },
+              onUpdate: update,
+              onKeyDown: ({ event }: SuggestionKeyDownProps) => {
+                if (!state) return false
+                if (event.key === 'ArrowUp') {
+                  state.index = (state.index + state.items.length - 1) % Math.max(state.items.length, 1)
+                  paint()
+                  return true
+                }
+                if (event.key === 'ArrowDown') {
+                  state.index = (state.index + 1) % Math.max(state.items.length, 1)
+                  paint()
+                  return true
+                }
+                if (event.key === 'Enter') {
+                  const item = state.items[state.index]
+                  if (item) state.command(item)
+                  return true
+                }
+                if (event.key === 'Escape') {
+                  destroy()
+                  return true
+                }
+                return false
+              },
+              onExit: destroy,
+            }
+          },
+        }),
+      ]
+    },
   })
 }
 
@@ -362,6 +543,41 @@ const RichEditor = forwardRef<
   const [inTable, setInTable] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const navigate = useNavigate()
+  const utils = trpc.useUtils()
+
+  /** @ 引用搜索：三路合并为统一 RefItem 列表（utils/client 引用稳定，仅在 useEditor 初始化时闭包一次） */
+  const fetchRefItems = useCallback(
+    async (query: string): Promise<RefItem[]> => {
+      try {
+        const res = await utils.client.search.refSearch.query({ q: query })
+        const items: RefItem[] = [
+          ...res.records.map((r) => ({
+            kind: 'record' as const,
+            id: r.id,
+            label: r.title,
+            sub: r.recordDate,
+          })),
+          ...res.protocols.map((p) => ({
+            kind: 'protocol' as const,
+            id: p.id,
+            label: p.name,
+            sub: `${p.category} · ${p.version}`,
+          })),
+          ...res.samples.map((sm) => ({
+            kind: 'sample' as const,
+            id: sm.id,
+            label: sm.name,
+            sub: sm.type,
+          })),
+        ]
+        return items.slice(0, 8)
+      } catch {
+        return []
+      }
+    },
+    [utils],
+  )
   const [, setTick] = useState(0) // 选区变化时强制刷新工具栏 active 态
 
   const openImagePicker = useCallback(() => fileRef.current?.click(), [])
@@ -400,12 +616,25 @@ const RichEditor = forwardRef<
       Link.configure({ openOnClick: false }),
       Placeholder.configure({ placeholder }),
       DateInsert,
+      RefChip,
       makeSlashExtension(openImagePicker),
+      makeRefChipExtension(fetchRefItems),
     ],
     content: initialHtml,
     editorProps: {
       attributes: {
         class: 'rich-editor-content',
+      },
+      // 编辑态点击 @ 引用片直接跳转（atom 默认只选中；阅读态走原生 <a>）
+      handleClick: (_view, _pos, event) => {
+        const a = (event.target as HTMLElement).closest?.('a[data-ref-chip]')
+        if (a instanceof HTMLAnchorElement) {
+          event.preventDefault()
+          const href = a.getAttribute('href')
+          if (href) navigate(href)
+          return true
+        }
+        return false
       },
       handlePaste: (_view, event) => {
         const files = Array.from(event.clipboardData?.files ?? []).filter((f) =>
@@ -602,6 +831,8 @@ const RichEditor = forwardRef<
                 ['+列', () => editor.chain().focus().addColumnAfter().run()],
                 ['-行', () => editor.chain().focus().deleteRow().run()],
                 ['-列', () => editor.chain().focus().deleteColumn().run()],
+                ['合并', () => editor.chain().focus().mergeCells().run()],
+                ['拆分', () => editor.chain().focus().splitCell().run()],
                 ['删表', () => editor.chain().focus().deleteTable().run()],
               ] as [string, () => void][]
             ).map(([label, run]) => (

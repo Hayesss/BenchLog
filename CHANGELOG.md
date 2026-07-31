@@ -4,6 +4,20 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-07-31 · Benchling 对齐批次B：@ 提及 chip + 表格合并单元格 + PDF 打印导出
+
+差异对标 P1 批次落地：
+
+- 数据层：无（chip 为正文 HTML 内嵌 `<a data-ref-chip>`，零迁移）
+- 后端：`search.refSearch`——正文 @ 引用搜索，记录/方法/样本三路各 top5（标题/名称模糊过滤，q 空时取最近，软删除过滤；沿用全局搜索的内存过滤风格）
+- 前端（@ 提及 chip，Benchling entity chip）：TipTap inline atom 节点 `refChip`（kind/refId/label 三属性，序列化为 `<a data-ref-chip data-kind data-ref-id>`）+ `@` 唤起异步搜索菜单（复用斜杠菜单的手写 DOM 浮层：kind 徽标+标题+副信息，键盘 ↑↓/Enter/ESC，空态提示）；chip 按类型三色渲染（记录 bench 绿/方法蓝/样本紫，含 ::before 类型徽标）；编辑态点击 chip 直接跳转对应详情（handleClick 拦截），阅读/分享态走原生 `<a>`；DOMPurify 默认放行，分享页同源样式
+- 前端（表格）：inTable 工具组新增「合并/拆分」（mergeCells/splitCell，先拖选多格再合并）
+- 前端（PDF 导出）：记录菜单新增「打印 / 导出 PDF」（window.print）+ 全站 `@media print` 样式（隐藏侧栏/Navbar/导航/按钮/斜杠菜单，输入框去边框阴影，编辑器 min-height 归零防空白页）
+- 验证：`npx tsc -b` 通过；冒烟 refSearch 3 断言（空 q 三路/关键词搜回/不存在三路全空）真实库 PASS（脚本跑完即删）；33 资产 gzip+brotli 预压缩（br 945KB，FUSE 漏压缩重跑修正）；入包验证 `data-ref-chip`/`refSearch`/`合并`/`导出 PDF`/`@media print` 前后端产物齐在
+- 范围：@ chip 的 hover 元数据浮层 v1 以副信息行代替；样本 chip 跳转至样本页（无独立详情路由）；结构化表写库/审核签署/模板列入 P2 专项
+
+---
+
 ## 2026-07-31 · Benchling 对齐批次A：自动保存 + 日期段 + 文字颜色 + 页面级工具栏
 
 依据 Benchling Example Entry 真实界面截图与官方文档差异对标（P0 批次）：

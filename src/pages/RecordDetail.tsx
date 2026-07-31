@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Copy,
   Download,
+  Printer,
   FileText,
   History,
   MoreHorizontal,
@@ -640,6 +641,9 @@ export default function RecordDetail() {
             <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuItem onSelect={exportMarkdown} className="gap-2 text-[13px]">
                 <Download className="h-3.5 w-3.5" /> 导出 Markdown
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => window.print()} className="gap-2 text-[13px]">
+                <Printer className="h-3.5 w-3.5" /> 打印 / 导出 PDF
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => navigate(`/export?ids=${recordId ?? ''}`)}

@@ -180,6 +180,35 @@
     height: 1px;
     background: #E3E1D9;
   }
+  /* @ 引用 chip（Benchling entity chip） */
+  .rich-editor-content .rich-ref-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 8px 1px 4px;
+    margin: 0 1px;
+    border-radius: 999px;
+    font-size: 0.88em;
+    font-weight: 500;
+    text-decoration: none !important;
+    border: 1px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .rich-editor-content .rich-ref-chip::before {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 0 4px;
+    border-radius: 4px;
+  }
+  .rich-editor-content .rich-ref-record { background: #3E7C6B14; color: #2F6355; border-color: #3E7C6B2E; }
+  .rich-editor-content .rich-ref-record::before { content: '记录'; background: #3E7C6B1F; color: #3E7C6B; }
+  .rich-editor-content .rich-ref-protocol { background: #5B7C9914; color: #47617C; border-color: #5B7C992E; }
+  .rich-editor-content .rich-ref-protocol::before { content: '方法'; background: #5B7C991F; color: #5B7C99; }
+  .rich-editor-content .rich-ref-sample { background: #7A5BA614; color: #624788; border-color: #7A5BA62E; }
+  .rich-editor-content .rich-ref-sample::before { content: '样本'; background: #7A5BA61F; color: #7A5BA6; }
+  .rich-editor-content .rich-ref-chip.ProseMirror-selectednode { outline: 2px solid #3E7C6B; }
+
   .rich-editor-content .rich-date-insert.ProseMirror-selectednode {
     outline: 2px solid #3E7C6B;
     outline-offset: 2px;
@@ -266,8 +295,28 @@
   }
   .rich-slash-item.active { background: #EAF1EE; }
   .rich-slash-title { font-size: 13px; color: #2B3A35; font-weight: 500; }
-  .rich-slash-hint { font-size: 11px; color: #9AA39C; }
+  .rich-slash-hint { font-size: 11px; color: #9AA39C; margin-left: auto; padding-left: 10px; }
+  .rich-slash-empty { padding: 7px 10px; font-size: 12px; color: #9AA39C; }
+  .rich-ref-kind {
+    flex: none;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .rich-slash-item .rich-ref-kind.rich-ref-record { background: #3E7C6B1F; color: #3E7C6B; }
+  .rich-slash-item .rich-ref-kind.rich-ref-protocol { background: #5B7C991F; color: #5B7C99; }
+  .rich-slash-item .rich-ref-kind.rich-ref-sample { background: #7A5BA61F; color: #7A5BA6; }
 
   /* 渲染态（分享页/查看态）复用编辑内容样式 */
   .rich-render .rich-editor-content { padding: 0; min-height: 0; }
+}
+
+/* 打印 / 导出 PDF：隐藏应用框架与交互控件，只留干净文档 */
+@media print {
+  body { background: #fff !important; }
+  aside, header, nav, button, .rich-slash-menu { display: none !important; }
+  input, textarea { border-color: transparent !important; box-shadow: none !important; }
+  .rich-editor-content { min-height: 0 !important; }
+  .shadow-card, .shadow-overlay { box-shadow: none !important; }
 }
