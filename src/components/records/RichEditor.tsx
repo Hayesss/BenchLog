@@ -2,7 +2,7 @@
 // 能力：工具栏（标题/粗斜体/上下标/高亮/列表/勾选/引用/代码块/表格/图片/链接/分割线）
 //      + 斜杠命令（/）+ 图片粘贴与插入（canvas 压缩 base64 内嵌）+ 表格行列操作 + 大纲提取
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { Editor, EditorContent, Extension, useEditor } from '@tiptap/react'
+import { Editor, EditorContent, Extension, Node, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import Highlight from '@tiptap/extension-highlight'
@@ -43,10 +43,53 @@ import {
   Table as TableIcon,
   Underline as UnderlineIcon,
   Undo2,
+  Keyboard,
+  X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type OutlineItem = { level: number; text: string; pos: number }
+
+/* ---------------- 日期段（Benchling New day） ---------------- */
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
+
+function todayIso(): string {
+  const d = new Date()
+  const p = (n: number) => `${n}`.padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+function formatDateLabel(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return iso
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 星期${WEEKDAYS[d.getDay()]}`
+}
+
+/** 不可编辑的日期分段块：加粗日期 + 右侧延伸横线（Benchling date insert） */
+const DateInsert = Node.create({
+  name: 'dateInsert',
+  group: 'block',
+  atom: true,
+  addAttributes() {
+    return { date: { default: null } }
+  },
+  parseHTML() {
+    return [
+      {
+        tag: 'div[data-date-insert]',
+        getAttrs: (el) => ({ date: (el as HTMLElement).dataset.dateInsert ?? null }),
+      },
+    ]
+  },
+  renderHTML({ node, HTMLAttributes }) {
+    const date = (node.attrs.date as string) ?? todayIso()
+    return [
+      'div',
+      { ...HTMLAttributes, 'data-date-insert': date, class: 'rich-date-insert' },
+      formatDateLabel(date),
+    ]
+  },
+})
 
 /* ---------------- 图片压缩：max 1280px，jpeg 0.85，base64 内嵌 ---------------- */
 function compressImage(file: File): Promise<string> {
@@ -97,6 +140,26 @@ const SLASH_ITEMS: SlashItem[] = [
   { title: '分割线', hint: '水平分隔', keywords: 'hr divider fenge', run: (e) => e.chain().focus().setHorizontalRule().run() },
   { title: '表格', hint: '插入 3×3 表格', keywords: 'table biaoge', run: (e) => e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
   { title: '图片', hint: '上传并插入图片', keywords: 'image img tupian', run: (_e, open) => open() },
+  {
+    title: '新一天',
+    hint: '日期分段（今天）',
+    keywords: 'newday xinyitian riqi date day fen',
+    run: (e) =>
+      e.chain().focus().insertContent([
+        { type: 'dateInsert', attrs: { date: todayIso() } },
+        { type: 'paragraph' },
+      ]).run(),
+  },
+  {
+    title: '时间戳',
+    hint: '插入当前日期时间文本',
+    keywords: 'time shijian chuo now shijianchuo',
+    run: (e) => {
+      const d = new Date()
+      const p = (n: number) => `${n}`.padStart(2, '0')
+      e.chain().focus().insertContent(`${todayIso()} ${p(d.getHours())}:${p(d.getMinutes())}`).run()
+    },
+  },
 ]
 
 /** 斜杠菜单：手写 DOM 浮层（不引 tippy），键盘上下选择、Enter 确认、Esc 关闭 */
@@ -209,7 +272,9 @@ function makeSlashExtension(openImagePicker: () => void) {
 function extractOutline(editor: Editor): OutlineItem[] {
   const items: OutlineItem[] = []
   editor.state.doc.descendants((node, pos) => {
-    if (node.type.name === 'heading') {
+    if (node.type.name === 'dateInsert') {
+      items.push({ level: 1, text: formatDateLabel((node.attrs.date as string) ?? ''), pos })
+    } else if (node.type.name === 'heading') {
       const text = node.textContent.trim()
       if (text) items.push({ level: node.attrs.level as number, text, pos })
     }
@@ -217,6 +282,24 @@ function extractOutline(editor: Editor): OutlineItem[] {
   })
   return items
 }
+
+/** 文字颜色预设（与项目设计 token 同色系，低饱和） */
+const TEXT_COLORS = ['#2B3A35', '#B4564E', '#D97B2B', '#B79B2E', '#4C8C6B', '#3E7C6B', '#5B7C99', '#7A5BA6']
+
+const SHORTCUTS: [string, string][] = [
+  ['Ctrl/⌘ B', '加粗'],
+  ['Ctrl/⌘ I', '斜体'],
+  ['Ctrl/⌘ U', '下划线'],
+  ['Ctrl/⌘ Z', '撤销'],
+  ['Ctrl/⌘ ⇧ Z', '重做'],
+  ['/', '插入菜单'],
+  ['↑ ↓ + Enter', '菜单内选择'],
+  ['Tab', '表格跳下一格'],
+  ['⇧ Tab', '表格跳上一格'],
+  ['Ctrl/⌘ V', '粘贴截图插入'],
+  ['拖拽图片', '拖入即插入'],
+  ['/新一天', '日期分段'],
+]
 
 /* ---------------- 工具栏按钮 ---------------- */
 function ToolBtn({
@@ -277,6 +360,8 @@ const RichEditor = forwardRef<
 ) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [inTable, setInTable] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [, setTick] = useState(0) // 选区变化时强制刷新工具栏 active 态
 
   const openImagePicker = useCallback(() => fileRef.current?.click(), [])
@@ -314,6 +399,7 @@ const RichEditor = forwardRef<
       TaskItem.configure({ nested: true }),
       Link.configure({ openOnClick: false }),
       Placeholder.configure({ placeholder }),
+      DateInsert,
       makeSlashExtension(openImagePicker),
     ],
     content: initialHtml,
@@ -376,9 +462,9 @@ const RichEditor = forwardRef<
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-surface">
+    <div>
       {/* 工具栏（sticky 顶部，Benchling 式） */}
-      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 border-b border-line bg-surface px-2 py-1.5">
+      <div className="sticky top-12 z-30 flex flex-wrap items-center gap-0.5 border-b border-line bg-paper/95 px-2 py-1.5 backdrop-blur md:top-14">
         <ToolBtn title="撤销" disabled={!editor?.can().undo()} onClick={() => editor?.chain().focus().undo().run()}>
           <Undo2 className="h-3.5 w-3.5" />
         </ToolBtn>
@@ -411,6 +497,61 @@ const RichEditor = forwardRef<
         <ToolBtn title="高亮" active={editor?.isActive('highlight')} onClick={() => editor?.chain().focus().toggleHighlight().run()}>
           <Highlighter className="h-3.5 w-3.5" />
         </ToolBtn>
+        {/* 文字颜色（Benchling 「A」） */}
+        <div className="relative">
+          <ToolBtn
+            title="文字颜色"
+            active={!!editor?.getAttributes('textStyle').color}
+            onClick={() => setPaletteOpen((v) => !v)}
+          >
+            <span
+              className="text-[13px] font-bold leading-none"
+              style={{ color: (editor?.getAttributes('textStyle').color as string) || undefined }}
+            >
+              A
+            </span>
+          </ToolBtn>
+          {paletteOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  setPaletteOpen(false)
+                }}
+              />
+              <div className="absolute left-0 top-full z-50 mt-1 w-[168px] rounded-xl border border-line bg-surface p-2 shadow-overlay">
+                <div className="grid grid-cols-4 gap-1.5">
+                  {TEXT_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      title={c}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        editor?.chain().focus().setColor(c).run()
+                        setPaletteOpen(false)
+                      }}
+                      className="h-7 w-full rounded-md border border-line/50 transition-transform duration-100 hover:scale-105"
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    editor?.chain().focus().unsetColor().run()
+                    setPaletteOpen(false)
+                  }}
+                  className="mt-1.5 w-full rounded-md border border-line px-2 py-1 text-[11.5px] text-ink-soft transition-colors hover:bg-bench-wash hover:text-ink"
+                >
+                  清除颜色
+                </button>
+              </div>
+            </>
+          )}
+        </div>
         <ToolBtn title="下标" active={editor?.isActive('subscript')} onClick={() => editor?.chain().focus().toggleSubscript().run()}>
           <SubIcon className="h-3.5 w-3.5" />
         </ToolBtn>
@@ -445,6 +586,10 @@ const RichEditor = forwardRef<
         </ToolBtn>
         <ToolBtn title="链接" active={editor?.isActive('link')} onClick={setLink}>
           <Link2 className="h-3.5 w-3.5" />
+        </ToolBtn>
+        <span className="mx-1 h-4 w-px bg-line" />
+        <ToolBtn title="键盘快捷键速查" onClick={() => setShortcutsOpen(true)}>
+          <Keyboard className="h-3.5 w-3.5" />
         </ToolBtn>
 
         {/* 选中表格时的行列操作（Benchling 式表格工具） */}
@@ -493,6 +638,41 @@ const RichEditor = forwardRef<
           e.target.value = ''
         }}
       />
+
+      {/* 快捷键速查浮层 */}
+      {shortcutsOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/25 p-4 backdrop-blur-sm"
+          onMouseDown={() => setShortcutsOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-overlay"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-[14px] font-semibold text-ink">键盘快捷键</p>
+              <button
+                type="button"
+                onClick={() => setShortcutsOpen(false)}
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-mute transition-colors hover:bg-bench-wash hover:text-ink"
+                aria-label="关闭"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-y-1.5 sm:grid-cols-2 sm:gap-x-6">
+              {SHORTCUTS.map(([keys, label]) => (
+                <div key={keys} className="flex items-center justify-between gap-3 text-[12.5px]">
+                  <span className="text-ink-soft">{label}</span>
+                  <kbd className="shrink-0 rounded border border-line bg-paper px-1.5 py-0.5 font-mono text-[11px] text-ink-mute">
+                    {keys}
+                  </kbd>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 })

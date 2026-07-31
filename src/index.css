@@ -156,9 +156,34 @@
   .rich-editor-content mark { background: #F2E3B3; border-radius: 2px; padding: 0 1px; }
   .rich-editor-content img {
     max-width: 100%;
-    border-radius: 8px;
+    border-radius: 12px;
+    border: 1px solid #E3E1D9;
+    box-shadow: 0 1px 2px rgb(43 58 53 / 0.06);
     margin: 0.5em 0;
     display: block;
+  }
+  /* 日期分段（Benchling New day）：加粗日期 + 右侧延伸横线 */
+  .rich-editor-content .rich-date-insert {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 1.5em 0 0.5em;
+    font-size: 0.92em;
+    font-weight: 600;
+    color: #2B3A35;
+    user-select: none;
+    cursor: default;
+  }
+  .rich-editor-content .rich-date-insert::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #E3E1D9;
+  }
+  .rich-editor-content .rich-date-insert.ProseMirror-selectednode {
+    outline: 2px solid #3E7C6B;
+    outline-offset: 2px;
+    border-radius: 4px;
   }
   .rich-editor-content img.ProseMirror-selectednode {
     outline: 2px solid #3E7C6B;

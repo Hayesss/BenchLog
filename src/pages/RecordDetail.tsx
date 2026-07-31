@@ -273,6 +273,17 @@ export default function RecordDetail() {
   // 刷新/关闭标签页时拦截未保存修改（新建模式另有 localStorage 草稿兜底）
   useUnsavedGuard(dirty)
 
+  // Benchling 式自动保存：停止输入 2.5s 自动入库（保存中跳过，dirty 仍在则下一轮再试）
+  const doSaveRef = useRef<( () => Promise<number | null>) | null>(null)
+  const savingRef = useRef(false)
+  useEffect(() => {
+    if (!dirty) return
+    const t = window.setTimeout(() => {
+      if (!savingRef.current) void doSaveRef.current?.()
+    }, 2500)
+    return () => window.clearTimeout(t)
+  }, [form, dirty])
+
   const patch = useCallback((p: Partial<FormState>) => {
     setForm((f) => ({ ...f, ...p }))
   }, [])
@@ -306,6 +317,8 @@ export default function RecordDetail() {
   const incrementUseMut = trpc.protocol.incrementUse.useMutation()
   const saving = createMut.isPending || updateMut.isPending
 
+  savingRef.current = saving
+
   const doSave = useCallback(async (): Promise<number | null> => {
     const payload = buildPayload()
     try {
@@ -337,6 +350,7 @@ export default function RecordDetail() {
       return null
     }
   }, [buildPayload, isNew, createMut, updateMut, incrementUseMut, utils, navigate, recordId, form])
+  doSaveRef.current = doSave
 
   const ensureRecordId = useCallback(async (): Promise<number> => {
     if (recordId != null) return recordId
@@ -703,7 +717,7 @@ export default function RecordDetail() {
             <div className="flex items-start gap-5">
               {outline.length > 0 && (
                 <aside className="hidden w-52 shrink-0 xl:block">
-                  <div className="sticky top-20">
+                  <div className="sticky top-24">
                     <p className="caption-en mb-2">大纲 OUTLINE</p>
                     <nav className="space-y-0.5">
                       {outline.map((o, i) => (

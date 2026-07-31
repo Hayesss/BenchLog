@@ -4,6 +4,20 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-07-31 · Benchling 对齐批次A：自动保存 + 日期段 + 文字颜色 + 页面级工具栏
+
+依据 Benchling Example Entry 真实界面截图与官方文档差异对标（P0 批次）：
+
+- 前端（自动保存）：RecordDetail 停止输入 2.5s 自动入库（debounce + doSaveRef/savingRef 防重入，保存中跳过待下一轮）；新建记录自动 create 后跳转详情，`key={initKey}` 保证编辑器内容无缝衔接；沿用「已保存 · HH:MM」指示——消灭「忘记保存丢正文」风险
+- 前端（日期段 dateInsert）：新增 TipTap atom 节点（`div[data-date-insert]`，不可编辑）——加粗日期 + 右侧延伸横线（Benchling New day 形态）；斜杠命令新增 `/新一天`（插入今日日期段+空段落）与 `/时间戳`（内联 `YYYY-MM-DD HH:MM` 文本）；大纲自动收录日期段（可点击跳转）；分享页渲染同源样式（DOMPurify 默认放行 data-* 属性）
+- 前端（文字颜色）：工具栏新增「A」按钮 + 色板浮层（8 个低饱和预设色 + 清除），接通已装载的 Color 扩展
+- 前端（快捷键速查）：工具栏键盘图标 → 浮层列出 12 组快捷键（格式化/斜杠/表格跳格/粘贴拖拽）
+- 前端（视觉对齐截图）：编辑器去卡片化（正文直接铺页面，无 border/rounded/shadow）；工具栏升级为**页面级 sticky**（top-12 md:top-14、bg-paper/95 backdrop-blur、z-30）；正文图片卡片化（圆角 12 + 边框 + 微阴影）；大纲 sticky 同步下调至 top-24
+- 验证：`npx tsc -b` 通过；33 资产 gzip+brotli 预压缩（br 944KB）；入包验证 `dateInsert`/`新一天`/`文字颜色`/`rich-date-insert` 均在产物
+- 范围：纯前端；P1 批次（@提及 chip/表格合并单元格/PDF 导出）紧随
+
+---
+
 ## 2026-07-31 · 实验记录界面 Benchling 化：全屏文档式大编辑面
 
 - 前端（RecordDetail 布局重构）：容器 1080px → 1360px、右侧属性栏 320px → 280px，主编辑栏由约 700px 扩至约 1050px；标题字号 22/28 → 24/32
