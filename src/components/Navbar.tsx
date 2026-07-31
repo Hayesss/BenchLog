@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router'
 import { format } from 'date-fns'
-import { Bell, CalendarCheck2, ChevronRight, LogOut, Plus, Search, SquareCheck } from 'lucide-react'
+import { Bell, CalendarCheck2, ChevronRight, LogOut, PanelLeftOpen, Plus, Search, SquareCheck } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { LOGIN_PATH } from '@/const'
 import { openCommandPalette } from '@/components/CommandPalette'
@@ -43,7 +43,13 @@ function useBreadcrumb(): string[] {
  * new / notifications / user. Sticky in normal document flow — no offset
  * bookkeeping required from pages.
  */
-export default function Navbar() {
+export default function Navbar({
+  sidebarCollapsed = false,
+  onExpandSidebar,
+}: {
+  sidebarCollapsed?: boolean
+  onExpandSidebar?: () => void
+}) {
   const crumbs = useBreadcrumb()
   const { user, isAuthenticated, isLoading, logout } = useAuth()
   // 今日议程（铃铛红点）：客户端本地日期，避免时区偏差
@@ -55,6 +61,18 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 hidden h-14 items-center gap-4 border-b border-line bg-paper/90 px-6 backdrop-blur md:flex">
+      {/* 侧栏收起态：展开按钮（Open WebUI 式） */}
+      {sidebarCollapsed && onExpandSidebar && (
+        <button
+          type="button"
+          aria-label="展开侧边栏"
+          title="展开侧边栏"
+          onClick={onExpandSidebar}
+          className="-ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-ink-soft shadow-card transition-colors duration-150 hover:text-ink"
+        >
+          <PanelLeftOpen className="h-4 w-4" strokeWidth={1.8} />
+        </button>
+      )}
       {/* breadcrumb */}
       <nav className="flex min-w-0 items-center text-[12.5px] text-ink-mute" aria-label="breadcrumb">
         {crumbs.map((c, i) => (

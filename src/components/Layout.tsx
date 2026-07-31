@@ -9,14 +9,17 @@ import {
   CalendarDays,
   Camera,
   ChevronDown,
+  ChevronUp,
   FileDown,
   FlaskConical,
   Grid3x3,
   Inbox,
   LayoutDashboard,
   Lightbulb,
+  LogOut,
   Menu,
   NotebookPen,
+  PanelLeftClose,
   Plus,
   Rat,
   Search,
@@ -35,6 +38,7 @@ import { LOGIN_PATH } from '@/const'
 import CommandPalette, { openCommandPalette } from '@/components/CommandPalette'
 import QuickCapture, { openQuickCapture } from '@/components/QuickCapture'
 import RecordProjectDialog from '@/components/records/RecordProjectDialog'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 const NAV_ITEMS = [
   { to: '/', label: '工作台', en: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -74,7 +78,7 @@ function useLenis() {
   }, [])
 }
 
-function Sidebar() {
+function Sidebar({ onCollapse }: { onCollapse: () => void }) {
   const [projectsOpen, setProjectsOpen] = useState(true)
   const [projectDialogOpen, setProjectDialogOpen] = useState(false)
   const { user, isAuthenticated, isLoading, logout } = useAuth()
@@ -90,11 +94,37 @@ function Sidebar() {
 
   return (
     <aside className="sticky top-0 hidden h-[100dvh] w-60 shrink-0 flex-col border-r border-line bg-paper md:flex">
-      {/* logo */}
-      <Link to="/" className="flex h-14 items-center gap-2.5 border-b border-line px-5">
-        <img src="/logo.svg" alt="BenchLog" className="h-7 w-7" />
-        <span className="font-display text-[18px] font-bold text-ink">BenchLog</span>
-      </Link>
+      {/* logo + 收起按钮（Open WebUI 式可折叠侧栏） */}
+      <div className="flex h-14 items-center border-b border-line pr-2">
+        <Link to="/" className="flex min-w-0 flex-1 items-center gap-2.5 px-5">
+          <img src="/logo.svg" alt="BenchLog" className="h-7 w-7" />
+          <span className="font-display text-[18px] font-bold text-ink">BenchLog</span>
+        </Link>
+        <button
+          type="button"
+          aria-label="收起侧边栏"
+          title="收起侧边栏"
+          onClick={onCollapse}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-mute transition-colors duration-150 hover:bg-bench-wash hover:text-ink"
+        >
+          <PanelLeftClose className="h-4 w-4" strokeWidth={1.8} />
+        </button>
+      </div>
+
+      {/* 全局搜索入口（唤起 ⌘K 命令面板，Open WebUI 式侧栏搜索） */}
+      <div className="px-3 pt-3">
+        <button
+          type="button"
+          onClick={openCommandPalette}
+          className="flex h-9 w-full items-center gap-2 rounded-lg border border-line bg-surface px-3 text-left text-[12.5px] text-ink-mute shadow-card transition-colors duration-150 hover:border-line-strong hover:text-ink-soft"
+        >
+          <Search className="h-4 w-4 shrink-0" />
+          <span className="flex-1 truncate">搜索</span>
+          <kbd className="rounded border border-line bg-paper px-1.5 py-0.5 font-mono text-[10.5px]">
+            ⌘K
+          </kbd>
+        </button>
+      </div>
 
       {/* primary nav */}
       <nav className="flex flex-col gap-0.5 px-3 py-4">
@@ -203,25 +233,46 @@ function Sidebar() {
         </Link>
       </div>
 
-      {/* user card */}
+      {/* user card（Open WebUI 式底部用户菜单：点头像弹出） */}
       <div className="border-t border-line p-3">
         {isLoading ? (
           <div className="h-12 animate-pulse rounded-lg bg-bench-wash/50" />
         ) : isAuthenticated && user ? (
-          <button
-            type="button"
-            onClick={logout}
-            title="点击退出登录"
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors duration-150 hover:bg-bench-wash/60"
-          >
-            <img src={user.avatar || '/avatar-user.png'} alt="" className="h-8 w-8 rounded-full" />
-            <span className="min-w-0">
-              <span className="block truncate text-[13px] font-medium text-ink">
-                {user.name ?? '研究者'}
-              </span>
-              <span className="block text-[11.5px] text-ink-mute">点击退出登录</span>
-            </span>
-          </button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors duration-150 hover:bg-bench-wash/60"
+              >
+                <img src={user.avatar || '/avatar-user.png'} alt="" className="h-8 w-8 rounded-full" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-medium text-ink">
+                    {user.name ?? '研究者'}
+                  </span>
+                  <span className="block truncate text-[11.5px] text-ink-mute">
+                    {user.unionId?.startsWith('local:') ? '本地账号' : 'Kimi 账号'}
+                  </span>
+                </span>
+                <ChevronUp className="h-3.5 w-3.5 shrink-0 text-ink-mute" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="top" align="start" sideOffset={8} className="w-56 rounded-xl border-line p-1.5">
+              <div className="border-b border-line px-2.5 pb-2 pt-1.5">
+                <p className="truncate text-[13px] font-medium text-ink">{user.name ?? '研究者'}</p>
+                <p className="truncate text-[11.5px] text-ink-mute">
+                  {user.unionId?.startsWith('local:') ? `账号 ${user.unionId.slice(6)}` : 'Kimi OAuth 登录'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={logout}
+                className="mt-1 flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[12.5px] text-danger transition-colors duration-150 hover:bg-danger/10"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                退出登录
+              </button>
+            </PopoverContent>
+          </Popover>
         ) : (
           <Link
             to={LOGIN_PATH}
@@ -450,9 +501,27 @@ function MobileTab({
  * mobile: 48px top bar + bottom tab bar with central FAB.
  * Content slot uses <Outlet/>: routes must be nested under this layout route.
  */
+const SIDEBAR_KEY = 'benchlog.sidebarOpen'
+
 export default function Layout() {
   useLenis()
   const { pathname } = useLocation()
+  // Open WebUI 式可折叠侧栏：偏好持久化，默认展开
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_KEY) !== '0'
+    } catch {
+      return true
+    }
+  })
+  const toggleSidebar = (open: boolean) => {
+    setSidebarOpen(open)
+    try {
+      localStorage.setItem(SIDEBAR_KEY, open ? '1' : '0')
+    } catch {
+      /* 私密模式写入失败忽略 */
+    }
+  }
   const { isAuthenticated, isLoading } = useAuth({
     redirectOnUnauthenticated: true,
     redirectPath: LOGIN_PATH,
@@ -471,9 +540,9 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-[100dvh] bg-paper">
-      <Sidebar />
+      {sidebarOpen && <Sidebar onCollapse={() => toggleSidebar(false)} />}
       <div className="flex min-w-0 flex-1 flex-col">
-        <Navbar />
+        <Navbar sidebarCollapsed={!sidebarOpen} onExpandSidebar={() => toggleSidebar(true)} />
         <MobileChrome />
         <main className="flex-1 pb-20 md:pb-0">
           {/* route transition: y 8→0, opacity, 240ms (design.md §6) */}

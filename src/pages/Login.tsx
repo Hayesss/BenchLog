@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { trpc } from '@/providers/trpc'
 
 function getOAuthUrl() {
   const kimiAuthUrl = import.meta.env.VITE_KIMI_AUTH_URL;
@@ -45,10 +46,8 @@ function HelixBackground() {
       const y1 = H / 2 + Math.sin(t) * AMP;
       const y2 = H / 2 + Math.sin(t + Math.PI) * AMP;
       rungs.push({ x, y1, y2 });
-      // 横档中点圆点（交替大小/透明度，营造节奏）
       dots.push({ x, y: (y1 + y2) / 2, r: i % 3 === 0 ? 10 : 6, o: i % 3 === 0 ? 0.5 : 0.32 });
     }
-    // 波峰/波谷端点大圆
     for (let i = 0; i <= 3; i++) {
       const x = ((i + 0.5) / 4) * W * (1 / CYCLES) * CYCLES;
       const t = (x / W) * Math.PI * 2 * CYCLES;
@@ -88,6 +87,128 @@ function HelixBackground() {
 
 const FEATURES = ['实验记录', '方法库', '样本盒', '小鼠台账', '生信分析', 'AI 助手'];
 
+const INPUT_CLS =
+  'h-10 w-full rounded-lg border border-line bg-surface px-3 text-[13.5px] text-ink outline-none placeholder:text-ink-mute focus:border-bench'
+
+/* ------------------------------------------------------------------ */
+/* 账号密码面板（本地账号登录 / 注册，与 Kimi OAuth 并存）                */
+/* ------------------------------------------------------------------ */
+
+function PasswordPanel() {
+  const regEnabledQ = trpc.auth.registrationEnabled.useQuery()
+  const canRegister = regEnabledQ.data?.enabled ?? false
+  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [username, setUsername] = useState('')
+  const [name, setName] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [localError, setLocalError] = useState('')
+
+  const goHome = () => {
+    window.location.href = '/'
+  }
+  const loginMut = trpc.auth.loginPassword.useMutation({ onSuccess: goHome })
+  const registerMut = trpc.auth.register.useMutation({ onSuccess: goHome })
+  const pending = loginMut.isPending || registerMut.isPending
+  const error = localError || loginMut.error?.message || registerMut.error?.message || ''
+
+  const submit = () => {
+    setLocalError('')
+    if (mode === 'register') {
+      if (password !== confirm) {
+        setLocalError('两次输入的密码不一致')
+        return
+      }
+      registerMut.mutate({ username: username.trim(), password, name: name.trim() || undefined })
+    } else {
+      loginMut.mutate({ username: username.trim(), password })
+    }
+  }
+
+  return (
+    <div className="mt-5 border-t border-line/70 pt-5">
+      {/* 登录 / 注册切换 */}
+      <div className="grid grid-cols-2 gap-1 rounded-lg bg-paper p-1">
+        <button
+          type="button"
+          onClick={() => { setMode('login'); setLocalError('') }}
+          className={`h-8 rounded-md text-[12.5px] font-medium transition-colors duration-150 ${
+            mode === 'login' ? 'bg-surface text-ink shadow-card' : 'text-ink-mute hover:text-ink-soft'
+          }`}
+        >
+          账号登录
+        </button>
+        <button
+          type="button"
+          onClick={() => { if (canRegister) { setMode('register'); setLocalError('') } }}
+          disabled={!canRegister}
+          title={canRegister ? '创建新账号' : '当前未开放注册'}
+          className={`h-8 rounded-md text-[12.5px] font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 ${
+            mode === 'register' ? 'bg-surface text-ink shadow-card' : 'text-ink-mute hover:text-ink-soft'
+          }`}
+        >
+          注册新账号
+        </button>
+      </div>
+
+      <form
+        className="mt-4 space-y-3"
+        onSubmit={(e) => {
+          e.preventDefault()
+          submit()
+        }}
+      >
+        <input
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="用户名（3-32 位字母、数字、_ 或 -）"
+          autoComplete="username"
+          className={INPUT_CLS}
+        />
+        {mode === 'register' && (
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="显示名（可选，默认与用户名相同）"
+            autoComplete="nickname"
+            className={INPUT_CLS}
+          />
+        )}
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder={mode === 'register' ? '密码（至少 8 位）' : '密码'}
+          autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+          className={INPUT_CLS}
+        />
+        {mode === 'register' && (
+          <input
+            type="password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder="再次输入密码"
+            autoComplete="new-password"
+            className={INPUT_CLS}
+          />
+        )}
+
+        {error && (
+          <p className="rounded-lg bg-danger/10 px-3 py-2 text-[12.5px] text-danger">{error}</p>
+        )}
+
+        <button
+          type="submit"
+          disabled={pending}
+          className="flex h-10 w-full items-center justify-center rounded-xl border border-bench-deep/20 bg-surface text-[13.5px] font-medium text-bench-deep transition-colors duration-150 hover:bg-bench-wash disabled:opacity-50"
+        >
+          {pending ? '请稍候…' : mode === 'register' ? '创建账号并进入' : '登录'}
+        </button>
+      </form>
+    </div>
+  )
+}
+
 export default function Login() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-paper via-bench-wash/50 to-paper">
@@ -113,14 +234,17 @@ export default function Login() {
             }}
             className="mt-7 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-bench-deep text-[14.5px] font-medium text-white shadow-card transition-all duration-150 hover:-translate-y-px hover:bg-[#2F6355] active:translate-y-0"
           >
-            <svg viewBox="0 0 24 24" className="h-4.5 w-4.5 h-[18px] w-[18px]" fill="currentColor" aria-hidden="true">
+            <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="currentColor" aria-hidden="true">
               <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 3.2A6.8 6.8 0 1 1 5.2 12 6.8 6.8 0 0 1 12 5.2Zm0 2.6A4.2 4.2 0 1 0 16.2 12 4.2 4.2 0 0 0 12 7.8Z" />
             </svg>
             使用 Kimi 账号登录
           </button>
 
+          {/* 本地账号登录 / 注册 */}
+          <PasswordPanel />
+
           {/* 功能速览 */}
-          <div className="mt-7 border-t border-line/70 pt-5">
+          <div className="mt-6 border-t border-line/70 pt-5">
             <p className="caption-en text-center">一个工作台 THIS IS BENCHLOG</p>
             <div className="mt-2.5 flex flex-wrap justify-center gap-1.5">
               {FEATURES.map((f) => (

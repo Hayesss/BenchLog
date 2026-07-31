@@ -16,4 +16,6 @@ export const env = {
   kimiAuthUrl: required("KIMI_AUTH_URL"),
   kimiOpenUrl: required("KIMI_OPEN_URL"),
   ownerUnionId: process.env.OWNER_UNION_ID ?? "",
+  // 本地账号注册开关：默认开放，REGISTRATION_ENABLED=false 关闭
+  registrationEnabled: process.env.REGISTRATION_ENABLED !== "false",
 };

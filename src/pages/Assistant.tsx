@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Inbox,
   MessageSquarePlus,
+  Search,
   Send,
   Settings2,
   Sparkles,
@@ -51,6 +52,112 @@ const QUICK_PROMPTS = [
   '收集箱里还没处理的内容，帮我排个优先级',
   '基于现有数据，帮我想下一步可以验证的假设',
 ]
+
+/** Open WebUI 式会话日期分组：今天/昨天/过去 7 天/过去 30 天/更早（空组不渲染） */
+function groupByDate(convs: Conversation[]): { label: string; items: Conversation[] }[] {
+  const now = new Date()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const DAY = 86_400_000
+  const groups = [
+    { label: '今天', items: [] as Conversation[] },
+    { label: '昨天', items: [] as Conversation[] },
+    { label: '过去 7 天', items: [] as Conversation[] },
+    { label: '过去 30 天', items: [] as Conversation[] },
+    { label: '更早', items: [] as Conversation[] },
+  ]
+  for (const c of convs) {
+    const t = new Date(c.updatedAt).getTime()
+    if (t >= startOfToday) groups[0].items.push(c)
+    else if (t >= startOfToday - DAY) groups[1].items.push(c)
+    else if (t >= startOfToday - 7 * DAY) groups[2].items.push(c)
+    else if (t >= startOfToday - 30 * DAY) groups[3].items.push(c)
+    else groups[4].items.push(c)
+  }
+  return groups.filter((g) => g.items.length > 0)
+}
+
+/* ------------------------------------------------------------------ */
+/* 模型选择器（Open WebUI 式顶部下拉）：切换 active 模型档案              */
+/* ------------------------------------------------------------------ */
+function ModelSwitcher({ onOpenSettings }: { onOpenSettings: () => void }) {
+  const utils = trpc.useUtils()
+  const [open, setOpen] = useState(false)
+  const profilesQ = trpc.aiProfile.list.useQuery()
+  const setActiveMut = trpc.aiProfile.setActive.useMutation({
+    onSuccess: () => {
+      void utils.aiProfile.list.invalidate()
+      setOpen(false)
+    },
+    onError: (e) => toast.error(`切换失败：${e.message}`),
+  })
+  const profiles = profilesQ.data ?? []
+  const active = profiles.find((p) => p.active)
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          title="切换当前对话使用的模型档案"
+          className="flex h-8 max-w-[190px] shrink-0 items-center gap-1.5 rounded-lg px-2 text-[12px] text-ink-soft transition-colors duration-150 hover:bg-paper hover:text-ink"
+        >
+          <Bot className="h-3.5 w-3.5 shrink-0 text-bench" />
+          <span className="truncate">{active ? active.label || active.model : '选择模型'}</span>
+          <ChevronDown className="h-3 w-3 shrink-0" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 rounded-xl border-line p-2">
+        <p className="caption-en mb-1.5 px-1.5">模型档案 MODELS</p>
+        {profiles.length === 0 ? (
+          <p className="px-1.5 py-3 text-[12.5px] text-ink-mute">尚无模型档案，请先创建</p>
+        ) : (
+          <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
+            {profiles.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                disabled={setActiveMut.isPending}
+                onClick={() => {
+                  if (!p.hasApiKey) {
+                    toast.error('该档案未保存 API Key，请先在设置中填写')
+                    setOpen(false)
+                    onOpenSettings()
+                    return
+                  }
+                  if (!p.active) setActiveMut.mutate({ id: p.id })
+                  else setOpen(false)
+                }}
+                className={cn(
+                  'flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12.5px] transition-colors duration-150',
+                  p.active ? 'bg-bench-wash font-medium text-bench-ink' : 'text-ink-soft hover:bg-paper',
+                )}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{p.label || p.model}</span>
+                  <span className="block truncate font-mono text-[10.5px] text-ink-mute">
+                    {p.model}
+                    {!p.hasApiKey && ' · 缺 Key'}
+                  </span>
+                </span>
+                {p.active && <Check className="h-3.5 w-3.5 shrink-0" />}
+              </button>
+            ))}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false)
+            onOpenSettings()
+          }}
+          className="mt-1.5 flex w-full items-center gap-2 rounded-lg border-t border-line px-1.5 pt-2 text-left text-[12px] font-medium text-bench transition-colors duration-150 hover:underline"
+        >
+          <Settings2 className="h-3.5 w-3.5" /> 管理模型档案…
+        </button>
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 /* ------------------------------------------------------------------ */
 /* 消息气泡                                                              */
@@ -217,6 +324,9 @@ function ChatPane({
   onOpenSettings,
   onBack,
   onProjectMoved,
+  pendingMessage,
+  onPendingMessageConsumed,
+  onRequestConversation,
 }: {
   conversation: Conversation | null
   projectName: string | null
@@ -225,6 +335,11 @@ function ChatPane({
   onOpenSettings: () => void
   onBack: () => void
   onProjectMoved: (projectId: number | null) => void
+  /** 欢迎页直发：新会话创建成功后待发送的首条消息 */
+  pendingMessage: { convId: number; text: string } | null
+  onPendingMessageConsumed: () => void
+  /** 无选中会话时发送 = 请求新建会话并捎带首条消息 */
+  onRequestConversation: (text: string) => void
 }) {
   const utils = trpc.useUtils()
   const [draft, setDraft] = useState('')
@@ -285,7 +400,16 @@ function ChatPane({
     setPendingToolCalls([])
     setNotices([])
     setStreaming({ active: false, text: '' })
-    if (conversation) setTimeout(() => inputRef.current?.focus(), 80)
+    if (conversation) {
+      setTimeout(() => inputRef.current?.focus(), 80)
+      // 消费欢迎页捎来的首条消息（会话刚建好）
+      if (pendingMessage && pendingMessage.convId === conversation.id) {
+        const t = pendingMessage.text
+        onPendingMessageConsumed()
+        setTimeout(() => sendRef.current(t), 100)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation?.id])
 
   const onDraftChange = (v: string) => {
@@ -350,7 +474,15 @@ function ChatPane({
 
   const send = (text: string) => {
     const v = text.trim()
-    if (!v || !conversation || busy) return
+    if (!v || busy) return
+    // 欢迎页直发：无会话时先请父级创建会话，首条消息随 pendingMessage 回流
+    if (!conversation) {
+      setDraft('')
+      setRefs([])
+      setRefQuery(null)
+      onRequestConversation(v)
+      return
+    }
     // 只带上仍出现在正文里的引用（用户可能已删掉 token）
     const refIds = refs.filter((r) => v.includes(`【@${r.title}】`)).map((r) => r.id)
     setDraft('')
@@ -362,11 +494,93 @@ function ChatPane({
       void streamSend(v, refIds)
     }
   }
+  const sendRef = useRef(send)
+  sendRef.current = send
 
   const settleToolCall = (call: ToolCall, notice?: string) => {
     setPendingToolCalls((prev) => prev.filter((t) => t.id !== call.id))
     if (notice) setNotices((prev) => [...prev, { id: Date.now(), text: notice }])
   }
+
+  // 输入区（Open WebUI 式：欢迎页内嵌居中 / 会话底部固定，两处复用）
+  const inputBox = (
+    <div className="relative mx-auto w-full max-w-[720px]">
+      {refQuery != null && recordOptions.length > 0 && (
+        <div className="absolute bottom-full left-0 z-10 mb-2 w-full max-w-[420px] overflow-hidden rounded-xl border border-line bg-surface shadow-card">
+          <p className="border-b border-line-soft px-3 py-1.5 text-[11px] text-ink-mute">引用记录（点击插入）</p>
+          {recordOptions.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => pickRef(r)}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] text-ink transition-colors duration-150 hover:bg-bench-wash"
+            >
+              <span className="shrink-0 text-[11px] text-ink-mute">{r.recordDate}</span>
+              <span className="truncate">{r.title}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {refs.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {refs.map((r) => (
+            <span
+              key={r.id}
+              className="flex items-center gap-1 rounded-full bg-bench-wash px-2.5 py-1 text-[11.5px] text-bench-ink"
+            >
+              <AtSign className="h-3 w-3" />
+              <span className="max-w-[180px] truncate">{r.title}</span>
+              <button
+                type="button"
+                aria-label="移除引用"
+                onClick={() => {
+                  setRefs((prev) => prev.filter((x) => x.id !== r.id))
+                  setDraft((d) => d.replace(`【@${r.title}】`, ''))
+                }}
+                className="text-bench-ink/60 hover:text-bench-ink"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex items-end gap-2">
+        <textarea
+          ref={inputRef}
+          value={draft}
+          onChange={(e) => onDraftChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault()
+              send(draft)
+            }
+          }}
+          rows={2}
+          placeholder={
+            !hasKey
+              ? '请先配置 LLM'
+              : conversation
+                ? opsMode
+                  ? '操作模式：AI 可提议创建待办/收集箱（Enter 发送，@ 引用记录）'
+                  : '输入问题…（Enter 发送，Shift+Enter 换行，@ 引用记录）'
+                : '先随便问一句，将自动开启新对话…（Enter 发送）'
+          }
+          disabled={!hasKey || busy}
+          className="max-h-32 min-h-[44px] flex-1 resize-none rounded-xl border border-line bg-paper px-3 py-2.5 text-[13.5px] leading-[20px] text-ink outline-none transition-colors duration-150 placeholder:text-ink-mute focus:border-bench disabled:opacity-60"
+        />
+        <button
+          type="button"
+          aria-label="发送"
+          onClick={() => send(draft)}
+          disabled={!hasKey || busy || draft.trim() === ''}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-bench text-white shadow-card transition-all duration-150 hover:bg-bench-deep disabled:opacity-50"
+        >
+          <Send className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  )
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -383,6 +597,7 @@ function ChatPane({
         <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-ink">
           {conversation ? conversation.title || '新对话' : 'AI 助手'}
         </span>
+        <ModelSwitcher onOpenSettings={onOpenSettings} />
         {conversation && (
           <Popover open={projOpen} onOpenChange={setProjOpen}>
             <PopoverTrigger asChild>
@@ -485,18 +700,30 @@ function ChatPane({
       {/* 消息流 */}
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-6">
         {!conversation ? (
-          <div className="mx-auto flex h-full max-w-[520px] flex-col items-center justify-center gap-4 text-center">
+          <div className="mx-auto flex h-full w-full max-w-[640px] flex-col items-center justify-center text-center">
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-bench-wash">
               <Sparkles className="h-6 w-6 text-bench" strokeWidth={1.6} />
             </span>
-            <div>
-              <p className="font-display text-[17px] font-semibold text-ink">BenchLog AI 副驾</p>
-              <p className="mt-1.5 text-[13px] leading-[20px] text-ink-mute">
-                我能读取你的项目、实验记录、方法与收集箱，陪你讨论数据、分析失败原因、规划下一步。
-                输入 @ 可引用具体记录；开启「操作模式」后，写入类操作都会先给你确认。
-              </p>
+            <p className="mt-4 font-display text-[22px] font-semibold text-ink">今天想分析什么？</p>
+            <p className="mt-2 max-w-[520px] text-[13px] leading-[20px] text-ink-mute">
+              我能读取你的项目、实验记录、方法与收集箱，陪你讨论数据、分析失败原因、规划下一步。
+              输入 @ 可引用具体记录；开启「操作模式」后，写入类操作都会先给你确认。
+            </p>
+            <div className="mt-5 w-full text-left">{inputBox}</div>
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              {QUICK_PROMPTS.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => send(p)}
+                  disabled={!hasKey || busy}
+                  className="rounded-full border border-line bg-surface px-3 py-1.5 text-[12px] text-ink-soft shadow-card transition-all duration-150 hover:border-bench/40 hover:text-ink disabled:opacity-50"
+                >
+                  {p}
+                </button>
+              ))}
             </div>
-            <p className="text-[12px] text-ink-mute">从左侧选择一个会话，或新建对话开始</p>
+            <p className="mt-4 text-[12px] text-ink-mute">也可以从左侧选择一个历史会话继续</p>
           </div>
         ) : messages.length === 0 && !busy ? (
           <div className="mx-auto max-w-[520px] pt-6">
@@ -556,84 +783,9 @@ function ChatPane({
         )}
       </div>
 
-      {/* 输入框 */}
+      {/* 会话底部输入区（欢迎页内嵌见上） */}
       {conversation && (
-        <div className="shrink-0 border-t border-line bg-surface px-3 py-3 md:px-6">
-          <div className="relative mx-auto max-w-[720px]">
-            {refQuery != null && recordOptions.length > 0 && (
-              <div className="absolute bottom-full left-0 z-10 mb-2 w-full max-w-[420px] overflow-hidden rounded-xl border border-line bg-surface shadow-card">
-                <p className="border-b border-line-soft px-3 py-1.5 text-[11px] text-ink-mute">引用记录（点击插入）</p>
-                {recordOptions.map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => pickRef(r)}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] text-ink transition-colors duration-150 hover:bg-bench-wash"
-                  >
-                    <span className="shrink-0 text-[11px] text-ink-mute">{r.recordDate}</span>
-                    <span className="truncate">{r.title}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {refs.length > 0 && (
-              <div className="mb-2 flex flex-wrap gap-1.5">
-                {refs.map((r) => (
-                  <span
-                    key={r.id}
-                    className="flex items-center gap-1 rounded-full bg-bench-wash px-2.5 py-1 text-[11.5px] text-bench-ink"
-                  >
-                    <AtSign className="h-3 w-3" />
-                    <span className="max-w-[180px] truncate">{r.title}</span>
-                    <button
-                      type="button"
-                      aria-label="移除引用"
-                      onClick={() => {
-                        setRefs((prev) => prev.filter((x) => x.id !== r.id))
-                        setDraft((d) => d.replace(`【@${r.title}】`, ''))
-                      }}
-                      className="text-bench-ink/60 hover:text-bench-ink"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-            <div className="flex items-end gap-2">
-              <textarea
-                ref={inputRef}
-                value={draft}
-                onChange={(e) => onDraftChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                    e.preventDefault()
-                    send(draft)
-                  }
-                }}
-                rows={2}
-                placeholder={
-                  hasKey
-                    ? opsMode
-                      ? '操作模式：AI 可提议创建待办/收集箱（Enter 发送，@ 引用记录）'
-                      : '输入问题…（Enter 发送，Shift+Enter 换行，@ 引用记录）'
-                    : '请先配置 LLM'
-                }
-                disabled={!hasKey || busy}
-                className="max-h-32 min-h-[44px] flex-1 resize-none rounded-xl border border-line bg-paper px-3 py-2.5 text-[13.5px] leading-[20px] text-ink outline-none transition-colors duration-150 placeholder:text-ink-mute focus:border-bench disabled:opacity-60"
-              />
-              <button
-                type="button"
-                aria-label="发送"
-                onClick={() => send(draft)}
-                disabled={!hasKey || busy || draft.trim() === ''}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-bench text-white shadow-card transition-all duration-150 hover:bg-bench-deep disabled:opacity-50"
-              >
-                <Send className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
+        <div className="shrink-0 border-t border-line bg-surface px-3 py-3 md:px-6">{inputBox}</div>
       )}
     </div>
   )
@@ -653,6 +805,10 @@ export default function Assistant() {
   const [selectedConv, setSelectedConv] = useState<number | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [deleteConv, setDeleteConv] = useState<Conversation | null>(null)
+  const [convQuery, setConvQuery] = useState('')
+  // 欢迎页直发：记下首条消息，会话创建成功后经 pendingMessage 交给 ChatPane 发送
+  const firstMsgRef = useRef<string | null>(null)
+  const [pendingMessage, setPendingMessage] = useState<{ convId: number; text: string } | null>(null)
 
   const settingsQ = trpc.ai.getSettings.useQuery()
   const profilesQ = trpc.aiProfile.list.useQuery()
@@ -662,6 +818,10 @@ export default function Assistant() {
   const createMut = trpc.ai.createConversation.useMutation({
     onSuccess: (c) => {
       setSelectedConv(c.id)
+      if (firstMsgRef.current) {
+        setPendingMessage({ convId: c.id, text: firstMsgRef.current })
+        firstMsgRef.current = null
+      }
       void utils.ai.listConversations.invalidate()
     },
     onError: (e) => toast.error(`创建失败：${e.message}`),
@@ -693,6 +853,13 @@ export default function Assistant() {
   const filtered = conversations.filter((c) =>
     selectedProject === null ? c.projectId === null : c.projectId === selectedProject,
   )
+  // 会话搜索（Open WebUI 式）：按标题模糊过滤后再按日期分组
+  const searched = useMemo(() => {
+    const q = convQuery.trim().toLowerCase()
+    if (!q) return filtered
+    return filtered.filter((c) => (c.title || '新对话').toLowerCase().includes(q))
+  }, [filtered, convQuery])
+  const grouped = useMemo(() => groupByDate(searched), [searched])
   const current = conversations.find((c) => c.id === selectedConv) ?? null
   const currentProjectName =
     current?.projectName ??
@@ -708,9 +875,38 @@ export default function Assistant() {
     createMut.mutate({ projectId: selectedProject ?? undefined })
   }
 
+  /** 欢迎页直发：记下首条消息再建会话，onSuccess 里转 pendingMessage */
+  const requestConversation = (text: string) => {
+    if (createMut.isPending) return
+    firstMsgRef.current = text
+    createMut.mutate({ projectId: selectedProject ?? undefined })
+  }
+
   /* 中栏会话列表（移动端与项目选择合一） */
   const listPane = (
     <div className="flex min-h-0 flex-1 flex-col">
+      {/* 新对话主按钮 + 会话搜索（Open WebUI 式置顶） */}
+      <div className="shrink-0 border-b border-line p-3">
+        <button
+          type="button"
+          onClick={newConversation}
+          disabled={createMut.isPending}
+          className="flex h-9 w-full items-center gap-2 rounded-xl border border-line bg-surface px-3 text-[13px] font-medium text-ink shadow-card transition-all duration-150 hover:border-bench/40 hover:text-bench-ink disabled:opacity-50"
+        >
+          <MessageSquarePlus className="h-4 w-4 text-bench" />
+          新对话
+        </button>
+        <div className="relative mt-2">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-mute" />
+          <input
+            value={convQuery}
+            onChange={(e) => setConvQuery(e.target.value)}
+            placeholder="搜索会话"
+            className="h-8 w-full rounded-lg border border-line bg-paper pl-8 pr-2 text-[12.5px] text-ink outline-none placeholder:text-ink-mute focus:border-bench"
+          />
+        </div>
+      </div>
+
       {/* 项目选择 */}
       <div className="shrink-0 border-b border-line px-3 py-2.5">
         <p className="caption-en mb-1.5 px-1">项目 PROJECT</p>
@@ -745,23 +941,17 @@ export default function Assistant() {
         </div>
       </div>
 
-      {/* 会话列表 */}
-      <div className="flex h-10 shrink-0 items-center justify-between border-b border-line px-4">
-        <span className="caption-en">会话 CHATS</span>
-        <button
-          type="button"
-          onClick={newConversation}
-          disabled={createMut.isPending}
-          className="flex h-7 items-center gap-1 rounded-md px-1.5 text-[12px] font-medium text-bench transition-colors duration-150 hover:bg-bench-wash disabled:opacity-50"
-        >
-          <MessageSquarePlus className="h-3.5 w-3.5" /> 新对话
-        </button>
-      </div>
+      {/* 会话列表（Open WebUI 式日期分组） */}
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
-        {filtered.length === 0 ? (
-          <p className="px-3 py-8 text-center text-[12.5px] text-ink-mute">暂无会话，点「新对话」开始</p>
+        {grouped.length === 0 ? (
+          <p className="px-3 py-8 text-center text-[12.5px] text-ink-mute">
+            {convQuery.trim() ? '没有匹配的会话' : '暂无会话，点上方「新对话」开始'}
+          </p>
         ) : (
-          filtered.map((c) => (
+          grouped.map((g) => (
+            <div key={g.label}>
+              <p className="caption-en px-3 pb-1 pt-2.5">{g.label}</p>
+              {g.items.map((c) => (
             <div
               key={c.id}
               className={cn(
@@ -795,6 +985,8 @@ export default function Assistant() {
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             </div>
+              ))}
+            </div>
           ))
         )}
       </div>
@@ -812,6 +1004,9 @@ export default function Assistant() {
       onOpenSettings={() => setSettingsOpen(true)}
       onBack={() => setSelectedConv(null)}
       onProjectMoved={(pid) => selectProject(pid)}
+      pendingMessage={pendingMessage}
+      onPendingMessageConsumed={() => setPendingMessage(null)}
+      onRequestConversation={requestConversation}
     />
   )
 

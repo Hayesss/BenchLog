@@ -4,6 +4,19 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-07-31 · 本地账号注册登录 + Open WebUI 式布局重构 + README 全量重写
+
+- 数据层：`users` 新增 `passwordHash`（varchar 255 nullable，Kimi OAuth 用户为空）；幂等迁移 `scripts/add-password-auth.ts`
+- 后端：本地账号体系——密码用户以 `local:用户名` 合成 unionId（与 OAuth 用户天然隔离，JWT 会话与 unionId→user 查找零改动）；scrypt（N=16384）加盐哈希零外部依赖（`api/lib/password.ts`）；`auth.register`（开关 `REGISTRATION_ENABLED` 默认开、用户名正则、重名 CONFLICT）/ `auth.loginPassword`（不存在与密码错误统一措辞不泄露账号存在性）/ `auth.registrationEnabled`；注册/登录成功即种与 OAuth 一致的 httpOnly 会话 cookie；**安全修复：`auth.me` 剥离 passwordHash 再下发**
+- 前端（登录页）：Kimi 按钮下方新增账号密码面板——「账号登录 / 注册新账号」双页签（注册开关关闭时注册页签禁用）、确认密码一致性校验、错误内嵌提示、成功后硬跳转进入
+- 前端（Open WebUI 式布局重构）：
+  - Layout：侧边栏可完全折叠（logo 旁收起按钮，localStorage 记忆，Navbar 左侧展开按钮）、边栏顶部搜索框（唤起 ⌘K）、底部用户卡改弹出菜单（账号类型标识 Kimi/本地 + 退出登录）
+  - Assistant：中栏置顶「新对话」主按钮 + 会话搜索框；会话列表按「今天/昨天/过去 7 天/过去 30 天/更早」分组；对话头部新增**模型选择器**（下拉即切 active 档案，缺 Key 档案引导去设置）；**欢迎页直发**（未选会话直接输入/点快捷提示即自动建会话并发首条，pendingMessage 机制）
+- 文档：README 全量重写（双登录/分享/AI 档案/Open WebUI 布局/性能特性/33 表清单/安全与隐私节）
+- 验证：tsc 通过；注册链路冒烟 11 断言（注册/cookie/scrypt 格式/重名 CONFLICT/大小写不敏感/错误密码与不存在用户同措辞/弱密码拦截）；生产模式 HTTP 端到端（注册→cookie→me）复核 + me 不含哈希复核
+
+---
+
 ## 2026-07-31 · 性能 P0：静态资源预压缩 + 分级缓存头 + React Query 全局默认值
 
 - 前端：`QueryClient` 全局 `staleTime: 60_000` + `refetchOnWindowFocus: false`——页面切换 60s 内命中缓存不发请求、切回窗口不再自动重拉（写操作走 invalidate 强制重拉不受影响；useAuth 局部 5min 覆盖不变）
