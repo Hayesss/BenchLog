@@ -37,7 +37,8 @@ import { cn } from '@/lib/utils'
 import { trpc } from '@/providers/trpc'
 import { ShareButton } from '@/components/share/ShareButton'
 import RecordDeviationTable from '@/components/records/RecordDeviationTable'
-import RecordMarkdownEditor from '@/components/records/RecordMarkdownEditor'
+import RichEditor, { textToInitialHtml } from '@/components/records/RichEditor'
+import type { OutlineItem, RichEditorHandle } from '@/components/records/RichEditor'
 import RecordImageGallery from '@/components/records/RecordImageGallery'
 import type { RecordImageGalleryHandle } from '@/components/records/RecordImageGallery'
 import RecordPropertiesPanel, {
@@ -68,6 +69,7 @@ type FormState = {
   protocolVersion: string | null
   deviations: Deviation[]
   resultMd: string
+  contentHtml: string
   conclusion: string
   nextStep: string
   status: RecordStatus
@@ -83,10 +85,17 @@ const EMPTY_FORM: FormState = {
   protocolVersion: null,
   deviations: [],
   resultMd: '',
+  contentHtml: '',
   conclusion: '',
   nextStep: '',
   status: 'ongoing',
   tags: [],
+}
+
+function htmlToText(html: string): string {
+  const div = document.createElement('div')
+  div.innerHTML = html
+  return (div.textContent || '').replace(/\u00a0/g, ' ').replace(/[ \t]+/g, ' ').trim()
 }
 
 function formFromRecord(r: RecordDetailData): FormState {
@@ -99,6 +108,8 @@ function formFromRecord(r: RecordDetailData): FormState {
     protocolVersion: r.protocolVersion ?? null,
     deviations: r.deviations ?? [],
     resultMd: r.resultMd ?? '',
+    // 老记录无富文本正文：由 resultMd 纯文本转为初始段落，实现无缝升级
+    contentHtml: r.contentHtml ?? (r.resultMd ? textToInitialHtml(r.resultMd) : ''),
     conclusion: r.conclusion ?? '',
     nextStep: r.nextStep ?? '',
     status: r.status,
@@ -159,6 +170,8 @@ export default function RecordDetail() {
   const [snapshot, setSnapshot] = useState<string>(() => JSON.stringify(EMPTY_FORM))
   // tracks which record ('new' | id) the form has been initialized for
   const [initKey, setInitKey] = useState<string | null>(null)
+  const [outline, setOutline] = useState<OutlineItem[]>([])
+  const editorRef = useRef<RichEditorHandle>(null)
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
   const [savePulse, setSavePulse] = useState(false)
   const [flashKey, setFlashKey] = useState(0)
@@ -244,6 +257,7 @@ export default function RecordDetail() {
       protocolVersion: form.protocolId ? form.protocolVersion : null,
       deviations,
       resultMd: form.resultMd,
+    contentHtml: form.contentHtml,
       conclusion: form.conclusion.trim() || undefined,
       nextStep: form.nextStep.trim() || undefined,
       status: form.status,
@@ -393,7 +407,8 @@ export default function RecordDetail() {
       }
       lines.push('')
     }
-    lines.push('## 结果', form.resultMd || '（空）', '')
+    const bodyText = form.contentHtml ? htmlToText(form.contentHtml) : form.resultMd
+    lines.push('## 结果', bodyText || '（空）', '')
     if (images.length > 0) {
       lines.push('### 结果图片')
       for (const im of images) lines.push(`- [${im.kind}] ${im.caption ?? `图片 ${im.id}`}`)
@@ -692,13 +707,38 @@ export default function RecordDetail() {
 
           {/* result */}
           <motion.section variants={sectionVariants}>
-            <p className="caption-en mb-1.5">结果 RESULTS</p>
-            <RecordMarkdownEditor
-              value={form.resultMd}
-              onChange={(v) => patch({ resultMd: v })}
-              onPasteFiles={(files) => galleryRef.current?.uploadFiles(files)}
-              onInsertImage={() => galleryRef.current?.pick(false)}
-            />
+            <p className="caption-en mb-1.5">实验正文 NOTEBOOK</p>
+            <div className="flex items-start gap-5">
+              {outline.length > 0 && (
+                <aside className="hidden w-44 shrink-0 xl:block">
+                  <div className="sticky top-20">
+                    <p className="caption-en mb-2">大纲 OUTLINE</p>
+                    <nav className="space-y-0.5">
+                      {outline.map((o, i) => (
+                        <button
+                          key={`${o.pos}-${i}`}
+                          type="button"
+                          onClick={() => editorRef.current?.scrollToPos(o.pos)}
+                          className="block w-full truncate rounded-lg px-2 py-1 text-left text-[12px] text-ink-soft transition-colors hover:bg-bench-wash hover:text-bench-deep"
+                          style={{ paddingLeft: `${(o.level - 1) * 12 + 8}px` }}
+                        >
+                          {o.text}
+                        </button>
+                      ))}
+                    </nav>
+                  </div>
+                </aside>
+              )}
+              <div className="min-w-0 flex-1">
+                <RichEditor
+                  ref={editorRef}
+                  key={initKey ?? 'new'}
+                  initialHtml={initKey === wantKey ? form.contentHtml : ''}
+                  onChange={(html) => patch({ contentHtml: html })}
+                  onOutlineChange={setOutline}
+                />
+              </div>
+            </div>
             <div className="mt-3">
               <RecordImageGallery
                 ref={galleryRef}

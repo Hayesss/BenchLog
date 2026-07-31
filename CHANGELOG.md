@@ -4,6 +4,18 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-07-31 · Benchling 式实验记录：TipTap 富文本笔记本编辑器
+
+- 数据层：`records` 新增 `contentHtml`（LONGTEXT nullable，承载富文本正文；`resultMd` 保留作老数据兼容）；`RecordSnapshot` 类型同步；幂等迁移 `scripts/add-record-content-html.ts`（已执行）
+- 后端：`record.create/update` 接受 `contentHtml`；版本快照 `snapshotOf` 与 `restoreVersion` 回写均含 `contentHtml`（恢复历史版本不丢正文）；分享 payload `SharedRecordPayload.contentHtml`；AI 上下文新增 `stripHtml()`——引用记录正文时把 HTML 转纯文本后截断投喂
+- 前端（编辑器内核 `RichEditor.tsx`，~570 行）：TipTap 2 + StarterKit + 14 个扩展（下划线/高亮/文字颜色/上下标/表格四件套/图片/任务清单/链接/占位提示）；sticky 工具栏（撤销重做、H1-H3、粗斜体下划线删除线、高亮、上下标、三种列表、引用、代码块、分割线、表格行列增删、链接）；**斜杠（/）命令菜单**（@tiptap/suggestion 手写原生 DOM 浮层，11 项命令含拼音关键词检索，键盘上下/回车/ESC）；粘贴图片自动压缩（最长边 1280 / JPEG 0.85）为内嵌 dataURL
+- 前端（RecordDetail 集成）：「结果 RESULTS」区升级为「实验正文 NOTEBOOK」——xl+ 左侧 sticky 自动大纲（从正文标题实时提取、可点击平滑滚动跳转）+ 笔记本主体；`key={initKey}` 保证记录加载后编辑器以正确 initialHtml 重挂载；老记录打开时 `resultMd` 经 `textToInitialHtml()` 无缝升级为富文本（零数据迁移）；导出 .md 时正文优先取 contentHtml 纯文本（`htmlToText`）
+- 前端（分享页）：record 分支以 DOMPurify 消毒后渲染 `contentHtml`（复用编辑器排版样式），无富文本时回退原 markdown 渲染
+- 验证：`npx tsc -b` 通过；vite 构建 33 个资产全部 gzip+brotli 预压缩（原始 4265KB → br 943KB）；冒烟 `create→byId→update→byId→旧记录 null 兼容→版本快照→分享 payload` 全链路真实库往返 PASS（脚本跑完即删）；入包验证中文与 `contentHtml`/`snap.contentHtml` 均在产物
+- 范围：实验记录正文编辑体验；结论/下一步/实验目的等结构字段保持表单不变（下游统计与 AI 上下文继续受益）；代码分割（bundle 体积）列入 P2 待办
+
+---
+
 ## 2026-07-31 · 本地账号注册登录 + Open WebUI 式布局重构 + README 全量重写
 
 - 数据层：`users` 新增 `passwordHash`（varchar 255 nullable，Kimi OAuth 用户为空）；幂等迁移 `scripts/add-password-auth.ts`

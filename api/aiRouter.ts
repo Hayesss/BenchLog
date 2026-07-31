@@ -83,6 +83,15 @@ function clip(value: string | null, max: number): string | null {
   return value.length > max ? value.slice(0, max) : value;
 }
 
+/** 富文本正文 → 纯文本（AI 上下文用；去标签压缩空白） */
+function stripHtml(html: string | null): string {
+  if (!html) return "";
+  return html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /**
  * 构建实验数据快照（system prompt 的一部分）。
  * 目标总长 ≤ CONTEXT_MAX_CHARS：单字段在采集时已截断，超限后按比例缩减各数组条数。
@@ -212,6 +221,7 @@ export async function buildContext(
         recordDate: records.recordDate,
         purpose: records.purpose,
         resultMd: records.resultMd,
+        contentHtml: records.contentHtml,
         conclusion: records.conclusion,
         nextStep: records.nextStep,
       })
@@ -229,6 +239,7 @@ export async function buildContext(
       recordDate: r.recordDate,
       purpose: clip(r.purpose, 800),
       resultMd: clip(r.resultMd, 800),
+      contentText: clip(stripHtml(r.contentHtml) || r.resultMd, 1200),
       conclusion: clip(r.conclusion, 300),
       nextStep: clip(r.nextStep, 300),
     }));

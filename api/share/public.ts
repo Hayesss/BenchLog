@@ -19,6 +19,7 @@ export interface SharedRecordPayload {
   protocolVersion: string | null;
   purpose: string | null;
   resultMd: string | null;
+  contentHtml: string | null;
   conclusion: string | null;
   nextStep: string | null;
   images: { caption: string | null; kind: string; mime: string; data: string }[];
@@ -73,6 +74,7 @@ export async function getSharedPayload(token: string): Promise<SharedPayload | n
         tags: records.tags,
         purpose: records.purpose,
         resultMd: records.resultMd,
+        contentHtml: records.contentHtml,
         conclusion: records.conclusion,
         nextStep: records.nextStep,
         protocolVersion: records.protocolVersion,

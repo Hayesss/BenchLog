@@ -153,6 +153,8 @@ export const records = mysqlTable(
     purpose: text("purpose"),
     deviations: json("deviations").$type<Deviation[]>().notNull(),
     resultMd: text("resultMd"),
+    // Benchling 式笔记本正文（TipTap 富文本 HTML，含表格/内嵌图片，LONGTEXT）
+    contentHtml: longtext("contentHtml"),
     conclusion: text("conclusion"),
     nextStep: text("nextStep"),
     status: mysqlEnum("status", ["ongoing", "done", "failed"])
@@ -219,6 +221,7 @@ export type RecordSnapshot = {
   purpose: string | null;
   deviations: Deviation[];
   resultMd: string | null;
+  contentHtml?: string | null;
   conclusion: string | null;
   nextStep: string | null;
   status: "ongoing" | "done" | "failed";

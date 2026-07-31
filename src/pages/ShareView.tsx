@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { CalendarDays, Eye, FlaskConical, FolderKanban, Link2Off, SquareTerminal } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import DOMPurify from 'dompurify'
 import { cn } from '@/lib/utils'
 
 /* ------------------------------------------------------------------ */
@@ -20,6 +21,7 @@ type RecordContent = {
   protocolVersion: string | null
   purpose: string | null
   resultMd: string | null
+  contentHtml: string | null
   conclusion: string | null
   nextStep: string | null
   images: { caption: string | null; kind: string; mime: string; data: string }[]
@@ -195,10 +197,21 @@ function RecordView({ c }: { c: RecordContent }) {
           <p className="whitespace-pre-wrap text-[14px] leading-[22px] text-ink">{c.purpose}</p>
         </Section>
       )}
-      {c.resultMd && (
-        <Section title="实验结果 RESULTS">
-          <Md text={c.resultMd} />
+      {c.contentHtml ? (
+        <Section title="实验正文 NOTEBOOK">
+          <div className="rich-render">
+            <div
+              className="rich-editor-content"
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(c.contentHtml) }}
+            />
+          </div>
         </Section>
+      ) : (
+        c.resultMd && (
+          <Section title="实验结果 RESULTS">
+            <Md text={c.resultMd} />
+          </Section>
+        )
       )}
       {c.images.length > 0 && (
         <Section title={`结果图片 IMAGES (${c.images.length})`}>

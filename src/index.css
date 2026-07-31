@@ -99,3 +99,150 @@
   .assistant-md table { border-collapse: collapse; margin: 0.5em 0; font-size: 0.92em; }
   .assistant-md th, .assistant-md td { border: 1px solid #E3E1D9; padding: 4px 10px; }
 }
+
+/* ---------------- Benchling 式富文本编辑器（RichEditor / 渲染态共用） ---------------- */
+@layer components {
+  .rich-editor-content {
+    padding: 14px 18px 20px;
+    min-height: 260px;
+    outline: none;
+    font-size: 14px;
+    line-height: 1.75;
+    color: #2B3A35;
+  }
+  .rich-editor-content p { margin: 0.35em 0; }
+  .rich-editor-content h1,
+  .rich-editor-content h2,
+  .rich-editor-content h3 {
+    font-weight: 650;
+    line-height: 1.35;
+    margin: 0.9em 0 0.4em;
+    color: #22302B;
+  }
+  .rich-editor-content h1 { font-size: 1.45em; }
+  .rich-editor-content h2 { font-size: 1.22em; }
+  .rich-editor-content h3 { font-size: 1.08em; }
+  .rich-editor-content ul,
+  .rich-editor-content ol { padding-left: 1.4em; margin: 0.35em 0; }
+  .rich-editor-content ul { list-style: disc; }
+  .rich-editor-content ol { list-style: decimal; }
+  .rich-editor-content li p { margin: 0; }
+  .rich-editor-content blockquote {
+    border-left: 3px solid #3E7C6B55;
+    padding-left: 0.85em;
+    margin: 0.5em 0;
+    color: #5A625D;
+  }
+  .rich-editor-content code {
+    background: #3E7C6B14;
+    border-radius: 4px;
+    padding: 0.1em 0.35em;
+    font-family: ui-monospace, monospace;
+    font-size: 0.88em;
+  }
+  .rich-editor-content pre {
+    background: #262B28;
+    color: #E8EAE6;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 0.5em 0;
+    overflow-x: auto;
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+  .rich-editor-content pre code { background: transparent; padding: 0; color: inherit; }
+  .rich-editor-content hr { border: none; border-top: 1px solid #E3E1D9; margin: 1em 0; }
+  .rich-editor-content a { color: #3E7C6B; text-decoration: underline; }
+  .rich-editor-content mark { background: #F2E3B3; border-radius: 2px; padding: 0 1px; }
+  .rich-editor-content img {
+    max-width: 100%;
+    border-radius: 8px;
+    margin: 0.5em 0;
+    display: block;
+  }
+  .rich-editor-content img.ProseMirror-selectednode {
+    outline: 2px solid #3E7C6B;
+  }
+  /* 表格 */
+  .rich-editor-content table {
+    border-collapse: collapse;
+    margin: 0.6em 0;
+    font-size: 0.93em;
+    width: 100%;
+    table-layout: fixed;
+  }
+  .rich-editor-content th,
+  .rich-editor-content td {
+    border: 1px solid #D8D5C9;
+    padding: 5px 10px;
+    vertical-align: top;
+    position: relative;
+  }
+  .rich-editor-content th {
+    background: #F6F4EE;
+    font-weight: 600;
+    text-align: left;
+  }
+  .rich-editor-content .selectedCell::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: #3E7C6B18;
+    pointer-events: none;
+  }
+  /* 勾选清单 */
+  .rich-editor-content ul[data-type='taskList'] {
+    list-style: none;
+    padding-left: 0.2em;
+  }
+  .rich-editor-content ul[data-type='taskList'] li {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .rich-editor-content ul[data-type='taskList'] li > label {
+    margin-top: 4px;
+  }
+  .rich-editor-content ul[data-type='taskList'] li > div { flex: 1; }
+  .rich-editor-content ul[data-type='taskList'] li[data-checked='true'] > div {
+    color: #8A9089;
+    text-decoration: line-through;
+  }
+  /* placeholder（首段落空时） */
+  .rich-editor-content p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+    color: #9AA39C;
+  }
+
+  /* 斜杠命令浮层 */
+  .rich-slash-menu {
+    position: absolute;
+    z-index: 80;
+    min-width: 220px;
+    max-height: 280px;
+    overflow-y: auto;
+    border-radius: 12px;
+    border: 1px solid #E3E1D9;
+    background: #FFFEFA;
+    box-shadow: 0 12px 32px -8px rgba(43, 58, 53, 0.18);
+    padding: 4px;
+  }
+  .rich-slash-item {
+    display: flex;
+    width: 100%;
+    align-items: baseline;
+    gap: 10px;
+    border-radius: 8px;
+    padding: 7px 10px;
+    text-align: left;
+  }
+  .rich-slash-item.active { background: #EAF1EE; }
+  .rich-slash-title { font-size: 13px; color: #2B3A35; font-weight: 500; }
+  .rich-slash-hint { font-size: 11px; color: #9AA39C; }
+
+  /* 渲染态（分享页/查看态）复用编辑内容样式 */
+  .rich-render .rich-editor-content { padding: 0; min-height: 0; }
+}
