@@ -4,6 +4,16 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-07-31 · 实验记录界面 Benchling 化：全屏文档式大编辑面
+
+- 前端（RecordDetail 布局重构）：容器 1080px → 1360px、右侧属性栏 320px → 280px，主编辑栏由约 700px 扩至约 1050px；标题字号 22/28 → 24/32
+- 前端（区块重排）：「实验正文 NOTEBOOK」上移紧随标题——打开记录第一屏即为完整文档工作区；「实验目的」「参数偏离」改为可折叠区块（新增 `CollapsibleBlock`，默认收起，有内容时标题旁显示「已填写 / N 项偏离」徽标，随记录切换按 initKey 重算默认展开）；图片/附件/结论/下一步保持原位
+- 前端（编辑器撑满）：`.rich-editor-content` min-height 260px → `max(440px, calc(100dvh - 340px))`、字号 14px → 15px、内边距加大；大纲列 w-44 → w-52
+- 验证：`npx tsc -b` 通过；vite 构建 33 资产全量 gzip+brotli 预压缩（br 943KB）；入包验证 `100dvh`/`1360` 均在产物
+- 范围：纯前端布局，无数据层与 API 变更
+
+---
+
 ## 2026-07-31 · Benchling 式实验记录：TipTap 富文本笔记本编辑器
 
 - 数据层：`records` 新增 `contentHtml`（LONGTEXT nullable，承载富文本正文；`resultMd` 保留作老数据兼容）；`RecordSnapshot` 类型同步；幂等迁移 `scripts/add-record-content-html.ts`（已执行）

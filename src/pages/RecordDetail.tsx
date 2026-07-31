@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { motion } from 'framer-motion'
 import {
@@ -90,6 +90,40 @@ const EMPTY_FORM: FormState = {
   nextStep: '',
   status: 'ongoing',
   tags: [],
+}
+
+/** Benchling 式大编辑面：辅助区块默认折叠，让正文编辑器占据主视野 */
+function CollapsibleBlock({
+  title,
+  hint,
+  defaultOpen,
+  children,
+}: {
+  title: string
+  hint?: string
+  defaultOpen?: boolean
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen ?? false)
+  return (
+    <motion.section variants={sectionVariants}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="-mx-2 flex w-[calc(100%+16px)] items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-150 hover:bg-bench-wash"
+      >
+        <p className="caption-en">{title}</p>
+        {hint && <span className="text-[11.5px] text-ink-mute">{hint}</span>}
+        <ChevronDown
+          className={cn(
+            'ml-auto h-4 w-4 shrink-0 text-ink-mute transition-transform duration-200',
+            open && 'rotate-180',
+          )}
+        />
+      </button>
+      {open && <div className="mt-1.5">{children}</div>}
+    </motion.section>
+  )
 }
 
 function htmlToText(html: string): string {
@@ -450,7 +484,7 @@ export default function RecordDetail() {
     return (
       <div className="mx-auto w-full max-w-[1080px] px-4 py-8 md:px-8">
         <div className="h-8 w-48 animate-pulse rounded bg-line/60" />
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_280px]">
           <div className="flex flex-col gap-4">
             {[0, 1, 2].map((i) => (
               <div key={i} className="h-32 animate-pulse rounded-xl border border-line bg-surface" />
@@ -513,7 +547,7 @@ export default function RecordDetail() {
   )
 
   return (
-    <div className="mx-auto w-full max-w-[1080px] px-4 pb-28 pt-5 md:px-8 md:pb-10 md:pt-6">
+    <div className="mx-auto w-full max-w-[1360px] px-4 pb-28 pt-5 md:px-8 md:pb-10 md:pt-6">
       <Toaster position="top-right" />
 
       {/* ---------- header ---------- */}
@@ -654,7 +688,7 @@ export default function RecordDetail() {
               value={form.title}
               onChange={(e) => patch({ title: e.target.value })}
               placeholder={isNew ? '未命名湿实验记录' : '给这次实验起个名字…'}
-              className="peer w-full border-none bg-transparent pb-2 font-display text-[22px] font-bold leading-[32px] text-ink outline-none placeholder:text-ink-mute md:text-[28px] md:leading-[38px]"
+              className="peer w-full border-none bg-transparent pb-2 font-display text-[24px] font-bold leading-[34px] text-ink outline-none placeholder:text-ink-mute md:text-[32px] md:leading-[42px]"
             />
             <span className="absolute bottom-0 left-0 h-[2px] w-full bg-line" aria-hidden />
             <span
@@ -663,54 +697,12 @@ export default function RecordDetail() {
             />
           </motion.div>
 
-          {/* purpose */}
-          <motion.section variants={sectionVariants}>
-            <p className="caption-en mb-1.5">实验目的 PURPOSE</p>
-            <textarea
-              value={form.purpose}
-              onChange={(e) => {
-                patch({ purpose: e.target.value })
-                e.target.style.height = 'auto'
-                e.target.style.height = `${Math.max(e.target.scrollHeight, 66)}px`
-              }}
-              ref={(el) => {
-                if (el) {
-                  el.style.height = 'auto'
-                  el.style.height = `${Math.max(el.scrollHeight, 66)}px`
-                }
-              }}
-              rows={3}
-              placeholder="为什么做这次实验？假设是什么？"
-              className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2.5 text-[14px] leading-[22px] text-ink shadow-card outline-none transition-colors duration-150 placeholder:text-ink-mute focus:border-bench"
-            />
-          </motion.section>
-
-          {/* deviations */}
-          <motion.section variants={sectionVariants}>
-            <div className="mb-1.5 flex flex-wrap items-baseline gap-2">
-              <p className="caption-en">参数偏离 DEVIATIONS</p>
-              <span className="text-[11.5px] text-ink-mute">
-                {form.protocolVersion
-                  ? `与方法 ${form.protocolVersion} 默认值的差异，自动对比生成`
-                  : '关联方法后自动铺入默认参数'}
-              </span>
-            </div>
-            <RecordDeviationTable
-              deviations={form.deviations}
-              onChange={(rows) => {
-                setDeviationTouched(true)
-                patch({ deviations: rows })
-              }}
-              flashKey={flashKey}
-            />
-          </motion.section>
-
-          {/* result */}
+          {/* notebook —— Benchling 式：正文即主角，紧随标题 */}
           <motion.section variants={sectionVariants}>
             <p className="caption-en mb-1.5">实验正文 NOTEBOOK</p>
             <div className="flex items-start gap-5">
               {outline.length > 0 && (
-                <aside className="hidden w-44 shrink-0 xl:block">
+                <aside className="hidden w-52 shrink-0 xl:block">
                   <div className="sticky top-20">
                     <p className="caption-en mb-2">大纲 OUTLINE</p>
                     <nav className="space-y-0.5">
@@ -748,6 +740,55 @@ export default function RecordDetail() {
               />
             </div>
           </motion.section>
+
+          {/* purpose */}
+          <CollapsibleBlock
+            key={`purpose-${initKey ?? 'new'}`}
+            title="实验目的 PURPOSE"
+            hint={form.purpose ? '已填写' : undefined}
+            defaultOpen={!!form.purpose}
+          >
+            <textarea
+              value={form.purpose}
+              onChange={(e) => {
+                patch({ purpose: e.target.value })
+                e.target.style.height = 'auto'
+                e.target.style.height = `${Math.max(e.target.scrollHeight, 66)}px`
+              }}
+              ref={(el) => {
+                if (el) {
+                  el.style.height = 'auto'
+                  el.style.height = `${Math.max(el.scrollHeight, 66)}px`
+                }
+              }}
+              rows={3}
+              placeholder="为什么做这次实验？假设是什么？"
+              className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2.5 text-[14px] leading-[22px] text-ink shadow-card outline-none transition-colors duration-150 placeholder:text-ink-mute focus:border-bench"
+            />
+          </CollapsibleBlock>
+
+          {/* deviations */}
+          <CollapsibleBlock
+            key={`deviations-${initKey ?? 'new'}`}
+            title="参数偏离 DEVIATIONS"
+            hint={
+              form.deviations.length > 0
+                ? `${form.deviations.length} 项偏离`
+                : form.protocolVersion
+                  ? `与方法 ${form.protocolVersion} 自动对比`
+                  : '关联方法后自动铺入默认参数'
+            }
+            defaultOpen={form.deviations.length > 0}
+          >
+            <RecordDeviationTable
+              deviations={form.deviations}
+              onChange={(rows) => {
+                setDeviationTouched(true)
+                patch({ deviations: rows })
+              }}
+              flashKey={flashKey}
+            />
+          </CollapsibleBlock>
 
           {/* attachments */}
           <motion.section variants={sectionVariants}>
