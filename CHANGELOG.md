@@ -4,6 +4,16 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-07-31 · 性能 P0：静态资源预压缩 + 分级缓存头 + React Query 全局默认值
+
+- 前端：`QueryClient` 全局 `staleTime: 60_000` + `refetchOnWindowFocus: false`——页面切换 60s 内命中缓存不发请求、切回窗口不再自动重拉（写操作走 invalidate 强制重拉不受影响；useAuth 局部 5min 覆盖不变）
+- 服务端（`api/lib/vite.ts` 重写静态服务）：按 `Accept-Encoding` 择优返回构建时预压缩的 `.br`/`.gz`（免运行时压缩 CPU）；`/assets/*` 带 hash 产物 `Cache-Control: public, max-age=31536000, immutable`（二次访问零网络请求）；根级静态（favicon/logo/背景图/guide）一周缓存；`index.html` 启动时读入内存（SPA 回退不再每次读盘）+ `no-cache`；路径穿越防护
+- 构建链：新增 `scripts/compress-assets.mjs`（gzip level 9 + brotli quality 11 预压缩 js/css/html/svg/json/txt，<1KB 跳过），出货链嵌入「vite build → 回拷 → 预压缩 → esbuild」
+- 实测：主 bundle 2,065,925B → gzip 562,835B / **brotli 448,024B（-78%）**；生产模式 curl 验证 br/gzip 协商、immutable/no-cache 头、SPA 回退、API 路由不受影响
+- 背景：性能诊断实测 TiDB 新加坡区 SQL 往返稳态 86ms，首屏慢主因之一为 2MB 未压缩无缓存头传输；本次 P0 解决传输与缓存层，P1（查询精简/分页）与 P2（代码分割/同区部署）待后续
+
+---
+
 ## 2026-07-31 · #20 协作与分享第一期：只读分享链接（仿 Benchling）+ 登录页重设计
 
 - 数据层：新表 `shares`（token 16 字节 hex 唯一/kind=record|analysis/targetId/revokedAt）
