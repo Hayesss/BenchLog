@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import { trpc } from '@/providers/trpc'
+import { ShareButton } from '@/components/share/ShareButton'
 import RecordDeviationTable from '@/components/records/RecordDeviationTable'
 import RecordMarkdownEditor from '@/components/records/RecordMarkdownEditor'
 import RecordImageGallery from '@/components/records/RecordImageGallery'
@@ -525,6 +526,9 @@ export default function RecordDetail() {
 
         <div className="ml-auto flex items-center gap-2">
           <RecordStatusMenu status={form.status} onChange={(s) => void onStatusChange(s)} />
+          {!isNew && record?.id != null && (
+            <ShareButton kind="record" targetId={record.id} />
+          )}
           {!isNew && (
             <button
               type="button"

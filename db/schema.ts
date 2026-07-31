@@ -521,6 +521,27 @@ export const aiModelProfiles = mysqlTable("ai_model_profiles", {
 export type AiModelProfile = typeof aiModelProfiles.$inferSelect;
 export type InsertAiModelProfile = typeof aiModelProfiles.$inferInsert;
 
+/**
+ * 只读分享链接（#20 协作与分享第一期，仿 Benchling share read-only link）：
+ * 记录/生信分析生成公开 token 链接，免登录查看；revokedAt 非空即失效。
+ * token 为 16 字节 hex（不可枚举）；公开端点只返回脱敏内容，绝不暴露 userId/邮箱。
+ */
+export const shares = mysqlTable(
+  "shares",
+  {
+    id: serial("id").primaryKey(),
+    token: varchar("token", { length: 32 }).notNull().unique(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(), // 创建者（撤销/列表归属）
+    kind: mysqlEnum("kind", ["record", "analysis"]).notNull(),
+    targetId: bigint("targetId", { mode: "number", unsigned: true }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    revokedAt: timestamp("revokedAt"), // null = 有效；撤销即 404
+  },
+  (t) => [index("shares_user_idx").on(t.userId), index("shares_target_idx").on(t.kind, t.targetId)],
+);
+export type Share = typeof shares.$inferSelect;
+export type InsertShare = typeof shares.$inferInsert;
+
 /** AI 会话：projectId 可空（null = 未归档/副驾快聊）；title 空串待首条消息自动生成 */
 export const aiConversations = mysqlTable(
   "ai_conversations",

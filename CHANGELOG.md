@@ -4,6 +4,17 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-07-31 · #20 协作与分享第一期：只读分享链接（仿 Benchling）+ 登录页重设计
+
+- 数据层：新表 `shares`（token 16 字节 hex 唯一/kind=record|analysis/targetId/revokedAt）
+- 后端：`shareRouter`（trpc `share.*`）——create（目标归属+未软删校验，同目标幂等复用同 token）/revoke（即时失效，重复拦截）/list（含目标标题与撤销态）；公开端点 GET `/api/share/:token` 免登录（`getSharedPayload`：token 格式校验、撤销/目标删除→404、绝不暴露 userId/邮箱/附件本体，记录含图片联查 projectName/protocolTitle）
+- 前端：`/share/:token` 公开只读页（Layout 外路由，BenchLog 顶栏+只读徽标，记录=状态/标签/目的/结果 Markdown/图片画廊/结论/下一步，分析=可复现信息表/命令/结果摘要，404 友好态，页脚署名 sharedBy+日期）；记录与生信详情页头部加「分享」按钮（复用组件 ShareButton：创建/复制/撤销弹层）
+- 登录页重设计（仿 Benchling）：浅绿白渐变底 + SVG DNA 双螺旋波形装饰（错相正弦+横档+圆点，斜向穿越）、居中白卡大柔影、logo+slogan「湿实验 × 生信的一体化记录台」、bench-deep 深色主按钮、功能 chips 速览、卡片下方「首次登录自动创建工作台」小字
+- 验证：tsc 全过；冒烟 7 断言全过（幂等复用/归属拦截/payload 脱敏/非法 token/revoke 失效/analysis kind/清理）；bundle 复核全 OK
+- 范围说明（#20 后续期）：团队成员与角色、评论@提及、任务指派未在本期；分享粒度=单条记录/分析，无批量分享
+
+---
+
 ## 2026-07-31 · 项目 × AI 助手双向打通（以项目内容为上下文的对话）
 
 - 项目侧入口：侧边栏项目行 hover 出现 AI 图标、/projects 管理页项目卡操作行加「AI 对话」，均跳 `/assistant?project=<id>`

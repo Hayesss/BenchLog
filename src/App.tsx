@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
+import ShareView from './pages/ShareView'
 import Protocols from './pages/Protocols'
 import ProtocolDetail from './pages/ProtocolDetail'
 import Records from './pages/Records'
@@ -26,6 +27,8 @@ export default function App() {
     <Routes>
       {/* Login renders full-screen, WITHOUT the AppShell */}
       <Route path="/login" element={<Login />} />
+      {/* 只读分享公开页（免登录，同样不套 AppShell） */}
+      <Route path="/share/:token" element={<ShareView />} />
       {/* AppShell: Layout renders <Outlet/> — pages are nested layout-route children */}
       <Route element={<Layout />}>
         <Route index element={<Dashboard />} />

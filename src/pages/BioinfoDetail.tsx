@@ -34,6 +34,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { ShareButton } from '@/components/share/ShareButton'
 import RecordMarkdownEditor from '@/components/records/RecordMarkdownEditor'
 import RepoPanel from '@/components/bioinfo/RepoPanel'
 import RepoStaging, { type StagedFile } from '@/components/bioinfo/RepoStaging'
@@ -353,6 +354,7 @@ export default function BioinfoDetail() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          {analysisId != null && <ShareButton kind="analysis" targetId={analysisId} />}
           {analysisId != null && (
             <button
               type="button"

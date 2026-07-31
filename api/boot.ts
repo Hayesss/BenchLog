@@ -7,6 +7,7 @@ import { createContext } from "./context";
 import { env } from "./lib/env";
 import { createOAuthCallbackHandler } from "./kimi/auth";
 import { aiStreamHandler } from "./ai/stream";
+import { sharePublicHandler } from "./share/public";
 import { Paths } from "@contracts/constants";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
@@ -23,6 +24,8 @@ app.use("/api/trpc/*", async (c) => {
 });
 // AI 流式聊天（SSE，纯文本；写操作仍走 tRPC ai.chat withTools 确认卡）
 app.post("/api/ai/stream", aiStreamHandler);
+// 只读分享公开端点（免登录，token 即权限；撤销/目标删除即 404）
+app.get("/api/share/:token", sharePublicHandler);
 app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
 
 export default app;
