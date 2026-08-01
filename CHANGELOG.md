@@ -4,6 +4,23 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-08-01 · 批次E：合规加固 + 体验补齐（E1–E8 八项）
+
+差异对标批次E（便宜高价值清单）落地：
+
+- 合规（E1 附件写保护）：`attachment.add`/`remove` 改走 `assertRecordWritable` 三合一闸（归属+软删+锁定），锁定记录增删附件均被 FORBIDDEN 拒绝，与图片 upload/update/updateStatus/remove/restoreVersion 同一道闸——签署后的附件清单也成为审计痕迹；remove 先查 recordId 再过闸，不误伤孤儿行
+- 合规（E8 分享页偏离表）：分享 payload 增加 `deviations` 字段；ShareView 正文后新增「参数偏离 DEVIATIONS (n)」表格（参数/方法默认/本次实际——不一致时 warning 色高亮/偏离说明），外部审阅者能看到完整的条件变更记录
+- 体验（E2 版本历史富文本）：版本历史「查看」展开区优先渲染快照 `contentHtml`（rich-render + DOMPurify 消毒，与分享页同模式），无富文本才回落旧版 `resultMd` Markdown；空态判断同步纳入 contentHtml——历史版本终于能看到正文全貌（表格/图片/引用片）而非只剩结果段
+- 体验（E3 拖拽插图）：`handleDrop` 支持图片文件直接拖入编辑器，按 `posAtCoords` 落点坐标定位插入（不再只插当前光标处）；多张串行插入保序（压缩异步防乱序）；只读态与编辑器内部节点拖拽（moved）不受影响
+- 体验（E4 表格列宽拖拽）：Table `resizable: true` + column-resize-handle/resize-cursor 样式（bench 色 3px 手柄）；列宽持久化到 colgroup col style，随 contentHtml 保存与分享渲染
+- 体验（E5 链接浮层）：替换 `window.prompt`——链接按钮改开浮层（复用调色板模式：fixed 关闭层 + absolute 面板），预填当前 href，「应用」（空值即移除）/「移除链接」分离，Enter 应用 / ESC 关闭；输入框不抢编辑器选区（PM state 选区不因 blur 改变）
+- 体验（E6 样本 chip 跳盒子页高亮孔位）：`refSearch` samples 补 `boxId/row/col`；RefChip 新增 `boxId/well` 属性（dataset 存取，老 chip 无 dataset 回落 null 兼容）；样本 chip href 从裸 `/samples` 改为 `/samples/:boxId?well=A1`；盒子详情页解析 `?well=` 高亮闪烁（0.9s×4 warning 色 ring 动画）+ scrollIntoView 居中定位；@ 候选 sub 顺带显示孔位（如「DNA · A1」）
+- 体验（E7 表格 CSV 导出）：inTable 工具组新增「CSV」——复用表格解析，RFC4180 引号转义 + BOM 头（Excel 直开 UTF-8 中文不乱码），Blob 下载 `表格-YYYY-MM-DD.csv`
+- 验证：`npx tsc -b` 通过；冒烟 7 断言真实库全 PASS（未锁定可加附件/锁定 add 拒/锁定 remove 拒/解锁恢复可删/refSearch 带 boxId+row+col/分享 payload deviations 值匹配，脚本跑完即删）；**playwright 生产实测 15/15**（注册→项目/盒子/记录/样本→E5 应用+移除链接→插表格填 6 格→E7 下载 CSV 内容含 C0/C3→E4 拖列缘 col style width=296px→E6 chip href+data-well 断言→点击跳 `/samples/:id?well=A1` #well-highlight 存在→E2 旧版「正文 NOTEBOOK」富文本渲染含首版文字→E3 drop 事件 img +1→E1 锁定横幅+附件区 pointer-events-none 罩层）；61 资产清单 diff 一致、33 资产 gzip+brotli 预压缩；boot.js/前端产物入包验证八项功能串齐在；测试数据已清理
+- 范围：列宽拖拽仅在编辑态（渲染态 colgroup 只读展示）；E6 高亮以 query 参数驱动，手动刷新页面仍保留；CSV 导出按单元格 textContent（合并格简化取值）
+
+---
+
 ## 2026-08-01 · P2 批次D：表格转样本入库 + 图片标注（P2 专项收官）
 
 差异对标 P2 专项后半（⑪ 结构化表写库 + ⑫ 图片标注）：

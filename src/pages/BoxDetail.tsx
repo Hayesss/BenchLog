@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { ArrowLeft, MapPin, Pencil, Search, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -269,6 +269,21 @@ export default function BoxDetail() {
     }
   }, [box?.id])
 
+  // E6：?well=B3 高亮定位——记录正文样本 chip 点击直跳到本页并闪烁定位该孔
+  const [searchParams] = useSearchParams()
+  const hlWell = useMemo(() => {
+    const m = searchParams.get('well')?.toUpperCase().match(/^([A-Z])(\d{1,2})$/)
+    if (!m) return null
+    return { row: m[1].charCodeAt(0) - 65, col: Number(m[2]) - 1 }
+  }, [searchParams])
+  useEffect(() => {
+    if (!hlWell || !box) return
+    const t = window.setTimeout(() => {
+      document.getElementById('well-highlight')?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }, 150)
+    return () => window.clearTimeout(t)
+  }, [hlWell, box])
+
   const renameMut = trpc.sample.renameBox.useMutation({
     onSuccess: () => {
       toast.success('盒子信息已更新')
@@ -425,9 +440,11 @@ export default function BoxDetail() {
               {Array.from({ length: box.cols }, (_, c) => {
                 const w = wellMap.get(`${r}-${c}`)
                 const dim = needle && !matchOf(w)
+                const isHl = hlWell != null && hlWell.row === r && hlWell.col === c
                 return (
                   <button
                     key={c}
+                    id={isHl ? 'well-highlight' : undefined}
                     type="button"
                     onClick={() => setWellPos({ row: r, col: c })}
                     title={w ? `${wellLabel(r, c)} · ${w.name}（${w.type}）${w.recordTitle ? `\n关联记录：${w.recordTitle}` : ''}` : `${wellLabel(r, c)} 空孔`}
@@ -438,6 +455,7 @@ export default function BoxDetail() {
                         : 'border-dashed border-line-strong bg-paper text-ink-mute hover:border-bench hover:bg-bench-wash/40',
                       dim && 'opacity-20',
                       needle && w && matchOf(w) && 'ring-2 ring-bench ring-offset-1',
+                      isHl && 'well-flash',
                     )}
                     style={w ? { backgroundColor: TYPE_COLOR[w.type] ?? '#8A9099' } : undefined}
                   >

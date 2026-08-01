@@ -436,12 +436,8 @@ export const attachmentRouter = createRouter({
       if (input.size > ATTACHMENT_MAX_BYTES) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "附件超过 2MB 上限" });
       }
-      // 归属校验：记录必须属于当前用户
-      const rec = await getDb()
-        .select({ id: records.id })
-        .from(records)
-        .where(and(eq(records.id, input.recordId), eq(records.userId, ctx.user.id)));
-      if (!rec[0]) throw new TRPCError({ code: "NOT_FOUND", message: "记录不存在" });
+      // 归属+锁定校验：锁定记录禁止新增附件（与图片 upload 同一道闸）
+      await assertRecordWritable(ctx.user.id, input.recordId);
       const [{ id }] = await getDb()
         .insert(recordAttachments)
         .values({
@@ -457,6 +453,12 @@ export const attachmentRouter = createRouter({
     }),
 
   remove: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    // 先定位附件所属记录，锁定记录禁止删除附件（前端禁用之外的第二道闸）
+    const att = await getDb()
+      .select({ recordId: recordAttachments.recordId })
+      .from(recordAttachments)
+      .where(and(eq(recordAttachments.id, input.id), eq(recordAttachments.userId, ctx.user.id)));
+    if (att[0]) await assertRecordWritable(ctx.user.id, att[0].recordId);
     await getDb()
       .delete(recordAttachments)
       .where(and(eq(recordAttachments.id, input.id), eq(recordAttachments.userId, ctx.user.id)));

@@ -29,7 +29,8 @@ export const searchRouter = createRouter({
           .orderBy(desc(protocols.id))
           .limit(SCAN),
         db
-          .select({ id: samples.id, name: samples.name, type: samples.type })
+          // 带孔位坐标：记录正文样本引用片可直跳盒子页并高亮孔位（E6）
+          .select({ id: samples.id, name: samples.name, type: samples.type, boxId: samples.boxId, row: samples.row, col: samples.col })
           .from(samples)
           .where(eq(samples.userId, ctx.user.id))
           .orderBy(desc(samples.id))

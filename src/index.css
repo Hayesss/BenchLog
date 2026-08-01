@@ -244,6 +244,20 @@
     background: #3E7C6B18;
     pointer-events: none;
   }
+  /* 列宽拖拽手柄（Table resizable） */
+  .rich-editor-content .column-resize-handle {
+    position: absolute;
+    right: -2px;
+    top: 0;
+    bottom: -2px;
+    width: 3px;
+    background: #3E7C6B;
+    pointer-events: none;
+    z-index: 20;
+  }
+  .rich-editor-content.resize-cursor {
+    cursor: col-resize;
+  }
   /* 勾选清单 */
   .rich-editor-content ul[data-type='taskList'] {
     list-style: none;
@@ -310,6 +324,16 @@
 
   /* 渲染态（分享页/查看态）复用编辑内容样式 */
   .rich-render .rich-editor-content { padding: 0; min-height: 0; }
+}
+
+/* 盒子孔位高亮闪烁：记录正文样本 chip 跳入（?well=B3）时定位提示 */
+@keyframes well-flash {
+  0%, 100% { box-shadow: 0 0 0 2px #F6F4EE, 0 0 0 4px #B98A3E; }
+  50% { box-shadow: 0 0 0 2px #F6F4EE, 0 0 0 9px #B98A3E55; }
+}
+.well-flash {
+  animation: well-flash 0.9s ease-in-out 4;
+  z-index: 5;
 }
 
 /* 打印 / 导出 PDF：隐藏应用框架与交互控件，只留干净文档 */

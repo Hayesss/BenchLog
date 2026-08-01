@@ -22,6 +22,7 @@ type RecordContent = {
   purpose: string | null
   resultMd: string | null
   contentHtml: string | null
+  deviations: { param: string; defaultValue: string; actualValue: string; reason?: string | null }[]
   conclusion: string | null
   nextStep: string | null
   images: { caption: string | null; kind: string; mime: string; data: string }[]
@@ -212,6 +213,38 @@ function RecordView({ c }: { c: RecordContent }) {
             <Md text={c.resultMd} />
           </Section>
         )
+      )}
+      {c.deviations.length > 0 && (
+        <Section title={`参数偏离 DEVIATIONS (${c.deviations.length})`}>
+          <div className="overflow-x-auto rounded-xl border border-line">
+            <table className="w-full border-collapse text-[13px]">
+              <thead>
+                <tr className="bg-paper text-left text-[12px] text-ink-mute">
+                  <th className="border-b border-line px-3 py-2 font-medium">参数</th>
+                  <th className="border-b border-line px-3 py-2 font-medium">方法默认</th>
+                  <th className="border-b border-line px-3 py-2 font-medium">本次实际</th>
+                  <th className="border-b border-line px-3 py-2 font-medium">偏离说明</th>
+                </tr>
+              </thead>
+              <tbody>
+                {c.deviations.map((d, i) => (
+                  <tr key={i}>
+                    <td className="border-b border-line-soft px-3 py-2 font-medium text-ink">{d.param}</td>
+                    <td className="border-b border-line-soft px-3 py-2 text-ink-soft">{d.defaultValue}</td>
+                    <td className="border-b border-line-soft px-3 py-2 text-ink">
+                      {d.actualValue !== d.defaultValue ? (
+                        <span className="rounded bg-warning/10 px-1.5 py-0.5 font-medium text-warning">{d.actualValue}</span>
+                      ) : (
+                        d.actualValue
+                      )}
+                    </td>
+                    <td className="border-b border-line-soft px-3 py-2 text-ink-mute">{d.reason ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
       )}
       {c.images.length > 0 && (
         <Section title={`结果图片 IMAGES (${c.images.length})`}>

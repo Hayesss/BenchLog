@@ -20,6 +20,7 @@ export interface SharedRecordPayload {
   purpose: string | null;
   resultMd: string | null;
   contentHtml: string | null;
+  deviations: { param: string; defaultValue: string; actualValue: string; reason?: string | null }[];
   conclusion: string | null;
   nextStep: string | null;
   images: { caption: string | null; kind: string; mime: string; data: string }[];
@@ -72,6 +73,7 @@ export async function getSharedPayload(token: string): Promise<SharedPayload | n
         recordDate: records.recordDate,
         status: records.status,
         tags: records.tags,
+        deviations: records.deviations,
         purpose: records.purpose,
         resultMd: records.resultMd,
         contentHtml: records.contentHtml,

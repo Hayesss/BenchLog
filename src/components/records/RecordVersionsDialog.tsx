@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Eye, EyeOff, History, RotateCcw } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import DOMPurify from 'dompurify'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -138,7 +139,17 @@ export default function RecordVersionsDialog({
                     {viewing && (
                       <div className="mt-2 border-t border-line pt-1">
                         <Field label="目的 PURPOSE">{snap.purpose}</Field>
-                        {snap.resultMd && (
+                        {snap.contentHtml ? (
+                          <div className="mt-2.5">
+                            <p className="caption-en !text-[10px]">正文 NOTEBOOK</p>
+                            <div className="rich-render mt-1 rounded-lg border border-line">
+                              <div
+                                className="rich-editor-content !min-h-0 !p-3 text-[13px]"
+                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(snap.contentHtml) }}
+                              />
+                            </div>
+                          </div>
+                        ) : snap.resultMd && (
                           <div className="mt-2.5">
                             <p className="caption-en !text-[10px]">结果 RESULTS</p>
                             <div className="mt-1 text-[13px] leading-[20px] text-ink-soft [&_h1]:text-[15px] [&_h1]:font-semibold [&_h1]:text-ink [&_h2]:text-[14px] [&_h2]:font-semibold [&_h2]:text-ink [&_strong]:text-ink [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5">
@@ -148,7 +159,7 @@ export default function RecordVersionsDialog({
                         )}
                         <Field label="结论 CONCLUSION">{snap.conclusion}</Field>
                         <Field label="下一步 NEXT STEP">{snap.nextStep}</Field>
-                        {!snap.purpose && !snap.resultMd && !snap.conclusion && !snap.nextStep && (
+                        {!snap.purpose && !snap.contentHtml && !snap.resultMd && !snap.conclusion && !snap.nextStep && (
                           <p className="mt-2 text-[12.5px] text-ink-mute">（该版本各字段均为空）</p>
                         )}
                       </div>

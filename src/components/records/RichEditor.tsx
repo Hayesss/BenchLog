@@ -3,6 +3,7 @@
 //      + 斜杠命令（/）+ 图片粘贴与插入（canvas 压缩 base64 内嵌）+ 表格行列操作 + 大纲提取
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
+import { toast } from 'sonner'
 import { trpc } from '@/providers/trpc'
 import ImageAnnotateDialog from './ImageAnnotateDialog'
 import { Editor, EditorContent, Extension, Node, useEditor } from '@tiptap/react'
@@ -24,7 +25,7 @@ import { TextStyle } from '@tiptap/extension-text-style'
 import { Color } from '@tiptap/extension-color'
 import Suggestion from '@tiptap/suggestion'
 import type { SuggestionProps, SuggestionKeyDownProps } from '@tiptap/suggestion'
-import { NodeSelection, PluginKey } from '@tiptap/pm/state'
+import { NodeSelection, PluginKey, TextSelection } from '@tiptap/pm/state'
 import {
   Bold,
   CheckSquare,
@@ -126,13 +127,24 @@ function compressImage(file: File): Promise<string> {
 
 /* ---------------- @ 引用 chip（Benchling entity chip） ---------------- */
 type RefKind = 'record' | 'protocol' | 'sample'
-type RefItem = { kind: RefKind; id: number; label: string; sub: string }
+type RefItem = {
+  kind: RefKind
+  id: number
+  label: string
+  sub: string
+  /** 样本专用：所在盒子与孔位（如 A3），chip 点击直跳盒子页并高亮该孔 */
+  boxId?: number | null
+  well?: string | null
+}
 
 const REF_KIND_LABEL: Record<RefKind, string> = { record: '记录', protocol: '方法', sample: '样本' }
 
-function refHref(kind: RefKind, id: number): string {
+function refHref(kind: RefKind, id: number, boxId?: number | null, well?: string | null): string {
   if (kind === 'protocol') return `/protocols/${id}`
-  if (kind === 'sample') return '/samples'
+  if (kind === 'sample') {
+    if (boxId == null) return '/samples'
+    return `/samples/${boxId}${well ? `?well=${encodeURIComponent(well)}` : ''}`
+  }
   return `/records/${id}`
 }
 
@@ -147,6 +159,8 @@ const RefChip = Node.create({
       kind: { default: 'record' },
       refId: { default: 0 },
       label: { default: '' },
+      boxId: { default: null },
+      well: { default: null },
     }
   },
   parseHTML() {
@@ -159,6 +173,9 @@ const RefChip = Node.create({
             kind: dom.dataset.kind ?? 'record',
             refId: Number(dom.dataset.refId ?? 0),
             label: dom.dataset.label ?? dom.textContent ?? '',
+            // 老 chip 无这两个 dataset，回落 null 保持兼容
+            boxId: dom.dataset.boxId ? Number(dom.dataset.boxId) : null,
+            well: dom.dataset.well ?? null,
           }
         },
       },
@@ -168,6 +185,8 @@ const RefChip = Node.create({
     const kind = (node.attrs.kind as RefKind) ?? 'record'
     const refId = Number(node.attrs.refId ?? 0)
     const label = (node.attrs.label as string) ?? ''
+    const boxId = node.attrs.boxId as number | null
+    const well = node.attrs.well as string | null
     return [
       'a',
       {
@@ -176,7 +195,9 @@ const RefChip = Node.create({
         'data-kind': kind,
         'data-ref-id': String(refId),
         'data-label': label,
-        href: refHref(kind, refId),
+        ...(boxId != null ? { 'data-box-id': String(boxId) } : {}),
+        ...(well ? { 'data-well': well } : {}),
+        href: refHref(kind, refId, boxId, well),
         class: `rich-ref-chip rich-ref-${kind}`,
       },
       label,
@@ -201,7 +222,10 @@ function makeRefChipExtension(fetchItems: (query: string) => Promise<RefItem[]>)
               .focus()
               .deleteRange(range)
               .insertContent([
-                { type: 'refChip', attrs: { kind: props.kind, refId: props.id, label: props.label } },
+                {
+                  type: 'refChip',
+                  attrs: { kind: props.kind, refId: props.id, label: props.label, boxId: props.boxId ?? null, well: props.well ?? null },
+                },
                 { type: 'text', text: ' ' },
               ])
               .run()
@@ -558,6 +582,9 @@ const RichEditor = forwardRef<
   // P2-D1 图片标注：当前选中的图片节点（NodeSelection）与标注浮层状态
   const [imgSelected, setImgSelected] = useState(false)
   const [anno, setAnno] = useState<{ pos: number; src: string } | null>(null)
+  // 链接浮层（替代 window.prompt）：预填当前 href，应用/移除分离
+  const [linkOpen, setLinkOpen] = useState(false)
+  const [linkUrl, setLinkUrl] = useState('')
   const navigate = useNavigate()
   const utils = trpc.useUtils()
 
@@ -579,12 +606,17 @@ const RichEditor = forwardRef<
             label: p.name,
             sub: `${p.category} · ${p.version}`,
           })),
-          ...res.samples.map((sm) => ({
-            kind: 'sample' as const,
-            id: sm.id,
-            label: sm.name,
-            sub: sm.type,
-          })),
+          ...res.samples.map((sm) => {
+            const well = sm.row != null && sm.col != null ? `${String.fromCharCode(65 + sm.row)}${sm.col + 1}` : null
+            return {
+              kind: 'sample' as const,
+              id: sm.id,
+              label: sm.name,
+              sub: well ? `${sm.type} · ${well}` : sm.type,
+              boxId: sm.boxId ?? null,
+              well,
+            }
+          }),
         ]
         return items.slice(0, 8)
       } catch {
@@ -623,7 +655,7 @@ const RichEditor = forwardRef<
       Superscript,
       TextStyle,
       Color,
-      Table.configure({ resizable: false }),
+      Table.configure({ resizable: true }),
       TableRow,
       TableHeader,
       TableCell,
@@ -662,6 +694,22 @@ const RichEditor = forwardRef<
         if (files.length === 0) return false
         event.preventDefault()
         files.forEach((f) => void insertImageFile(editor)(f))
+        return true
+      },
+      // 拖拽插图：按落点坐标定位插入（拖进编辑器的图片插到光标落点处，而非当前选区）
+      handleDrop: (view, event, _slice, moved) => {
+        if (readOnlyRef.current || moved) return false
+        const files = Array.from(event.dataTransfer?.files ?? []).filter((f) =>
+          f.type.startsWith('image/'),
+        )
+        if (files.length === 0) return false
+        event.preventDefault()
+        const coords = view.posAtCoords({ left: event.clientX, top: event.clientY })
+        if (coords) view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(coords.pos))))
+        // 串行插入保持拖入顺序（压缩是异步的，并发会乱序）
+        void (async () => {
+          for (const f of files) await insertImageFile(editor)(f)
+        })()
         return true
       },
     },
@@ -725,6 +773,24 @@ const RichEditor = forwardRef<
     return null
   }
 
+  /** E7：当前表格导出 CSV（含 BOM 让 Excel 识别 UTF-8 中文，引号按 RFC4180 转义） */
+  const exportTableCsv = () => {
+    const rows = extractCurrentTable()
+    if (!rows || rows.length === 0) {
+      toast.warning('未检测到表格内容')
+      return
+    }
+    const esc = (s: string) => (/[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s)
+    const csv = '﻿' + rows.map((r) => r.map(esc).join(',')).join('\r\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `表格-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+    toast.success(`已导出 ${rows.length} 行 CSV`)
+  }
+
   /** P2-D1：打开当前选中图片的标注浮层 */
   const openAnnotate = () => {
     if (!editor) return
@@ -743,14 +809,19 @@ const RichEditor = forwardRef<
 
   const setLink = () => {
     if (!editor) return
-    const prev = (editor.getAttributes('link').href as string) ?? ''
-    const url = window.prompt('链接地址（留空移除链接）', prev)
-    if (url === null) return
-    if (url.trim() === '') {
-      editor.chain().focus().unsetLink().run()
-    } else {
-      editor.chain().focus().setLink({ href: url.trim() }).run()
-    }
+    setLinkUrl((editor.getAttributes('link').href as string) ?? '')
+    setLinkOpen(true)
+  }
+  const applyLink = () => {
+    if (!editor) return
+    const url = linkUrl.trim()
+    if (url === '') editor.chain().focus().unsetLink().run()
+    else editor.chain().focus().setLink({ href: url }).run()
+    setLinkOpen(false)
+  }
+  const removeLink = () => {
+    editor?.chain().focus().unsetLink().run()
+    setLinkOpen(false)
   }
 
   return (
@@ -877,9 +948,54 @@ const RichEditor = forwardRef<
         <ToolBtn title="插入图片" onClick={openImagePicker}>
           <ImageIcon className="h-4 w-4" />
         </ToolBtn>
-        <ToolBtn title="链接" active={editor?.isActive('link')} onClick={setLink}>
-          <Link2 className="h-3.5 w-3.5" />
-        </ToolBtn>
+        <div className="relative">
+          <ToolBtn title="链接" active={editor?.isActive('link')} onClick={setLink}>
+            <Link2 className="h-3.5 w-3.5" />
+          </ToolBtn>
+          {linkOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  setLinkOpen(false)
+                }}
+              />
+              <div className="absolute left-0 top-full z-50 mt-1 w-[248px] rounded-xl border border-line bg-surface p-2 shadow-overlay">
+                <input
+                  autoFocus
+                  value={linkUrl}
+                  onChange={(e) => setLinkUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      applyLink()
+                    }
+                    if (e.key === 'Escape') setLinkOpen(false)
+                  }}
+                  placeholder="https://…（留空即移除链接）"
+                  className="w-full rounded-md border border-line bg-paper px-2 py-1.5 text-[12.5px] text-ink outline-none placeholder:text-ink-mute focus:border-bench"
+                />
+                <div className="mt-1.5 flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={applyLink}
+                    className="flex-1 rounded-md bg-bench px-2 py-1 text-[11.5px] font-medium text-white transition-colors hover:bg-bench-deep"
+                  >
+                    应用
+                  </button>
+                  <button
+                    type="button"
+                    onClick={removeLink}
+                    className="flex-1 rounded-md border border-line px-2 py-1 text-[11.5px] text-ink-soft transition-colors hover:bg-bench-wash hover:text-ink"
+                  >
+                    移除链接
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
         <span className="mx-1 h-4 w-px bg-line" />
         <ToolBtn title="键盘快捷键速查" onClick={() => setShortcutsOpen(true)}>
           <Keyboard className="h-3.5 w-3.5" />
@@ -926,6 +1042,17 @@ const RichEditor = forwardRef<
                 入库
               </button>
             )}
+            <button
+              type="button"
+              title="把本表格导出为 CSV 文件"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                exportTableCsv()
+              }}
+              className="flex h-7 items-center rounded-md px-1.5 text-[11.5px] text-ink-soft transition-colors duration-100 hover:bg-paper hover:text-ink"
+            >
+              CSV
+            </button>
           </>
         )}
 
