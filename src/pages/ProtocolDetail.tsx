@@ -12,6 +12,7 @@ import {
   History,
   MoreHorizontal,
   Pencil,
+  Users,
   Play,
   Rocket,
   Trash2,
@@ -40,6 +41,7 @@ import {
 import ProtocolCharTitle from '@/components/protocols/ProtocolCharTitle'
 import ProtocolEditorDialog from '@/components/protocols/ProtocolEditorDialog'
 import PinStarButton from '@/components/protocols/PinStarButton'
+import { ShareMembersDialog } from '@/components/collab/ShareMembersDialog'
 import ProtocolMaterials from '@/components/protocols/ProtocolMaterials'
 import ProtocolSteps, { stepKey } from '@/components/protocols/ProtocolSteps'
 import ProtocolTagChip, { useProtocolTagColors } from '@/components/protocols/ProtocolTagChip'
@@ -82,6 +84,10 @@ export default function ProtocolDetail() {
   const recordsQuery = trpc.record.list.useQuery(undefined, { enabled })
 
   const protocol = protocolQuery.data ?? null
+  // #20-II 协作角色：viewer 只读；editor 可编辑（不可归档/管理成员）；owner 全权
+  const access = protocol?.access ?? null
+  const isViewer = access === 'viewer'
+  const isOwner = access == null || access === 'owner'
   const versions = useMemo(() => versionsQuery.data ?? [], [versionsQuery.data])
 
   /* ------- version viewing state (?v=vX.Y) ------- */
@@ -91,6 +97,7 @@ export default function ProtocolDetail() {
       ? versions.find((v) => v.version === viewParam) ?? null
       : null
   const isHistory = !!viewingVersion
+  const contentReadOnly = isHistory || isViewer
   const content: ProtocolContentView | null = protocol
     ? isHistory
       ? viewingVersion.snapshot
@@ -163,6 +170,7 @@ export default function ProtocolDetail() {
   const createMut = trpc.protocol.create.useMutation()
   const [editOpen, setEditOpen] = useState(false)
   const [publishOpen, setPublishOpen] = useState(false)
+  const [membersOpen, setMembersOpen] = useState(false)
   const [diffOpen, setDiffOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [sessionActive, setSessionActive] = useState(false)
@@ -303,9 +311,21 @@ export default function ProtocolDetail() {
             viewing={content.version}
             onSelect={selectVersion}
           />
-          <span className="group flex items-center">
-            <PinStarButton id={protocol.id} pinned={protocol.pinned} className="!opacity-100 border border-line bg-surface shadow-card" />
-          </span>
+          {!isViewer && (
+            <span className="group flex items-center">
+              <PinStarButton id={protocol.id} pinned={protocol.pinned} className="!opacity-100 border border-line bg-surface shadow-card" />
+            </span>
+          )}
+          {isOwner && (
+            <button
+              type="button"
+              onClick={() => setMembersOpen(true)}
+              className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[12.5px] font-medium text-ink-soft shadow-card transition-colors duration-150 hover:text-ink"
+            >
+              <Users className="h-4 w-4" />
+              成员
+            </button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -317,12 +337,16 @@ export default function ProtocolDetail() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 rounded-lg border-line">
-              <DropdownMenuItem className="cursor-pointer gap-2" onSelect={() => setEditOpen(true)}>
-                <Pencil className="h-4 w-4" /> 编辑方法
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer gap-2" onSelect={() => setPublishOpen(true)}>
-                <Rocket className="h-4 w-4" /> 发布新版本
-              </DropdownMenuItem>
+              {!isViewer && (
+                <DropdownMenuItem className="cursor-pointer gap-2" onSelect={() => setEditOpen(true)}>
+                  <Pencil className="h-4 w-4" /> 编辑方法
+                </DropdownMenuItem>
+              )}
+              {!isViewer && (
+                <DropdownMenuItem className="cursor-pointer gap-2" onSelect={() => setPublishOpen(true)}>
+                  <Rocket className="h-4 w-4" /> 发布新版本
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 className="cursor-pointer gap-2"
                 onSelect={() => {
@@ -335,17 +359,31 @@ export default function ProtocolDetail() {
               <DropdownMenuItem className="cursor-pointer gap-2" onSelect={duplicateProtocol}>
                 <Copy className="h-4 w-4" /> 复制
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="cursor-pointer gap-2 text-danger focus:text-danger"
-                onSelect={() => setDeleteOpen(true)}
-              >
-                <Trash2 className="h-4 w-4" /> 归档
-              </DropdownMenuItem>
+              {isOwner && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="cursor-pointer gap-2 text-danger focus:text-danger"
+                    onSelect={() => setDeleteOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4" /> 归档
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
+
+      {/* 共享只读横幅（#20-II viewer） */}
+      {isViewer && (
+        <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-line bg-bench-wash px-4 py-2.5">
+          <Users className="h-4 w-4 shrink-0 text-bench" />
+          <p className="text-[13px] leading-5 text-ink">
+            本方法由所有者共享给你，当前为只读查看权限。
+          </p>
+        </div>
+      )}
 
       {/* ============ 区块 1：标题与元信息 ============ */}
       <ProtocolCharTitle
@@ -405,7 +443,7 @@ export default function ProtocolDetail() {
             materials={content.materials}
             checked={checked}
             onToggle={toggle}
-            readOnly={isHistory}
+            readOnly={contentReadOnly}
           />
 
           {/* 区块 4：操作步骤 */}
@@ -417,7 +455,7 @@ export default function ProtocolDetail() {
               params={content.params}
               registerStepRef={registerStepRef}
               flashKey={flashKey}
-              readOnly={isHistory}
+              readOnly={contentReadOnly}
             />
           </div>
 
@@ -695,6 +733,14 @@ export default function ProtocolDetail() {
       )}
 
       {/* ============ dialogs ============ */}
+      {isOwner && (
+        <ShareMembersDialog
+          kind="protocol"
+          targetId={protocol.id}
+          open={membersOpen}
+          onOpenChange={setMembersOpen}
+        />
+      )}
       <ProtocolEditorDialog open={editOpen} onOpenChange={setEditOpen} mode="edit" protocol={protocol} />
       <ProtocolEditorDialog open={publishOpen} onOpenChange={setPublishOpen} mode="publish" protocol={protocol} />
       {viewingVersion && (

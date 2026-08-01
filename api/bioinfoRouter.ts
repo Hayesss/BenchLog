@@ -2,7 +2,8 @@ import { z } from "zod";
 import { and, desc, eq } from "drizzle-orm";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { bioinfoAnalyses, projects, gitCommits, gitRefs } from "@db/schema";
+import { bioinfoAnalyses, projects, gitCommits, gitRefs, shareMembers } from "@db/schema";
+import { assertCollabReadable, assertCollabWritable, assertOwner } from "./lib/collab";
 import { dateStr } from "./zodSchemas";
 
 const bioinfoStatusSchema = z.enum(["running", "done", "failed"]);
@@ -72,13 +73,15 @@ export const bioinfoRouter = createRouter({
     }),
 
   byId: authedQuery.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
+    // #20-II 协作读：成员（viewer/editor）可打开，项目归属按所有者域解析
     const rows = await getDb()
       .select()
       .from(bioinfoAnalyses)
-      .where(and(eq(bioinfoAnalyses.id, input.id), eq(bioinfoAnalyses.userId, ctx.user.id)));
+      .where(eq(bioinfoAnalyses.id, input.id));
     if (!rows[0]) return null;
-    const [withMeta] = await attachProject(ctx.user.id, [rows[0]]);
-    return withMeta;
+    const access = await assertCollabReadable(ctx.user.id, "analysis", input.id);
+    const [withMeta] = await attachProject(rows[0].userId, [rows[0]]);
+    return { ...withMeta, access };
   }),
 
   create: authedQuery.input(z.object(bioinfoFieldsInput)).mutation(async ({ ctx, input }) => {
@@ -93,24 +96,30 @@ export const bioinfoRouter = createRouter({
     .input(z.object({ id: z.number(), ...bioinfoFieldsInput }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
+      await assertCollabWritable(ctx.user.id, "analysis", id);
       await getDb()
         .update(bioinfoAnalyses)
         .set(normalize(data))
-        .where(and(eq(bioinfoAnalyses.id, id), eq(bioinfoAnalyses.userId, ctx.user.id)));
+        .where(eq(bioinfoAnalyses.id, id));
       return { ok: true };
     }),
 
   updateStatus: authedQuery
     .input(z.object({ id: z.number(), status: bioinfoStatusSchema }))
     .mutation(async ({ ctx, input }) => {
+      await assertCollabWritable(ctx.user.id, "analysis", input.id);
       await getDb()
         .update(bioinfoAnalyses)
         .set({ status: input.status })
-        .where(and(eq(bioinfoAnalyses.id, input.id), eq(bioinfoAnalyses.userId, ctx.user.id)));
+        .where(eq(bioinfoAnalyses.id, input.id));
       return { ok: true };
     }),
 
   remove: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    await assertOwner(ctx.user.id, "analysis", input.id);
+    await getDb()
+      .delete(shareMembers)
+      .where(and(eq(shareMembers.kind, "analysis"), eq(shareMembers.targetId, input.id)));
     await getDb()
       .delete(bioinfoAnalyses)
       .where(and(eq(bioinfoAnalyses.id, input.id), eq(bioinfoAnalyses.userId, ctx.user.id)));

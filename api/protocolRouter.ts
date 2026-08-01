@@ -3,7 +3,8 @@ import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { protocols, protocolVersions, type ProtocolSnapshot } from "@db/schema";
+import { assertCollabReadable, assertOwner } from "./lib/collab";
+import { protocols, protocolVersions, shareMembers, type ProtocolSnapshot } from "@db/schema";
 import { materialSchema, stepGroupSchema, paramSchema } from "./zodSchemas";
 import { PROTOCOL_TEMPLATES } from "@contracts/protocol-templates";
 import { bumpProtocolUse } from "./lib/activity";
@@ -33,15 +34,33 @@ function snapshotOf(p: typeof protocols.$inferSelect): ProtocolSnapshot {
   };
 }
 
-/** 写入前校验：协议须归属当前用户且未进回收站（已软删的协议禁止任何写入） */
+/** 写入前校验（#20-II 协作感知）：协议未进回收站，且当前用户为所有者或 editor 成员（viewer FORBIDDEN）。
+    返回协议行（含所有者 userId）。 */
 async function assertProtocolWritable(userId: number, protocolId: number) {
   const rows = await getDb()
-    .select({ id: protocols.id, deletedAt: protocols.deletedAt })
+    .select({ id: protocols.id, userId: protocols.userId, deletedAt: protocols.deletedAt })
     .from(protocols)
-    .where(and(eq(protocols.id, protocolId), eq(protocols.userId, userId)));
-  if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "方法不存在" });
-  if (rows[0].deletedAt)
+    .where(eq(protocols.id, protocolId));
+  const row = rows[0];
+  if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "方法不存在" });
+  if (row.deletedAt)
     throw new TRPCError({ code: "BAD_REQUEST", message: "方法已在回收站，请先恢复再操作" });
+  if (row.userId !== userId) {
+    const mem = await getDb()
+      .select({ role: shareMembers.role })
+      .from(shareMembers)
+      .where(
+        and(
+          eq(shareMembers.kind, "protocol"),
+          eq(shareMembers.targetId, protocolId),
+          eq(shareMembers.memberId, userId),
+        ),
+      );
+    if (!mem[0]) throw new TRPCError({ code: "NOT_FOUND", message: "方法不存在或无权访问" });
+    if (mem[0].role === "viewer")
+      throw new TRPCError({ code: "FORBIDDEN", message: "你对此方法只有查看权限" });
+  }
+  return row;
 }
 
 export const protocolRouter = createRouter({
@@ -54,17 +73,14 @@ export const protocolRouter = createRouter({
   ),
 
   byId: authedQuery.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
+    // #20-II 协作读：成员（viewer/editor）可打开，附 access 角色供前端只读态
     const rows = await getDb()
       .select()
       .from(protocols)
-      .where(
-        and(
-          eq(protocols.id, input.id),
-          eq(protocols.userId, ctx.user.id),
-          isNull(protocols.deletedAt),
-        ),
-      );
-    return rows[0] ?? null;
+      .where(and(eq(protocols.id, input.id), isNull(protocols.deletedAt)));
+    if (!rows[0]) return null;
+    const access = await assertCollabReadable(ctx.user.id, "protocol", input.id);
+    return { ...rows[0], access };
   }),
 
   create: authedQuery
@@ -108,15 +124,13 @@ export const protocolRouter = createRouter({
       const clean = Object.fromEntries(
         Object.entries(data).filter(([, v]) => v !== undefined),
       );
-      await getDb()
-        .update(protocols)
-        .set(clean)
-        .where(and(eq(protocols.id, id), eq(protocols.userId, ctx.user.id)));
+      await getDb().update(protocols).set(clean).where(eq(protocols.id, id));
       return { ok: true };
     }),
 
-  /** 软删除：移入回收站（protocolVersions 保留，恢复时完整还原） */
+  /** 软删除：移入回收站（protocolVersions 保留，恢复时完整还原）；仅所有者 */
   remove: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    await assertOwner(ctx.user.id, "protocol", input.id);
     await getDb()
       .update(protocols)
       .set({ deletedAt: new Date() })
@@ -160,8 +174,11 @@ export const protocolRouter = createRouter({
     return { ok: true };
   }),
 
-  /** 彻底删除：级联清掉 protocolVersions（不可恢复） */
+  /** 彻底删除：级联清掉 protocolVersions/members（不可恢复） */
   purge: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    await getDb()
+      .delete(shareMembers)
+      .where(and(eq(shareMembers.kind, "protocol"), eq(shareMembers.targetId, input.id)));
     await getDb()
       .delete(protocolVersions)
       .where(and(eq(protocolVersions.protocolId, input.id), eq(protocolVersions.userId, ctx.user.id)));
@@ -175,18 +192,12 @@ export const protocolRouter = createRouter({
   saveVersion: authedQuery
     .input(z.object({ id: z.number(), note: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
-      const p = (
-        await getDb()
-          .select()
-          .from(protocols)
-          .where(and(eq(protocols.id, input.id), eq(protocols.userId, ctx.user.id)))
-      )[0];
+      const row = await assertProtocolWritable(ctx.user.id, input.id);
+      const p = (await getDb().select().from(protocols).where(eq(protocols.id, input.id)))[0];
       if (!p) throw new Error("Protocol not found");
-      if (p.deletedAt)
-        throw new TRPCError({ code: "BAD_REQUEST", message: "方法已在回收站，请先恢复再操作" });
       await getDb().insert(protocolVersions).values({
         protocolId: p.id,
-        userId: ctx.user.id,
+        userId: row.userId,
         version: p.version,
         note: input.note ?? null,
         snapshot: snapshotOf(p),
@@ -196,27 +207,23 @@ export const protocolRouter = createRouter({
 
   listVersions: authedQuery
     .input(z.object({ protocolId: z.number() }))
-    .query(({ ctx, input }) =>
-      getDb()
+    .query(async ({ ctx, input }) => {
+      await assertCollabReadable(ctx.user.id, "protocol", input.protocolId);
+      return getDb()
         .select()
         .from(protocolVersions)
-        .where(
-          and(
-            eq(protocolVersions.protocolId, input.protocolId),
-            eq(protocolVersions.userId, ctx.user.id),
-          ),
-        )
-        .orderBy(desc(protocolVersions.createdAt)),
-    ),
+        .where(eq(protocolVersions.protocolId, input.protocolId))
+        .orderBy(desc(protocolVersions.createdAt));
+    }),
 
   incrementUse: authedQuery
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await assertProtocolWritable(ctx.user.id, input.id);
+      await assertCollabReadable(ctx.user.id, "protocol", input.id);
       await getDb()
         .update(protocols)
         .set({ useCount: sql`${protocols.useCount} + 1` })
-        .where(and(eq(protocols.id, input.id), eq(protocols.userId, ctx.user.id)));
+        .where(eq(protocols.id, input.id));
       bumpProtocolUse(ctx.user.id);
       return { ok: true };
     }),
@@ -229,7 +236,7 @@ export const protocolRouter = createRouter({
       await getDb()
         .update(protocols)
         .set({ pinned: input.pinned, pinnedAt: input.pinned ? new Date() : null })
-        .where(and(eq(protocols.id, input.id), eq(protocols.userId, ctx.user.id)));
+        .where(eq(protocols.id, input.id));
       return { ok: true };
     }),
 

@@ -4,6 +4,44 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-08-01 · 批次#20-II-a 协作底座：对象级成员共享（记录/方法/生信三类 × owner/editor/viewer）
+
+方案1（对象级共享角色）先行落地，方案2（团队空间）登记后续、接口已按三类通用 kind 预留兼容：
+
+**数据层**
+
+- 新表 `share_members`：ownerId 冗余 + kind 枚举（record/protocol/analysis）+ targetId + memberId + role（viewer/editor），`unique(kind,targetId,memberId)` + member/owner 双索引；迁移脚本幂等已执行真实库
+- `record.purge` 级联清空对应 share_members 行
+
+**权限中枢（api/lib/collab.ts）**
+
+- `getCollabAccess`（owner>editor>viewer>null）+ `assertCollabReadable`（无权→NOT_FOUND「不存在或无权访问」，防存在性探测）+ `assertCollabWritable`（viewer→FORBIDDEN「只有查看权限」）+ `assertOwner`（删除/锁定/成员管理→FORBIDDEN）
+- 三域写读路径全接入：record（byId/update/updateStatus/remove/purge/versions + 图片/附件四端点）、protocol（byId/update/remove/saveVersion/listVersions/incrementUse/setPinned/purge）、bioinfo（byId/update/updateStatus/remove）
+- **对象附属数据恒归所有者域**：editor 代传的图片/附件/版本快照 userId 一律落对象所有者 id（冒烟实测验证）
+- record.byId 附 `access` + 非 owner 视角附 `ownerName`
+
+**memberRouter（新）**
+
+- `directory` 用户目录（name/unionId 模糊、排除自己、上限 8）、`list/add/updateRole/remove`（owner 专属，add 幂等 upsert，member 可自退）、`sharedWithMe`（三类 join，记录/方法滤软删、生信硬删除不滤，统一 title/role/ownerName/updatedAt）
+
+**前端**
+
+- RecordDetail：`readOnly = locked || isViewer` 派生闸口接管全部编辑控件（标题/正文/图库/偏离/附件/目的/结论/状态/保存）；owner-only（删除/锁定/解锁/成员按钮）按 isOwner 收口；viewer 独享「共享只读」横幅（带所有者名）；**顺带修复**：无权访问（NOT_FOUND 抛错）与行不存在（data null）同走 404 页（原实现 error 态卡骨架屏）
+- 新组件 `ShareMembersDialog`（ui/dialog）：成员列表（角色双段切换/移除）+ 目录搜索添加（角色预选）
+- 新页面 `/shared`「共享给我」：三类分组 + 角色徽标 + 所有者/更新时间 + 退出共享；Layout 导航 +「共享给我 Shared」（Users 图标）
+- ProtocolDetail：viewer 隐藏编辑/发布/pin/归档、材料与步骤 readOnly、owner 成员按钮+横幅；BioinfoDetail：fieldset disabled 包裹全表单（markdown 编辑器单独 pointer-events 包裹）、状态/保存禁用、删除 owner-only、成员按钮+横幅
+
+**验证**
+
+- 冒烟 20/20（真实库）：viewer 读通写拒删拒、editor 写通+附属归 owner 域+删拒、陌生人 NOT_FOUND、三类对象各验一角、sharedWithMe 三类齐全、移除后访问回收、purge 级联
+- playwright 双账号 14/14：注册→建记录→成员弹窗加 viewer→「共享给我」列表→只读横幅/保存禁用/无成员按钮→升级 editor→编辑落库→菜单无删除项→移除→列表清空→直访 404
+- 实测固化的断言教训：受控 input 的 value 不进 body.textContent，标题类断言必须按 input.value 取值
+- tsc 全绿 / vite build 通过 / dist 静态 67 项压缩 / boot.js 重打入包验证
+
+**范围**：#20-II-a 协作底座（方案1对象级共享）。后续：#20-II-b 评论@+通知（三类对象评论区 + @mention + 铃铛未读）；#20-II-c 任务指派（todos assignedById + 双视图）；团队空间（方案2）登记待排期。
+
+---
+
 ## 2026-08-01 · 批次F 科学联动：表格公式 / Relevant Items 双向链接 / 序列块 / 孔板图
 
 批次F 四项全落地，并借 F4 实弹挖出并修复 E6 引入的芯片降级潜伏 bug：

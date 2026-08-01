@@ -17,6 +17,7 @@ import {
   MoreHorizontal,
   Save,
   Trash2,
+  Users,
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -41,6 +42,7 @@ import {
 import { cn } from '@/lib/utils'
 import { trpc } from '@/providers/trpc'
 import { ShareButton } from '@/components/share/ShareButton'
+import { ShareMembersDialog } from '@/components/collab/ShareMembersDialog'
 import RecordDeviationTable from '@/components/records/RecordDeviationTable'
 import RichEditor, { textToInitialHtml } from '@/components/records/RichEditor'
 import type { OutlineItem, RichEditorHandle } from '@/components/records/RichEditor'
@@ -218,6 +220,7 @@ export default function RecordDetail() {
   const [propsOpen, setPropsOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [membersOpen, setMembersOpen] = useState(false)
   const [lockOpen, setLockOpen] = useState(false)
   const [lockNote, setLockNote] = useState('')
   const [tplSaveOpen, setTplSaveOpen] = useState(false)
@@ -237,6 +240,12 @@ export default function RecordDetail() {
   // 签署锁定（P2-C1）：锁定后整页只读，服务端同步拒绝一切写操作
   const lockedAt = record?.lockedAt ?? null
   const locked = lockedAt != null
+  // #20-II 协作角色：owner > editor（可编辑内容）> viewer（只读共享）
+  const access = record?.access ?? null
+  const isViewer = access === 'viewer'
+  const isOwner = access == null || access === 'owner'
+  // 编辑闸口：签署锁定 或 viewer 只读共享
+  const readOnly = locked || isViewer
 
   const preProtocolQuery = trpc.protocol.byId.useQuery(
     { id: preProtocolId ?? 0 },
@@ -343,8 +352,8 @@ export default function RecordDetail() {
   savingRef.current = saving
 
   const doSave = useCallback(async (): Promise<number | null> => {
-    if (!isNew && locked) {
-      toast.error('记录已签署锁定，无法保存修改')
+    if (!isNew && readOnly) {
+      toast.error(locked ? '记录已签署锁定，无法保存修改' : '你对此记录只有查看权限')
       return null
     }
     const payload = buildPayload()
@@ -379,7 +388,7 @@ export default function RecordDetail() {
       toast.error(`保存失败：${e instanceof Error ? e.message : '未知错误'}`)
       return null
     }
-  }, [buildPayload, isNew, locked, createMut, updateMut, incrementUseMut, utils, navigate, recordId, form])
+  }, [buildPayload, isNew, readOnly, locked, createMut, updateMut, incrementUseMut, utils, navigate, recordId, form])
   doSaveRef.current = doSave
 
   const ensureRecordId = useCallback(async (): Promise<number> => {
@@ -633,7 +642,8 @@ export default function RecordDetail() {
     )
   }
 
-  if (!isNew && detailQuery.data === null) {
+  // #20-II：无权访问（NOT_FOUND 抛错）与行不存在（data null）同页呈现——刻意不区分，防存在性探测
+  if (!isNew && (detailQuery.data === null || detailQuery.isError)) {
     return (
       <div className="mx-auto flex w-full max-w-[1080px] flex-col items-center px-4 py-24 text-center md:px-8">
         <img src="/empty-records.svg" alt="" className="w-[200px] opacity-70" />
@@ -668,7 +678,7 @@ export default function RecordDetail() {
       : null
 
   const propertiesPanel = (
-    <div className={locked ? 'pointer-events-none opacity-75' : undefined}>
+    <div className={readOnly ? 'pointer-events-none opacity-75' : undefined}>
     <RecordPropertiesPanel
       recordDate={form.recordDate}
       onDateChange={(d) => patch({ recordDate: d })}
@@ -716,7 +726,7 @@ export default function RecordDetail() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
-          <RecordStatusMenu status={form.status} onChange={(s) => void onStatusChange(s)} disabled={locked} />
+          <RecordStatusMenu status={form.status} onChange={(s) => void onStatusChange(s)} disabled={readOnly} />
           {locked && (
             <span className="flex h-8 items-center gap-1.5 rounded-full border border-warning/50 bg-warning/10 px-3 text-[12.5px] font-medium text-warning">
               <Lock className="h-3.5 w-3.5" />
@@ -725,6 +735,16 @@ export default function RecordDetail() {
           )}
           {!isNew && record?.id != null && (
             <ShareButton kind="record" targetId={record.id} />
+          )}
+          {!isNew && record?.id != null && isOwner && (
+            <button
+              type="button"
+              onClick={() => setMembersOpen(true)}
+              className="flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[13px] font-medium text-ink-soft shadow-card transition-colors duration-150 hover:border-line-strong hover:text-ink"
+            >
+              <Users className="h-4 w-4" />
+              成员
+            </button>
           )}
           {!isNew && (
             <button
@@ -747,8 +767,8 @@ export default function RecordDetail() {
           <button
             type="button"
             onClick={() => void doSave()}
-            disabled={saving || (!dirty && !isNew) || locked}
-            title={locked ? '记录已锁定' : undefined}
+            disabled={saving || (!dirty && !isNew) || readOnly}
+            title={locked ? '记录已锁定' : isViewer ? '共享只读，无法保存' : undefined}
             className={cn(
               'flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-[13px] font-medium transition-all duration-150 active:scale-[0.97]',
               savePulse
@@ -798,6 +818,7 @@ export default function RecordDetail() {
                 <LayoutTemplate className="h-3.5 w-3.5" /> 存为模板…
               </DropdownMenuItem>
               {!isNew &&
+                isOwner &&
                 (locked ? (
                   <DropdownMenuItem onSelect={() => void doUnlock()} className="gap-2 text-[13px]">
                     <LockOpen className="h-3.5 w-3.5" /> 解除锁定
@@ -807,7 +828,7 @@ export default function RecordDetail() {
                     <Lock className="h-3.5 w-3.5" /> 锁定记录…
                   </DropdownMenuItem>
                 ))}
-              {!isNew && (
+              {!isNew && isOwner && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -867,15 +888,30 @@ export default function RecordDetail() {
                 {record?.lockedNote ? `：${record.lockedNote}` : ''}
                 。内容只读，解除锁定后方可修改。
               </p>
-              <button
-                type="button"
-                onClick={() => void doUnlock()}
-                disabled={unlockMut.isPending}
-                className="flex h-8 items-center gap-1.5 rounded-lg border border-warning/60 bg-surface px-3 text-[12.5px] font-medium text-warning transition-colors duration-150 hover:bg-warning/10 disabled:opacity-60"
-              >
-                <LockOpen className="h-3.5 w-3.5" />
-                {unlockMut.isPending ? '解除中…' : '解除锁定'}
-              </button>
+              {isOwner && (
+                <button
+                  type="button"
+                  onClick={() => void doUnlock()}
+                  disabled={unlockMut.isPending}
+                  className="flex h-8 items-center gap-1.5 rounded-lg border border-warning/60 bg-surface px-3 text-[12.5px] font-medium text-warning transition-colors duration-150 hover:bg-warning/10 disabled:opacity-60"
+                >
+                  <LockOpen className="h-3.5 w-3.5" />
+                  {unlockMut.isPending ? '解除中…' : '解除锁定'}
+                </button>
+              )}
+            </motion.div>
+          )}
+
+          {/* 共享只读横幅（#20-II viewer） */}
+          {isViewer && (
+            <motion.div
+              variants={sectionVariants}
+              className="flex flex-wrap items-center gap-2.5 rounded-xl border border-line bg-bench-wash px-4 py-2.5"
+            >
+              <Users className="h-4 w-4 shrink-0 text-bench" />
+              <p className="min-w-0 flex-1 text-[13px] leading-5 text-ink">
+                本记录由 {record?.ownerName ?? '所有者'} 共享给你，当前为只读查看权限。
+              </p>
             </motion.div>
           )}
 
@@ -884,7 +920,7 @@ export default function RecordDetail() {
             <input
               value={form.title}
               onChange={(e) => patch({ title: e.target.value })}
-              disabled={locked}
+              disabled={readOnly}
               placeholder={isNew ? '未命名湿实验记录' : '给这次实验起个名字…'}
               className="peer w-full border-none bg-transparent pb-2 font-display text-[24px] font-bold leading-[34px] text-ink outline-none placeholder:text-ink-mute disabled:cursor-not-allowed disabled:opacity-75 md:text-[32px] md:leading-[42px]"
             />
@@ -972,12 +1008,12 @@ export default function RecordDetail() {
                   initialHtml={initKey === wantKey ? form.contentHtml : ''}
                   onChange={(html) => patch({ contentHtml: html })}
                   onOutlineChange={setOutline}
-                  readOnly={locked}
+                  readOnly={readOnly}
                   onImportTable={(rows) => setImportRows(rows)}
                 />
               </div>
             </div>
-            <div className={cn('mt-3', locked && 'pointer-events-none opacity-75')}>
+            <div className={cn('mt-3', readOnly && 'pointer-events-none opacity-75')}>
               <RecordImageGallery
                 ref={galleryRef}
                 recordId={recordId}
@@ -996,7 +1032,7 @@ export default function RecordDetail() {
           >
             <textarea
               value={form.purpose}
-              disabled={locked}
+              disabled={readOnly}
               onChange={(e) => {
                 patch({ purpose: e.target.value })
                 e.target.style.height = 'auto'
@@ -1027,7 +1063,7 @@ export default function RecordDetail() {
             }
             defaultOpen={form.deviations.length > 0}
           >
-            <div className={locked ? 'pointer-events-none opacity-75' : undefined}>
+            <div className={readOnly ? 'pointer-events-none opacity-75' : undefined}>
             <RecordDeviationTable
               deviations={form.deviations}
               onChange={(rows) => {
@@ -1042,7 +1078,7 @@ export default function RecordDetail() {
           {/* attachments */}
           <motion.section
             variants={sectionVariants}
-            className={locked ? 'pointer-events-none opacity-75' : undefined}
+            className={readOnly ? 'pointer-events-none opacity-75' : undefined}
           >
             <RecordAttachments recordId={recordId} ensureRecordId={ensureRecordId} />
           </motion.section>
@@ -1128,7 +1164,7 @@ export default function RecordDetail() {
               </p>
               <textarea
                 value={form.conclusion}
-                disabled={locked}
+                disabled={readOnly}
                 onChange={(e) => patch({ conclusion: e.target.value })}
                 rows={4}
                 placeholder="这次实验回答了什么？数据支持什么结论？"
@@ -1142,7 +1178,7 @@ export default function RecordDetail() {
               </p>
               <textarea
                 value={form.nextStep}
-                disabled={locked}
+                disabled={readOnly}
                 onChange={(e) => patch({ nextStep: e.target.value })}
                 rows={4}
                 placeholder="接下来做什么？是否已排期（见日程）？"
@@ -1179,7 +1215,7 @@ export default function RecordDetail() {
         <button
           type="button"
           onClick={() => void doSave()}
-          disabled={saving || locked}
+          disabled={saving || readOnly}
           className="flex h-11 flex-[3] items-center justify-center gap-1.5 rounded-lg bg-bench text-[13.5px] font-medium text-white shadow-card transition-all duration-150 active:scale-[0.98] disabled:opacity-60"
         >
           {savePulse ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
@@ -1207,6 +1243,15 @@ export default function RecordDetail() {
       />
 
       {/* 锁定签署 dialog（P2-C1）：preventDefault 阻止自动关闭，待 mutation 完成后手动关 */}
+      {!isNew && record?.id != null && isOwner && (
+        <ShareMembersDialog
+          kind="record"
+          targetId={record.id}
+          open={membersOpen}
+          onOpenChange={setMembersOpen}
+        />
+      )}
+
       <AlertDialog open={lockOpen} onOpenChange={setLockOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

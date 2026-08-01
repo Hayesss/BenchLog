@@ -552,6 +552,32 @@ export type InsertAiModelProfile = typeof aiModelProfiles.$inferInsert;
  * token 为 16 字节 hex（不可枚举）；公开端点只返回脱敏内容，绝不暴露 userId/邮箱。
  */
 /**
+ * share_members（#20-II 协作与分享·第二期，对象级共享角色——方案1先行）：
+ * 记录/方法/生信三类对象共享给本平台指定用户，角色 viewer（只读）/ editor（可编辑，不含删除/锁定/共享管理）。
+ * 数据归属不变（ownerId 恒为对象所有者）；写路径经 api/lib/collab.ts getAccess 断言。
+ * 团队空间（方案2）预留兼容：未来 workspaces 的成员关系可物化为本表行（kind 语义不变），或独立 team_members 并存。
+ */
+export const shareMembers = mysqlTable(
+  "share_members",
+  {
+    id: serial("id").primaryKey(),
+    ownerId: bigint("ownerId", { mode: "number", unsigned: true }).notNull(), // 对象所有者（冗余便于管理与清理）
+    kind: mysqlEnum("kind", ["record", "protocol", "analysis"]).notNull(),
+    targetId: bigint("targetId", { mode: "number", unsigned: true }).notNull(),
+    memberId: bigint("memberId", { mode: "number", unsigned: true }).notNull(), // 被共享用户
+    role: mysqlEnum("role", ["viewer", "editor"]).notNull().default("viewer"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("share_members_unique").on(t.kind, t.targetId, t.memberId),
+    index("share_members_member_idx").on(t.memberId),
+    index("share_members_owner_idx").on(t.ownerId),
+  ],
+);
+export type ShareMember = typeof shareMembers.$inferSelect;
+export type InsertShareMember = typeof shareMembers.$inferInsert;
+
+/**
  * record_refs（批次F F4 Relevant Items 双向链接）：
  * 记录富文本 contentHtml 里 refChip（data-ref-chip）的结构化索引——record → record/protocol/sample 单向边。
  * create/update(contentHtml 变更时)/restoreVersion 三处写入点全量重建该记录的出边；

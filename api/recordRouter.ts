@@ -11,6 +11,7 @@ import {
   recordRefs,
   projects,
   protocols,
+  users,
 } from "@db/schema";
 import type { RecordSnapshot } from "@db/schema";
 import { dateStr, deviationSchema, recordStatusSchema } from "./zodSchemas";
@@ -19,6 +20,8 @@ import {
   referencedByRecords,
   syncRecordRefs,
 } from "./lib/record-refs";
+import { assertCollabReadable, assertOwner } from "./lib/collab";
+import { shareMembers } from "@db/schema";
 
 const recordFieldsInput = {
   title: z.string().min(1),
@@ -119,17 +122,40 @@ export async function snapshotCurrent(userId: number, recordId: number) {
   return true;
 }
 
-/** 写入前校验：记录须归属当前用户且未进回收站（已软删的记录禁止任何写入） */
+/** 写入前校验（#20-II 协作感知）：记录未进回收站、未锁定，且当前用户为所有者或 editor 成员
+    （viewer 明确 FORBIDDEN）。返回记录行（含所有者 userId，refs 索引/级联写须用所有者 id）。 */
 async function assertRecordWritable(userId: number, recordId: number) {
   const rows = await getDb()
-    .select({ id: records.id, deletedAt: records.deletedAt, lockedAt: records.lockedAt })
+    .select({
+      id: records.id,
+      userId: records.userId,
+      deletedAt: records.deletedAt,
+      lockedAt: records.lockedAt,
+    })
     .from(records)
-    .where(and(eq(records.id, recordId), eq(records.userId, userId)));
-  if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "记录不存在" });
-  if (rows[0].deletedAt)
+    .where(eq(records.id, recordId));
+  const row = rows[0];
+  if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "记录不存在" });
+  if (row.deletedAt)
     throw new TRPCError({ code: "BAD_REQUEST", message: "记录已在回收站，请先恢复再操作" });
-  if (rows[0].lockedAt)
+  if (row.lockedAt)
     throw new TRPCError({ code: "FORBIDDEN", message: "记录已签署锁定，请先解除锁定再修改" });
+  if (row.userId !== userId) {
+    const mem = await getDb()
+      .select({ role: shareMembers.role })
+      .from(shareMembers)
+      .where(
+        and(
+          eq(shareMembers.kind, "record"),
+          eq(shareMembers.targetId, recordId),
+          eq(shareMembers.memberId, userId),
+        ),
+      );
+    if (!mem[0]) throw new TRPCError({ code: "NOT_FOUND", message: "记录不存在或无权访问" });
+    if (mem[0].role === "viewer")
+      throw new TRPCError({ code: "FORBIDDEN", message: "你对此记录只有查看权限" });
+  }
+  return row;
 }
 
 export const recordRouter = createRouter({
@@ -224,13 +250,17 @@ export const recordRouter = createRouter({
     }),
 
   byId: authedQuery.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
+    // #20-II 协作读：先按 id 取行（不限归属），再按 owner/editor/viewer 断言访问角色
     const rows = await getDb()
       .select()
       .from(records)
-      .where(and(eq(records.id, input.id), eq(records.userId, ctx.user.id)));
+      .where(eq(records.id, input.id));
     if (!rows[0]) return null;
+    const access = await assertCollabReadable(ctx.user.id, "record", input.id);
     if (rows[0].deletedAt) throw new TRPCError({ code: "NOT_FOUND", message: "记录已删除" });
-    const [withMeta] = await attachMeta(ctx.user.id, [rows[0]]);
+    // meta/refs 均按对象所有者域解析（成员打开时项目/方法/引用归属所有者）
+    const ownerId = rows[0].userId;
+    const [withMeta] = await attachMeta(ownerId, [rows[0]]);
     const images = await getDb()
       .select()
       .from(recordImages)
@@ -238,10 +268,19 @@ export const recordRouter = createRouter({
       .orderBy(recordImages.createdAt);
     // F4 Relevant Items：正向引用（本记录 chips 指向）+ 反向被引用（谁的 chips 指向本记录）
     const [refs, referencedBy] = await Promise.all([
-      refsWithMeta(ctx.user.id, input.id),
-      referencedByRecords(ctx.user.id, input.id),
+      refsWithMeta(ownerId, input.id),
+      referencedByRecords(ownerId, input.id),
     ]);
-    return { ...withMeta, images, refs, referencedBy };
+    // 协作语境附所有者显示名（viewer 横幅等）；owner 自己看为 null 省一次查询
+    let ownerName: string | null = null;
+    if (access !== "owner") {
+      const u = await getDb()
+        .select({ name: users.name, unionId: users.unionId })
+        .from(users)
+        .where(eq(users.id, ownerId));
+      ownerName = u[0] ? (u[0].name ?? u[0].unionId.replace(/^local:/, "")) : null;
+    }
+    return { ...withMeta, images, refs, referencedBy, access, ownerName };
   }),
 
   create: authedQuery.input(z.object(recordFieldsInput)).mutation(async ({ ctx, input }) => {
@@ -264,9 +303,9 @@ export const recordRouter = createRouter({
     .input(z.object({ id: z.number(), ...recordFieldsInput }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
-      await assertRecordWritable(ctx.user.id, id);
-      // 保存前先把当前行快照进版本历史（留下「上一版」）
-      await snapshotCurrent(ctx.user.id, id);
+      const row = await assertRecordWritable(ctx.user.id, id);
+      // 保存前先把当前行快照进版本历史（留下「上一版」）；版本/引用索引归所有者域
+      await snapshotCurrent(row.userId, id);
       const res = await getDb()
         .update(records)
         .set({
@@ -275,27 +314,26 @@ export const recordRouter = createRouter({
           protocolId: data.protocolId ?? null,
           protocolVersion: data.protocolVersion ?? null,
         })
-        .where(and(eq(records.id, id), eq(records.userId, ctx.user.id)));
+        .where(eq(records.id, id));
       void res;
       // F4：仅 contentHtml 变更时重建引用索引（undefined 跳过语义——未传则不解析）
       if (data.contentHtml !== undefined) {
-        await syncRecordRefs(ctx.user.id, id, data.contentHtml);
+        await syncRecordRefs(row.userId, id, data.contentHtml);
       }
       return { ok: true };
     }),
 
-  /** 版本历史（新→旧），snapshot 含 resultMd 便于回看 */
+  /** 版本历史（新→旧），snapshot 含 resultMd 便于回看；#20-II 协作读成员可见，恢复仍所有者专属 */
   versions: authedQuery
     .input(z.object({ recordId: z.number() }))
-    .query(({ ctx, input }) =>
-      getDb()
+    .query(async ({ ctx, input }) => {
+      await assertCollabReadable(ctx.user.id, "record", input.recordId);
+      return getDb()
         .select()
         .from(recordVersions)
-        .where(
-          and(eq(recordVersions.recordId, input.recordId), eq(recordVersions.userId, ctx.user.id)),
-        )
-        .orderBy(desc(recordVersions.savedAt), desc(recordVersions.id)),
-    ),
+        .where(eq(recordVersions.recordId, input.recordId))
+        .orderBy(desc(recordVersions.savedAt), desc(recordVersions.id));
+    }),
 
   /** 恢复某版本：先把当前行同样快照，再把快照字段写回 records */
   restoreVersion: authedQuery
@@ -380,14 +418,15 @@ export const recordRouter = createRouter({
       await getDb()
         .update(records)
         .set({ status: input.status })
-        .where(and(eq(records.id, input.id), eq(records.userId, ctx.user.id)));
+        .where(eq(records.id, input.id));
       return { ok: true };
     }),
 
-  /** 软删除：移入回收站（images/attachments/versions 保留，恢复时完整还原） */
+  /** 软删除：移入回收站（images/attachments/versions 保留，恢复时完整还原）；仅所有者 */
   remove: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
-    // 锁定记录不可删除（签署内容必须保留审计痕迹，先解锁再删）
+    // 锁定记录不可删除（签署内容必须保留审计痕迹，先解锁再删）；删除敏感操作归所有者
     await assertRecordWritable(ctx.user.id, input.id);
+    await assertOwner(ctx.user.id, "record", input.id);
     await getDb()
       .update(records)
       .set({ deletedAt: new Date() })
@@ -426,8 +465,11 @@ export const recordRouter = createRouter({
     return { ok: true };
   }),
 
-  /** 彻底删除：级联清掉 images/attachments/versions/refs（不可恢复） */
+  /** 彻底删除：级联清掉 images/attachments/versions/refs/members（不可恢复） */
   purge: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    await getDb()
+      .delete(shareMembers)
+      .where(and(eq(shareMembers.kind, "record"), eq(shareMembers.targetId, input.id)));
     await getDb()
       .delete(recordRefs)
       .where(and(eq(recordRefs.userId, ctx.user.id), eq(recordRefs.recordId, input.id)));
@@ -461,13 +503,15 @@ export const recordRouter = createRouter({
 export const imageRouter = createRouter({
   listByRecord: authedQuery
     .input(z.object({ recordId: z.number() }))
-    .query(({ ctx, input }) =>
-      getDb()
+    .query(async ({ ctx, input }) => {
+      // #20-II 协作读：成员（viewer/editor）同可见
+      await assertCollabReadable(ctx.user.id, "record", input.recordId);
+      return getDb()
         .select()
         .from(recordImages)
-        .where(and(eq(recordImages.recordId, input.recordId), eq(recordImages.userId, ctx.user.id)))
-        .orderBy(recordImages.createdAt),
-    ),
+        .where(eq(recordImages.recordId, input.recordId))
+        .orderBy(recordImages.createdAt);
+    }),
 
   /** base64 dataURL 上传（移动端 capture 拍照同源处理） */
   upload: authedQuery
@@ -481,12 +525,12 @@ export const imageRouter = createRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // 校验记录归属且未在回收站（已删除记录禁止写入）
-      await assertRecordWritable(ctx.user.id, input.recordId);
+      // 校验记录可写（所有者或 editor）且未在回收站；图片归所有者域
+      const row = await assertRecordWritable(ctx.user.id, input.recordId);
       const [{ id }] = await getDb()
         .insert(recordImages)
         .values({
-          userId: ctx.user.id,
+          userId: row.userId,
           recordId: input.recordId,
           mime: input.mime,
           data: input.data,
@@ -507,18 +551,25 @@ export const imageRouter = createRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
+      const img = await getDb()
+        .select({ recordId: recordImages.recordId })
+        .from(recordImages)
+        .where(eq(recordImages.id, id));
+      if (!img[0]) throw new TRPCError({ code: "NOT_FOUND", message: "图片不存在" });
+      await assertRecordWritable(ctx.user.id, img[0].recordId);
       const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
-      await getDb()
-        .update(recordImages)
-        .set(clean)
-        .where(and(eq(recordImages.id, id), eq(recordImages.userId, ctx.user.id)));
+      await getDb().update(recordImages).set(clean).where(eq(recordImages.id, id));
       return { ok: true };
     }),
 
   remove: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
-    await getDb()
-      .delete(recordImages)
-      .where(and(eq(recordImages.id, input.id), eq(recordImages.userId, ctx.user.id)));
+    const img = await getDb()
+      .select({ recordId: recordImages.recordId })
+      .from(recordImages)
+      .where(eq(recordImages.id, input.id));
+    if (!img[0]) throw new TRPCError({ code: "NOT_FOUND", message: "图片不存在" });
+    await assertRecordWritable(ctx.user.id, img[0].recordId);
+    await getDb().delete(recordImages).where(eq(recordImages.id, input.id));
     return { ok: true };
   }),
 });
@@ -527,11 +578,12 @@ const ATTACHMENT_MAX_BYTES = 2 * 1024 * 1024; // 单文件 2MB 上限
 
 /** 记录附件（Excel / PDF / fcs 等原始数据文件，base64 存库） */
 export const attachmentRouter = createRouter({
-  /** 附件元信息列表（不返回 data 本体） */
+  /** 附件元信息列表（不返回 data 本体）；#20-II 协作读成员同可见 */
   listByRecord: authedQuery
     .input(z.object({ recordId: z.number() }))
-    .query(({ ctx, input }) =>
-      getDb()
+    .query(async ({ ctx, input }) => {
+      await assertCollabReadable(ctx.user.id, "record", input.recordId);
+      return getDb()
         .select({
           id: recordAttachments.id,
           recordId: recordAttachments.recordId,
@@ -541,14 +593,9 @@ export const attachmentRouter = createRouter({
           createdAt: recordAttachments.createdAt,
         })
         .from(recordAttachments)
-        .where(
-          and(
-            eq(recordAttachments.recordId, input.recordId),
-            eq(recordAttachments.userId, ctx.user.id),
-          ),
-        )
-        .orderBy(recordAttachments.createdAt),
-    ),
+        .where(eq(recordAttachments.recordId, input.recordId))
+        .orderBy(recordAttachments.createdAt);
+    }),
 
   add: authedQuery
     .input(
@@ -564,12 +611,12 @@ export const attachmentRouter = createRouter({
       if (input.size > ATTACHMENT_MAX_BYTES) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "附件超过 2MB 上限" });
       }
-      // 归属+锁定校验：锁定记录禁止新增附件（与图片 upload 同一道闸）
-      await assertRecordWritable(ctx.user.id, input.recordId);
+      // 归属+锁定校验：锁定记录禁止新增附件（与图片 upload 同一道闸）；附件归所有者域
+      const row = await assertRecordWritable(ctx.user.id, input.recordId);
       const [{ id }] = await getDb()
         .insert(recordAttachments)
         .values({
-          userId: ctx.user.id,
+          userId: row.userId,
           recordId: input.recordId,
           name: input.name,
           mime: input.mime,
@@ -581,29 +628,30 @@ export const attachmentRouter = createRouter({
     }),
 
   remove: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
-    // 先定位附件所属记录，锁定记录禁止删除附件（前端禁用之外的第二道闸）
+    // 先定位附件所属记录，锁定记录禁止删除附件（前端禁用之外的第二道闸）；协作 editor 可删
     const att = await getDb()
       .select({ recordId: recordAttachments.recordId })
       .from(recordAttachments)
-      .where(and(eq(recordAttachments.id, input.id), eq(recordAttachments.userId, ctx.user.id)));
-    if (att[0]) await assertRecordWritable(ctx.user.id, att[0].recordId);
-    await getDb()
-      .delete(recordAttachments)
-      .where(and(eq(recordAttachments.id, input.id), eq(recordAttachments.userId, ctx.user.id)));
+      .where(eq(recordAttachments.id, input.id));
+    if (!att[0]) throw new TRPCError({ code: "NOT_FOUND", message: "附件不存在" });
+    await assertRecordWritable(ctx.user.id, att[0].recordId);
+    await getDb().delete(recordAttachments).where(eq(recordAttachments.id, input.id));
     return { ok: true };
   }),
 
-  /** 下载：取回 base64 本体 */
+  /** 下载：取回 base64 本体；#20-II 协作读成员同可下载 */
   getData: authedQuery.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
     const rows = await getDb()
       .select({
+        recordId: recordAttachments.recordId,
         name: recordAttachments.name,
         mime: recordAttachments.mime,
         data: recordAttachments.data,
       })
       .from(recordAttachments)
-      .where(and(eq(recordAttachments.id, input.id), eq(recordAttachments.userId, ctx.user.id)));
+      .where(eq(recordAttachments.id, input.id));
     if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "附件不存在" });
+    await assertCollabReadable(ctx.user.id, "record", rows[0].recordId);
     return { name: rows[0].name, mime: rows[0].mime, dataBase64: rows[0].data };
   }),
 });

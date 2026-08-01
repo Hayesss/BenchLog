@@ -14,6 +14,7 @@ import {
   Loader2,
   Save,
   Trash2,
+  Users,
 } from 'lucide-react'
 import { toast, Toaster } from 'sonner'
 import { trpc } from '@/providers/trpc'
@@ -35,6 +36,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ShareButton } from '@/components/share/ShareButton'
+import { ShareMembersDialog } from '@/components/collab/ShareMembersDialog'
 import RecordMarkdownEditor from '@/components/records/RecordMarkdownEditor'
 import RepoPanel from '@/components/bioinfo/RepoPanel'
 import RepoStaging, { type StagedFile } from '@/components/bioinfo/RepoStaging'
@@ -172,6 +174,11 @@ export default function BioinfoDetail() {
   const [form, setForm] = useState<Form>(EMPTY)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [loaded, setLoaded] = useState(analysisId == null)
+  const [membersOpen, setMembersOpen] = useState(false)
+  // #20-II 协作角色：viewer 只读；editor 可编辑；owner 另有删除/成员管理权
+  const access = detailQ.data?.access ?? null
+  const isViewer = access === 'viewer'
+  const isOwner = access == null || access === 'owner'
   // 新建草稿：暂存代码 + 提交信息（创建时自动建仓、提交首个 commit 并锚定）
   const [draftFiles, setDraftFiles] = useState<StagedFile[]>([])
   const [draftMessage, setDraftMessage] = useState('')
@@ -334,7 +341,12 @@ export default function BioinfoDetail() {
           {/* 状态切换 */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button type="button" className="flex items-center gap-1 rounded-full transition-opacity hover:opacity-80">
+              <button
+                type="button"
+                disabled={isViewer}
+                title={isViewer ? '共享只读，无法修改状态' : undefined}
+                className="flex items-center gap-1 rounded-full transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
+              >
                 <BioStatusBadge status={form.status} />
                 <ChevronDown className="h-3.5 w-3.5 text-ink-mute" />
               </button>
@@ -355,7 +367,17 @@ export default function BioinfoDetail() {
             </DropdownMenuContent>
           </DropdownMenu>
           {analysisId != null && <ShareButton kind="analysis" targetId={analysisId} />}
-          {analysisId != null && (
+          {analysisId != null && isOwner && (
+            <button
+              type="button"
+              onClick={() => setMembersOpen(true)}
+              className="flex h-8 items-center gap-1.5 rounded-lg border border-line px-2.5 text-[12.5px] font-medium text-ink-soft transition-colors duration-150 hover:bg-paper hover:text-ink"
+            >
+              <Users className="h-4 w-4" />
+              成员
+            </button>
+          )}
+          {analysisId != null && isOwner && (
             <button
               type="button"
               onClick={() => setDeleteOpen(true)}
@@ -368,7 +390,8 @@ export default function BioinfoDetail() {
           <button
             type="button"
             onClick={save}
-            disabled={saving}
+            disabled={saving || isViewer}
+            title={isViewer ? '共享只读，无法保存' : undefined}
             className="flex h-9 items-center gap-1.5 rounded-lg bg-bench px-4 text-[13.5px] font-medium text-white shadow-card transition-all duration-150 hover:bg-bench-deep disabled:opacity-60"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -377,6 +400,20 @@ export default function BioinfoDetail() {
         </div>
       </motion.div>
 
+      {/* 共享只读横幅（#20-II viewer） */}
+      {isViewer && (
+        <motion.div
+          variants={sectionVariants}
+          className="mt-4 flex items-center gap-2.5 rounded-xl border border-line bg-bench-wash px-4 py-2.5"
+        >
+          <Users className="h-4 w-4 shrink-0 text-bench" />
+          <p className="text-[13px] leading-5 text-ink">
+            本分析由所有者共享给你，当前为只读查看权限。
+          </p>
+        </motion.div>
+      )}
+
+      <fieldset disabled={isViewer} className="contents">
       {/* 基本信息 */}
       <motion.section variants={sectionVariants} className="mt-6 rounded-lg border border-line bg-surface p-5 shadow-card">
         <p className="caption-en mb-3">基本信息 BASIC INFO</p>
@@ -566,7 +603,9 @@ export default function BioinfoDetail() {
       {/* 结果 */}
       <motion.section variants={sectionVariants} className="mt-4 rounded-lg border border-line bg-surface p-5 shadow-card">
         <p className="caption-en mb-3">结果 RESULTS</p>
-        <RecordMarkdownEditor value={form.resultMd} onChange={(v) => patch({ resultMd: v })} />
+        <div className={isViewer ? 'pointer-events-none opacity-75' : undefined}>
+          <RecordMarkdownEditor value={form.resultMd} onChange={(v) => patch({ resultMd: v })} />
+        </div>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="结论">
             <textarea
@@ -586,6 +625,17 @@ export default function BioinfoDetail() {
           </Field>
         </div>
       </motion.section>
+      </fieldset>
+
+      {/* 成员共享弹窗（owner） */}
+      {analysisId != null && isOwner && (
+        <ShareMembersDialog
+          kind="analysis"
+          targetId={analysisId}
+          open={membersOpen}
+          onOpenChange={setMembersOpen}
+        />
+      )}
 
       {/* 删除确认 */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>

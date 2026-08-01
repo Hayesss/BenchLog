@@ -27,6 +27,7 @@ import {
   SquareTerminal,
   Tag,
   Trash2,
+  Users,
   X,
   Zap,
 } from 'lucide-react'
@@ -53,6 +54,7 @@ const NAV_ITEMS = [
   { to: '/guide', label: '学习指南', en: 'Guide', icon: BookOpen },
   { to: '/schedule', label: '实验安排', en: 'Schedule', icon: CalendarDays },
   { to: '/export', label: '汇报导出', en: 'Export', icon: FileDown },
+  { to: '/shared', label: '共享给我', en: 'Shared', icon: Users },
   { to: '/trash', label: '最近删除', en: 'Trash', icon: Trash2 },
 ] as const
 
