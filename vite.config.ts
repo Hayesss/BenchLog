@@ -25,5 +25,19 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        /* P2 性能：vendor 拆分——TipTap/ProseMirror 全家桶独立 chunk（仅记录详情页加载时拉取），
+           react 运行时独立 chunk（所有页面共享，长期缓存命中率高） */
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (/node_modules[\\/]@tiptap[\\/]|node_modules[\\/]prosemirror-/.test(id))
+            return "vendor-tiptap";
+          if (/node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/.test(id))
+            return "vendor-react";
+          return undefined;
+        },
+      },
+    },
   },
 });

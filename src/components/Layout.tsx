@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { motion } from 'framer-motion'
 import Lenis from 'lenis'
@@ -552,7 +552,14 @@ export default function Layout() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
           >
-            <Outlet />
+            {/* P2 性能：lazy 页面的 Suspense 边界——页面区局部 loading，侧栏/导航框架不动 */}
+            <Suspense
+              fallback={
+                <p className="py-16 text-center text-[12.5px] text-ink-mute">载入中…</p>
+              }
+            >
+              <Outlet />
+            </Suspense>
           </motion.div>
         </main>
       </div>

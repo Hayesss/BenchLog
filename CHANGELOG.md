@@ -4,6 +4,18 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-08-01 · 性能 P2：代码分割（路由懒加载 + vendor 拆分）
+
+性能专项 P2 落地（承接 P0 静态服务重写）：
+
+- 路由级代码分割：除首屏关键路径（Login/Dashboard/Layout）外 20 个页面全部 `React.lazy`——Records/RecordDetail/Samples/BoxDetail/Mice/Export/Assistant/Bioinfo(Library)/Guide 等按路由 chunk 按需加载；Suspense 边界分级——Layout 内 Outlet 包页面区局部 loading（侧栏/导航框架不闪），ShareView 独立全屏 fallback（Layout 外公开页）
+- vendor 拆分（manualChunks）：`vendor-tiptap`（@tiptap+prosemirror 全家桶 376KB，仅记录详情页拉取）、`vendor-react`（react/react-dom/react-router/scheduler 228KB，全站共享长缓存）；其余依赖由 rollup 随路由 chunk 自动分配
+- 效果：单 bundle 2559KB（br 718KB）→ 首屏 index 512KB + vendor-react 228KB（+modulepreload），首屏 JS 减负约 71%（按 min 计）；Export 页 docx 大依赖（428KB）与 TipTap 全家桶彻底隔离出首屏；61 个 JS 资产（含路由/组件/图标碎 chunk，均 <10KB，HTTP 多路复用友好）
+- 验证：`npx tsc -b` 通过；产物清单 121 文件 diff 一致、65 项 gzip+brotli 预压缩（br 合计 1012KB）；**playwright 生产实测 11/11**（登录页渲染/首屏未加载 vendor-tiptap/首屏未加载其他路由 chunk/records→samples→mice 切路由各自拉新 chunk 无白屏/记录详情按需加载 RecordDetail+vendor-tiptap 且编辑器输入正常/保存跳转完整/分享页 ShareView chunk 渲染/全程无 chunk load error）；测试数据已清理
+- 范围：纯前端改动（无 API 变更，boot.js 未重打）；index 主 chunk 512KB 仍含 framer-motion/react-query/lucide 等全局依赖，进一步细分待 P3 评估
+
+---
+
 ## 2026-08-01 · 批次E：合规加固 + 体验补齐（E1–E8 八项）
 
 差异对标批次E（便宜高价值清单）落地：
