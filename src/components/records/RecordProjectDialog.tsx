@@ -66,7 +66,7 @@ function ProjectDialogInner({
   })
   const updateMut = trpc.project.update.useMutation({
     onSuccess: async () => {
-      await Promise.all([utils.project.list.invalidate(), utils.record.list.invalidate()])
+      await Promise.all([utils.project.list.invalidate(), utils.record.invalidate()])
       toast.success('已更新项目')
       onOpenChange(false)
     },

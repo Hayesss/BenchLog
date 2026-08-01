@@ -68,12 +68,12 @@ const groupVariants = {
 function matchesQuery(r: RecordListItem, q: string): boolean {
   const needle = q.trim().toLowerCase()
   if (!needle) return true
+  // P1 性能：列表投影不再回传 resultMd/contentHtml，搜索覆盖标题/目的/结论/下一步/标签/关联名（正文全文检索待服务端化）
   const hay = [
     r.title,
     r.purpose ?? '',
     r.conclusion ?? '',
     r.nextStep ?? '',
-    r.resultMd ?? '',
     (r.tags ?? []).join(' '),
     r.protocol?.name ?? '',
     r.project?.name ?? '',
@@ -339,11 +339,34 @@ export default function Records() {
     [selectedTags, patchParams],
   )
 
-  // data
-  const recordsQuery = trpc.record.list.useQuery()
+  // data（P1 性能双模式）：无搜索词且无标签筛选 → 服务端键集分页（listPage）；
+  // 有搜索词/标签筛选（客户端计算维度）→ 回退全量列表（list，投影精简后量小）
+  const clientMode = q.trim() !== '' || selectedTags.length > 0
+  const pageInput = useMemo(
+    () => ({
+      projectIds: selectedProjects.length ? selectedProjects : undefined,
+      status: status === 'all' ? undefined : status,
+      from: dateFrom || undefined,
+      to: dateTo || undefined,
+      limit: 50,
+    }),
+    [selectedProjects, status, dateFrom, dateTo],
+  )
+  const pageQuery = trpc.record.listPage.useInfiniteQuery(pageInput, {
+    enabled: !clientMode,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  })
+  const listQuery = trpc.record.list.useQuery(undefined, { enabled: clientMode })
+  const records = useMemo(
+    () =>
+      clientMode
+        ? (listQuery.data ?? [])
+        : (pageQuery.data?.pages.flatMap((p) => p.items) ?? []),
+    [clientMode, listQuery.data, pageQuery.data],
+  )
+  const recordsQuery = clientMode ? listQuery : pageQuery
   const projectsQuery = trpc.project.list.useQuery()
   const tagsQuery = trpc.tag.list.useQuery()
-  const records = useMemo(() => recordsQuery.data ?? [], [recordsQuery.data])
   const projects = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data])
 
   // tag cloud: registry tags + tags seen on records
@@ -370,16 +393,13 @@ export default function Records() {
     [records, selectedProjects, status, selectedTags, q, dateFrom, dateTo],
   )
 
-  // stats
-  const stats = useMemo(() => {
+  // stats（P1 性能：服务端条件聚合一次查，不再依赖全量行；分页模式下 records.length 只是已加载数，不能用）
+  const monthPrefix = useMemo(() => {
     const now = new Date()
-    const monthPrefix = `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, '0')}`
-    return {
-      total: records.length,
-      month: records.filter((r) => r.recordDate.startsWith(monthPrefix)).length,
-      ongoing: records.filter((r) => r.status === 'ongoing').length,
-    }
-  }, [records])
+    return `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, '0')}`
+  }, [])
+  const statsQuery = trpc.record.stats.useQuery({ monthPrefix })
+  const stats = statsQuery.data ?? { total: 0, month: 0, ongoing: 0 }
 
   // client-side infinite scroll
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
@@ -393,25 +413,38 @@ export default function Records() {
     setLoadingMore(false)
   }
   const sentinelRef = useRef<HTMLDivElement | null>(null)
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = pageQuery
   useEffect(() => {
     const el = sentinelRef.current
     if (!el) return
     const ob = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting && filtered.length > visibleCount && !loadingMore) {
-          setLoadingMore(true)
-          window.setTimeout(() => {
-            setVisibleCount((c) => c + PAGE_SIZE)
-            setLoadingMore(false)
-          }, 350)
+        if (!entries[0]?.isIntersecting) return
+        if (clientMode) {
+          // 客户端模式：本地切片加量（数据已全量在手）
+          if (filtered.length > visibleCount && !loadingMore) {
+            setLoadingMore(true)
+            window.setTimeout(() => {
+              setVisibleCount((c) => c + PAGE_SIZE)
+              setLoadingMore(false)
+            }, 350)
+          }
+        } else if (hasNextPage && !isFetchingNextPage) {
+          // 服务端分页模式：拉下一页
+          void fetchNextPage()
         }
       },
       { rootMargin: '240px' },
     )
     ob.observe(el)
     return () => ob.disconnect()
-  }, [filtered.length, visibleCount, loadingMore])
-  const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount])
+  }, [clientMode, filtered.length, visibleCount, loadingMore, hasNextPage, isFetchingNextPage, fetchNextPage])
+  const visible = useMemo(
+    () => (clientMode ? filtered.slice(0, visibleCount) : filtered),
+    [clientMode, filtered, visibleCount],
+  )
+  const hasMoreToShow = clientMode ? filtered.length > visibleCount : (hasNextPage ?? false)
+  const fetchingMore = clientMode ? loadingMore : isFetchingNextPage
 
   // grouping
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
@@ -496,7 +529,6 @@ export default function Records() {
               protocolId: r.protocolId,
               protocolVersion: r.protocolVersion,
               deviations: r.deviations ?? [],
-              resultMd: r.resultMd ?? undefined,
               conclusion: r.conclusion ?? undefined,
               nextStep: r.nextStep ?? undefined,
               status: r.status,
@@ -504,7 +536,7 @@ export default function Records() {
             }),
           ),
       )
-      await Promise.all([utils.record.list.invalidate(), utils.tag.list.invalidate()])
+      await Promise.all([utils.record.invalidate(), utils.tag.list.invalidate()])
       toast.success(`已为 ${selected.size} 条记录加上 #${name}`)
       setBatchTagValue('')
       setBatchTagOpen(false)
@@ -520,7 +552,7 @@ export default function Records() {
   const [deletingProject, setDeletingProject] = useState<ProjectItem | null>(null)
   const removeProjectMut = trpc.project.remove.useMutation({
     onSuccess: async () => {
-      await Promise.all([utils.project.list.invalidate(), utils.record.list.invalidate()])
+      await Promise.all([utils.project.list.invalidate(), utils.record.invalidate()])
       toast.success('项目已删除（记录保留为未分组）')
       setDeletingProject(null)
     },
@@ -1107,9 +1139,9 @@ export default function Records() {
       )}
 
       {/* infinite-scroll sentinel + skeletons */}
-      {filtered.length > visibleCount && (
+      {hasMoreToShow && (
         <div ref={sentinelRef} className="mt-4 flex flex-col gap-3">
-          {loadingMore &&
+          {fetchingMore &&
             [0, 1, 2].map((i) => (
               <div
                 key={i}

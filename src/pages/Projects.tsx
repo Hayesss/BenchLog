@@ -249,7 +249,7 @@ export default function Projects() {
   const archivedProjects = projects.filter((p) => p.archived)
 
   const invalidateProjects = async () => {
-    await Promise.all([utils.project.list.invalidate(), utils.record.list.invalidate()])
+    await Promise.all([utils.project.list.invalidate(), utils.record.invalidate()])
   }
 
   const renameMut = trpc.project.rename.useMutation({

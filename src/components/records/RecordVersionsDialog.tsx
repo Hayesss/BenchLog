@@ -69,7 +69,7 @@ export default function RecordVersionsDialog({
     onSuccess: async () => {
       await Promise.all([
         utils.record.byId.invalidate({ id: recordId }),
-        utils.record.list.invalidate(),
+        utils.record.invalidate(),
         utils.record.versions.invalidate({ recordId }),
       ])
       toast.success('已恢复到该版本（恢复前的内容也已留档）')

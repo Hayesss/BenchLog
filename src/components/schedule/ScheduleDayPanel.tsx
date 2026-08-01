@@ -107,7 +107,7 @@ export default function ScheduleDayPanel({
     onSuccess: (data) => {
       void utils.todo.listByRange.invalidate()
       void utils.todo.today.invalidate()
-      void utils.record.list.invalidate()
+      void utils.record.invalidate()
       toast.success(
         data.appended
           ? `已把 ${data.count} 项完成追加进当日实验记录`

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, desc, eq, gte, isNotNull, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
@@ -30,11 +30,43 @@ const recordFieldsInput = {
   tags: z.array(z.string()).default([]),
 };
 
-async function attachMeta(userId: number, rows: (typeof records.$inferSelect)[]) {
+/** P1 性能：列表投影列——去掉 contentHtml(LONGTEXT)/resultMd(text) 两个大字段与 userId/deletedAt（查询已滤/无需回传），
+    列表页传输量降 90%+；卡片/搜索/筛选所需字段全保留（tsc 兜底调用方） */
+const RECORD_LIST_COLS = {
+  id: records.id,
+  projectId: records.projectId,
+  protocolId: records.protocolId,
+  protocolVersion: records.protocolVersion,
+  title: records.title,
+  recordDate: records.recordDate,
+  purpose: records.purpose,
+  deviations: records.deviations,
+  lockedAt: records.lockedAt,
+  lockedNote: records.lockedNote,
+  conclusion: records.conclusion,
+  nextStep: records.nextStep,
+  status: records.status,
+  tags: records.tags,
+  isDemo: records.isDemo,
+  createdAt: records.createdAt,
+  updatedAt: records.updatedAt,
+} as const;
+
+/** 关联 project/protocol 对象：按需 IN 查询（只拉涉及行，不再全量扫两表）；byId 传完整行同样兼容 */
+async function attachMeta<T extends { projectId: number | null; protocolId: number | null }>(
+  userId: number,
+  rows: T[],
+) {
   const db = getDb();
+  const pIds = [...new Set(rows.map((r) => r.projectId).filter((v): v is number => v != null))];
+  const prIds = [...new Set(rows.map((r) => r.protocolId).filter((v): v is number => v != null))];
   const [ps, prs] = await Promise.all([
-    db.select().from(projects).where(eq(projects.userId, userId)),
-    db.select().from(protocols).where(eq(protocols.userId, userId)),
+    pIds.length
+      ? db.select().from(projects).where(and(eq(projects.userId, userId), inArray(projects.id, pIds)))
+      : Promise.resolve([]),
+    prIds.length
+      ? db.select().from(protocols).where(and(eq(protocols.userId, userId), inArray(protocols.id, prIds)))
+      : Promise.resolve([]),
   ]);
   const pMap = new Map(ps.map((p) => [p.id, p]));
   const prMap = new Map(prs.map((p) => [p.id, p]));
@@ -112,12 +144,77 @@ export const recordRouter = createRouter({
       if (input?.status) conds.push(eq(records.status, input.status));
       if (input?.from) conds.push(gte(records.recordDate, input.from));
       if (input?.to) conds.push(lte(records.recordDate, input.to));
+      // 投影列 + (recordDate, id) 降序（id 自增≈createdAt 序，且与 listPage 键集游标一致）
       const rows = await getDb()
-        .select()
+        .select(RECORD_LIST_COLS)
         .from(records)
         .where(and(...conds))
-        .orderBy(desc(records.recordDate), desc(records.createdAt));
+        .orderBy(desc(records.recordDate), desc(records.id));
       return attachMeta(ctx.user.id, rows);
+    }),
+
+  /** P1 性能：键集分页列表（Records 页默认视图）——(recordDate,id) 降序游标，limit+1 探测 hasMore */
+  listPage: authedQuery
+    .input(
+      z.object({
+        projectIds: z.array(z.number()).max(20).optional(),
+        status: recordStatusSchema.optional(),
+        from: dateStr.optional(),
+        to: dateStr.optional(),
+        limit: z.number().int().min(1).max(100).default(50),
+        cursor: z.string().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const conds = [eq(records.userId, ctx.user.id), isNull(records.deletedAt)];
+      if (input.projectIds?.length) conds.push(inArray(records.projectId, input.projectIds));
+      if (input.status) conds.push(eq(records.status, input.status));
+      if (input.from) conds.push(gte(records.recordDate, input.from));
+      if (input.to) conds.push(lte(records.recordDate, input.to));
+      if (input.cursor) {
+        const m = input.cursor.match(/^(\d{4}-\d{2}-\d{2})_(\d+)$/);
+        if (m) {
+          const [, d, cid] = m;
+          conds.push(
+            or(
+              lt(records.recordDate, d),
+              and(eq(records.recordDate, d), lt(records.id, Number(cid))),
+            )!,
+          );
+        }
+      }
+      const rows = await getDb()
+        .select(RECORD_LIST_COLS)
+        .from(records)
+        .where(and(...conds))
+        .orderBy(desc(records.recordDate), desc(records.id))
+        .limit(input.limit + 1);
+      const hasMore = rows.length > input.limit;
+      const items = hasMore ? rows.slice(0, input.limit) : rows;
+      const last = items[items.length - 1];
+      return {
+        items: await attachMeta(ctx.user.id, items),
+        nextCursor: hasMore && last ? `${last.recordDate}_${last.id}` : null,
+      };
+    }),
+
+  /** P1 性能：轻量统计（Records 页头部「共 N 条 / 本月 / 进行中」）——一次条件聚合，不拉行 */
+  stats: authedQuery
+    .input(z.object({ monthPrefix: z.string().regex(/^\d{4}-\d{2}$/) }))
+    .query(async ({ ctx, input }) => {
+      const [row] = await getDb()
+        .select({
+          total: sql<number>`count(*)`,
+          ongoing: sql<number>`coalesce(sum(${records.status} = 'ongoing'), 0)`,
+          month: sql<number>`coalesce(sum(${records.recordDate} like ${input.monthPrefix + '%'}), 0)`,
+        })
+        .from(records)
+        .where(and(eq(records.userId, ctx.user.id), isNull(records.deletedAt)));
+      return {
+        total: Number(row?.total ?? 0),
+        ongoing: Number(row?.ongoing ?? 0),
+        month: Number(row?.month ?? 0),
+      };
     }),
 
   byId: authedQuery.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {

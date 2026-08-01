@@ -148,7 +148,7 @@ function AppendDialog({
       })
       onOpenChange(false)
       void utils.quickNote.list.invalidate()
-      void utils.record.list.invalidate()
+      void utils.record.invalidate()
     },
     onError: (e) => toast.error(`追加失败：${e.message}`),
   })
@@ -220,7 +220,7 @@ function NoteCard({
         action: { label: '继续完善', onClick: () => navigate(`/records/${recordId}`) },
       })
       invalidate()
-      void utils.record.list.invalidate()
+      void utils.record.invalidate()
     },
     onError: (e) => toast.error(`转换失败：${e.message}`),
   })

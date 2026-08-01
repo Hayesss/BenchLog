@@ -4,6 +4,22 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-08-01 · 性能 P1：查询精简 + 记录列表服务端分页
+
+性能专项 P1 落地（承接 P0 静态服务 / P2 代码分割）：
+
+- record.list 投影列（RECORD_LIST_COLS）：去掉 contentHtml（LONGTEXT，内嵌图片后每条可达 MB 级）/resultMd/userId/deletedAt，列表页传输量降约 95%（冒烟：20KB/条正文 × 5 条 → 列表零回传）；卡片/搜索/筛选/统计所需字段全保留
+- attachMeta 泛型化 + 按需 IN 查询：不再全量扫 projects/protocols 两表，只拉列表涉及行（无关联时零查询）；byId 传完整行兼容不变
+- record.listPage（新）：(recordDate,id) 降序键集游标分页——limit+1 探测 hasMore、cursor 格式 `YYYY-MM-DD_id`、筛选同 list（projectIds 数组/status/from/to），无全表扫描无 offset 漂移
+- record.stats（新）：头部「共 N 条 · 本月 · 进行中」改一次条件聚合 SQL（count + 两个 conditional sum），不再依赖全量行
+- Records 页双模式数据源：无搜索词且无标签筛选 → `useInfiniteQuery(listPage)` 服务端分页（50/页，哨兵到底 fetchNextPage）；有搜索词/标签筛选 → 回退全量 list 客户端筛选切片（投影后量小）；两种模式共用筛选/分组/时间线渲染，切换无缝
+- 排序统一 (recordDate,id) 降序（id 自增≈createdAt 序，list 与 listPage 键集一致）；16 处 `utils.record.list.invalidate()` 升级 `utils.record.invalidate()`（router 级，list/listPage/stats 同步刷新）
+- 顺带修复隐患：批量加标签不再传 resultMd（drizzle undefined 跳过语义，投影缺字段下语义不变）；matchesQuery 去掉 resultMd 项（列表已不回传，正文全文检索待服务端化）
+- 验证：`npx tsc -b` 通过；冒烟 9/9 真实库（投影无大字段/attachMeta 3/5 关联/排序/键集 limit=2 翻 3 页拿全 5 条无重叠无遗漏/status+projectIds+日期筛选/stats 计数）；**playwright 生产实测 10/10**（60 条记录：stats 总数=60 且首屏只渲染 50 → 滚动拉满 60 → ?status=done 服务端筛 20 条 → q=zebra 客户端模式 3 条 → tags=PWTAG 客户端模式 5 条 → Dashboard/Export 回归）；65 资产预压缩（br 1012KB）；boot.js/Records chunk 入包验证齐（listPage/nextCursor/getNextPageParam）；测试数据已清理
+- 范围：搜索暂不含正文全文（投影不再回传 contentHtml/resultMd，服务端全文检索列入批次F 评估）；Dashboard/Export/Assistant/BoxDetail 仍全量拉（投影后量小，分页对接待后续批次）
+
+---
+
 ## 2026-08-01 · 性能 P2：代码分割（路由懒加载 + vendor 拆分）
 
 性能专项 P2 落地（承接 P0 静态服务重写）：

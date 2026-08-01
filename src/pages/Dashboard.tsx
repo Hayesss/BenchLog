@@ -639,7 +639,7 @@ function DemoCard() {
   const invalidateAll = () => {
     void utils.demo.status.invalidate()
     void utils.project.list.invalidate()
-    void utils.record.list.invalidate()
+    void utils.record.invalidate()
     void utils.protocol.list.invalidate()
   }
   const generateMut = trpc.demo.generate.useMutation({

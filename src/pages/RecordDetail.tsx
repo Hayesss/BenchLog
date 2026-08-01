@@ -354,7 +354,7 @@ export default function RecordDetail() {
         if (payload.protocolId) incrementUseMut.mutate({ id: payload.protocolId })
         localStorage.removeItem(DRAFT_KEY)
         await Promise.all([
-          utils.record.list.invalidate(),
+          utils.record.invalidate(),
           utils.protocol.list.invalidate(),
           utils.protocol.byId.invalidate(),
         ])
@@ -365,7 +365,7 @@ export default function RecordDetail() {
       await updateMut.mutateAsync({ id: recordId, ...payload })
       await Promise.all([
         utils.record.byId.invalidate({ id: recordId }),
-        utils.record.list.invalidate(),
+        utils.record.invalidate(),
       ])
       setSnapshot(JSON.stringify(form))
       setLastSavedAt(new Date())
@@ -394,7 +394,7 @@ export default function RecordDetail() {
           await updateStatusMut.mutateAsync({ id: recordId, status: s })
           await Promise.all([
             utils.record.byId.invalidate({ id: recordId }),
-            utils.record.list.invalidate(),
+            utils.record.invalidate(),
           ])
           setSnapshot(JSON.stringify({ ...form, status: s }))
           toast.success(s === 'failed' ? '已标记失败 — 失败也是数据' : '状态已更新')
@@ -512,7 +512,7 @@ export default function RecordDetail() {
     if (recordId == null) return
     try {
       await removeMut.mutateAsync({ id: recordId })
-      await utils.record.list.invalidate()
+      await utils.record.invalidate()
       toast.success('记录已删除')
       navigate('/records')
     } catch (e) {
@@ -532,7 +532,7 @@ export default function RecordDetail() {
       const res = await lockMut.mutateAsync({ id: recordId, note: lockNote.trim() || undefined })
       await Promise.all([
         utils.record.byId.invalidate({ id: recordId }),
-        utils.record.list.invalidate(),
+        utils.record.invalidate(),
       ])
       setLockOpen(false)
       setLockNote('')
@@ -549,7 +549,7 @@ export default function RecordDetail() {
       await unlockMut.mutateAsync({ id: recordId })
       await Promise.all([
         utils.record.byId.invalidate({ id: recordId }),
-        utils.record.list.invalidate(),
+        utils.record.invalidate(),
       ])
       toast.success('已解除锁定，记录恢复可编辑')
     } catch (e) {

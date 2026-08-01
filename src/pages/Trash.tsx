@@ -32,7 +32,7 @@ export default function Trash() {
   const invalidate = () => {
     void utils.record.trash.invalidate()
     void utils.protocol.trash.invalidate()
-    void utils.record.list.invalidate()
+    void utils.record.invalidate()
     void utils.protocol.list.invalidate()
   }
 
