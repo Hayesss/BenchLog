@@ -54,6 +54,7 @@ import type { ProtocolParamLike } from '@/components/records/RecordPropertiesPan
 import RecordStatusMenu from '@/components/records/RecordStatusMenu'
 import RecordAttachments from '@/components/records/RecordAttachments'
 import RecordVersionsDialog from '@/components/records/RecordVersionsDialog'
+import TableImportDialog from '@/components/records/TableImportDialog'
 import { useUnsavedGuard } from '@/hooks/useUnsavedGuard'
 import { EASE_OUT, recordCode, todayStr } from '@/components/records/record-types'
 import type {
@@ -223,6 +224,8 @@ export default function RecordDetail() {
   const [tplName, setTplName] = useState('')
   // 套用模板后 bump 此值强制 RichEditor 重挂载，让新正文进入编辑器
   const [editorEpoch, setEditorEpoch] = useState(0)
+  // P2-D2 表格转样本：解析出的表格行（非空即打开入库 dialog）
+  const [importRows, setImportRows] = useState<string[][] | null>(null)
   const galleryRef = useRef<RecordImageGalleryHandle | null>(null)
   const draftTimer = useRef<number | null>(null)
 
@@ -967,6 +970,7 @@ export default function RecordDetail() {
                   onChange={(html) => patch({ contentHtml: html })}
                   onOutlineChange={setOutline}
                   readOnly={locked}
+                  onImportTable={(rows) => setImportRows(rows)}
                 />
               </div>
             </div>
@@ -1115,6 +1119,17 @@ export default function RecordDetail() {
           拍照上传
         </button>
       </div>
+
+      {/* 表格转样本入库 dialog（P2-D2） */}
+      <TableImportDialog
+        open={importRows != null}
+        onOpenChange={(v) => {
+          if (!v) setImportRows(null)
+        }}
+        tableRows={importRows ?? []}
+        ensureRecordId={ensureRecordId}
+        defaultDate={form.recordDate}
+      />
 
       {/* 锁定签署 dialog（P2-C1）：preventDefault 阻止自动关闭，待 mutation 完成后手动关 */}
       <AlertDialog open={lockOpen} onOpenChange={setLockOpen}>

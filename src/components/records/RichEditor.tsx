@@ -4,6 +4,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { trpc } from '@/providers/trpc'
+import ImageAnnotateDialog from './ImageAnnotateDialog'
 import { Editor, EditorContent, Extension, Node, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
@@ -23,7 +24,7 @@ import { TextStyle } from '@tiptap/extension-text-style'
 import { Color } from '@tiptap/extension-color'
 import Suggestion from '@tiptap/suggestion'
 import type { SuggestionProps, SuggestionKeyDownProps } from '@tiptap/suggestion'
-import { PluginKey } from '@tiptap/pm/state'
+import { NodeSelection, PluginKey } from '@tiptap/pm/state'
 import {
   Bold,
   CheckSquare,
@@ -536,6 +537,8 @@ const RichEditor = forwardRef<
     placeholder?: string
     /** 锁定签署后的只读态：隐藏工具栏、禁止编辑（引用片点击跳转仍可用） */
     readOnly?: boolean
+    /** P2-D2 表格转样本：点击「入库」时把当前表格解析为行数组上抛 */
+    onImportTable?: (rows: string[][]) => void
   }
 >(function RichEditor(
   {
@@ -544,6 +547,7 @@ const RichEditor = forwardRef<
     onOutlineChange,
     placeholder = '记录实验过程、数据与观察…输入 / 插入标题、表格、图片等',
     readOnly = false,
+    onImportTable,
   },
   ref,
 ) {
@@ -551,6 +555,9 @@ const RichEditor = forwardRef<
   const [inTable, setInTable] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  // P2-D1 图片标注：当前选中的图片节点（NodeSelection）与标注浮层状态
+  const [imgSelected, setImgSelected] = useState(false)
+  const [anno, setAnno] = useState<{ pos: number; src: string } | null>(null)
   const navigate = useNavigate()
   const utils = trpc.useUtils()
 
@@ -664,6 +671,8 @@ const RichEditor = forwardRef<
     },
     onSelectionUpdate: ({ editor: e }) => {
       setInTable(e.isActive('table'))
+      const sel = e.state.selection
+      setImgSelected(sel instanceof NodeSelection && sel.node.type.name === 'image')
       setTick((t) => t + 1)
     },
     onCreate: ({ editor: e }) => {
@@ -694,6 +703,43 @@ const RichEditor = forwardRef<
     }),
     [editor],
   )
+
+  /** P2-D2：解析光标所在表格为行数组（含表头行；合并格按 textContent 取值，v1 简化） */
+  const extractCurrentTable = (): string[][] | null => {
+    if (!editor) return null
+    const { $from } = editor.state.selection
+    for (let d = $from.depth; d > 0; d--) {
+      const node = $from.node(d)
+      if (node.type.name === 'table') {
+        const rows: string[][] = []
+        node.forEach((row) => {
+          const cells: string[] = []
+          row.forEach((cell) => {
+            cells.push(cell.textContent.replace(/\u00a0/g, ' ').trim())
+          })
+          rows.push(cells)
+        })
+        return rows
+      }
+    }
+    return null
+  }
+
+  /** P2-D1：打开当前选中图片的标注浮层 */
+  const openAnnotate = () => {
+    if (!editor) return
+    const sel = editor.state.selection
+    if (sel instanceof NodeSelection && sel.node.type.name === 'image') {
+      setAnno({ pos: sel.from, src: sel.node.attrs.src as string })
+    }
+  }
+
+  /** P2-D1：标注保存——dataURL 回写 image 节点 src */
+  const saveAnnotate = (dataUrl: string) => {
+    if (!editor || !anno) return
+    editor.chain().focus().setNodeSelection(anno.pos).updateAttributes('image', { src: dataUrl }).run()
+    setAnno(null)
+  }
 
   const setLink = () => {
     if (!editor) return
@@ -866,6 +912,38 @@ const RichEditor = forwardRef<
                 {label}
               </button>
             ))}
+            {onImportTable && (
+              <button
+                type="button"
+                title="把本表格解析为样本，批量入库到冻存盒"
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  const rows = extractCurrentTable()
+                  if (rows && rows.length > 0) onImportTable(rows)
+                }}
+                className="flex h-7 items-center gap-1 rounded-md bg-bench-wash px-1.5 text-[11.5px] font-medium text-bench-deep transition-colors duration-100 hover:bg-bench hover:text-white"
+              >
+                入库
+              </button>
+            )}
+          </>
+        )}
+
+        {/* 选中图片时的标注入口（P2-D1） */}
+        {imgSelected && (
+          <>
+            <span className="mx-1 h-4 w-px bg-line" />
+            <button
+              type="button"
+              title="标注选中图片"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                openAnnotate()
+              }}
+              className="flex h-7 items-center gap-1 rounded-md bg-bench-wash px-1.5 text-[11.5px] font-medium text-bench-deep transition-colors duration-100 hover:bg-bench hover:text-white"
+            >
+              标注
+            </button>
           </>
         )}
       </div>
@@ -889,6 +967,16 @@ const RichEditor = forwardRef<
           if (f) void insertImageFile(editor)(f)
           e.target.value = ''
         }}
+      />
+
+      {/* 图片标注浮层（P2-D1） */}
+      <ImageAnnotateDialog
+        open={anno != null}
+        onOpenChange={(v) => {
+          if (!v) setAnno(null)
+        }}
+        src={anno?.src ?? null}
+        onSave={saveAnnotate}
       />
 
       {/* 快捷键速查浮层 */}

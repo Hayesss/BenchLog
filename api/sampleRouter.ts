@@ -226,6 +226,82 @@ export const sampleRouter = createRouter({
       return row[0];
     }),
 
+  /**
+   * 批量入库（P2-D2 表格转样本）：从首孔 (0,0) 起按行扫描分配空位，逐条插入。
+   * 空位不足整体拒绝（不部分入库）；recordId 关联来源实验记录（可空）。
+   */
+  batchCreate: authedQuery
+    .input(
+      z.object({
+        boxId: z.number(),
+        recordId: z.number().nullable().optional(),
+        rows: z
+          .array(
+            z.object({
+              name: z.string().min(1).max(120),
+              type: sampleTypeEnum.default("其他"),
+              concentration: z.string().max(40).optional(),
+              volume: z.string().max(40).optional(),
+              sampleDate: dateStr.nullish(),
+            }),
+          )
+          .min(1)
+          .max(96),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const box = await getOwnedBox(ctx.user.id, input.boxId);
+      // 关联记录归属校验（且排除软删除）
+      if (input.recordId != null) {
+        const rec = await db
+          .select({ id: records.id })
+          .from(records)
+          .where(and(eq(records.id, input.recordId), eq(records.userId, ctx.user.id), isNull(records.deletedAt)));
+        if (!rec[0]) throw new TRPCError({ code: "BAD_REQUEST", message: "关联的实验记录不存在" });
+      }
+      // 已占用孔位
+      const taken = await db
+        .select({ row: samples.row, col: samples.col })
+        .from(samples)
+        .where(eq(samples.boxId, box.id));
+      const used = new Set(taken.map((t) => t.row * box.cols + t.col));
+      // 按行扫描分配空位（A1 → A2 → … → B1 …，与 Benchling 默认一致）
+      const slots: { row: number; col: number }[] = [];
+      for (let idx = 0; idx < box.rows * box.cols && slots.length < input.rows.length; idx++) {
+        if (!used.has(idx)) slots.push({ row: Math.floor(idx / box.cols), col: idx % box.cols });
+      }
+      if (slots.length < input.rows.length) {
+        const free = box.rows * box.cols - used.size;
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `盒子空位不足：需 ${input.rows.length} 个，仅剩 ${free} 个`,
+        });
+      }
+      const created: { id: number; row: number; col: number; well: string; name: string }[] = [];
+      for (let i = 0; i < input.rows.length; i++) {
+        const r = input.rows[i];
+        const slot = slots[i];
+        const [{ id }] = await db
+          .insert(samples)
+          .values({
+            userId: ctx.user.id,
+            boxId: box.id,
+            row: slot.row,
+            col: slot.col,
+            name: r.name,
+            type: r.type,
+            concentration: r.concentration ?? null,
+            volume: r.volume ?? null,
+            sampleDate: r.sampleDate ?? null,
+            recordId: input.recordId ?? null,
+          })
+          .$returningId();
+        created.push({ id, row: slot.row, col: slot.col, well: wellLabel(slot.row, slot.col), name: r.name });
+      }
+      return { boxName: box.name, created };
+    }),
+
   /** 清空孔位：删除该孔样本（无则静默成功） */
   clearSlot: authedQuery
     .input(
