@@ -3,6 +3,7 @@ import { useParams } from 'react-router'
 import { CalendarDays, Eye, FlaskConical, FolderKanban, Link2Off, SquareTerminal } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import DOMPurify from 'dompurify'
+import { evaluateTablesInHtml } from '@/lib/evaluate-tables'
 import { cn } from '@/lib/utils'
 
 /* ------------------------------------------------------------------ */
@@ -203,7 +204,7 @@ function RecordView({ c }: { c: RecordContent }) {
           <div className="rich-render">
             <div
               className="rich-editor-content"
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(c.contentHtml) }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(evaluateTablesInHtml(c.contentHtml)) }}
             />
           </div>
         </Section>

@@ -551,6 +551,31 @@ export type InsertAiModelProfile = typeof aiModelProfiles.$inferInsert;
  * 记录/生信分析生成公开 token 链接，免登录查看；revokedAt 非空即失效。
  * token 为 16 字节 hex（不可枚举）；公开端点只返回脱敏内容，绝不暴露 userId/邮箱。
  */
+/**
+ * record_refs（批次F F4 Relevant Items 双向链接）：
+ * 记录富文本 contentHtml 里 refChip（data-ref-chip）的结构化索引——record → record/protocol/sample 单向边。
+ * create/update(contentHtml 变更时)/restoreVersion 三处写入点全量重建该记录的出边；
+ * 正向查"本记录引用了谁"，反向借 record_refs_target_idx 查"谁引用了我"。
+ */
+export const recordRefs = mysqlTable(
+  "record_refs",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(), // 归属用户（行级隔离）
+    recordId: bigint("recordId", { mode: "number", unsigned: true }).notNull(), // 引用发起方记录
+    targetKind: mysqlEnum("targetKind", ["record", "protocol", "sample"]).notNull(),
+    targetId: bigint("targetId", { mode: "number", unsigned: true }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("record_refs_unique").on(t.recordId, t.targetKind, t.targetId),
+    index("record_refs_target_idx").on(t.targetKind, t.targetId),
+    index("record_refs_user_idx").on(t.userId),
+  ],
+);
+export type RecordRef = typeof recordRefs.$inferSelect;
+export type InsertRecordRef = typeof recordRefs.$inferInsert;
+
 export const shares = mysqlTable(
   "shares",
   {

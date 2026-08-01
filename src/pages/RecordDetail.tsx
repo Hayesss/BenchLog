@@ -353,6 +353,9 @@ export default function RecordDetail() {
         const { id } = await createMut.mutateAsync(payload)
         if (payload.protocolId) incrementUseMut.mutate({ id: payload.protocolId })
         localStorage.removeItem(DRAFT_KEY)
+        // 同步 snapshot，避免 create 后 dirty 残留触发 2.5s 冗余 update（顺带产生幽灵版本快照）
+        setSnapshot(JSON.stringify(form))
+        setLastSavedAt(new Date())
         await Promise.all([
           utils.record.invalidate(),
           utils.protocol.list.invalidate(),
@@ -1043,6 +1046,78 @@ export default function RecordDetail() {
           >
             <RecordAttachments recordId={recordId} ensureRecordId={ensureRecordId} />
           </motion.section>
+
+          {/* F4 Relevant Items：本记录引用的对象 + 被哪些记录引用（双向链接） */}
+          {record && (record.refs.length > 0 || record.referencedBy.length > 0) && (
+            <motion.section variants={sectionVariants}>
+              <p className="caption-en mb-1.5">引用 LINKS</p>
+              <div className="rounded-lg border border-line bg-surface px-3 py-2.5 shadow-card">
+                {record.refs.length > 0 && (
+                  <div>
+                    <p className="mb-1.5 text-[11.5px] text-ink-mute">本记录引用</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {record.refs.map((r) =>
+                        r.target ? (
+                          <Link
+                            key={`${r.kind}-${r.id}`}
+                            to={r.target.href}
+                            title={r.target.sub ?? undefined}
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-medium transition-opacity hover:opacity-75"
+                            style={{
+                              color:
+                                r.kind === 'record'
+                                  ? '#3E7C6B'
+                                  : r.kind === 'protocol'
+                                    ? '#5B7C99'
+                                    : '#7A5BA6',
+                              backgroundColor:
+                                r.kind === 'record'
+                                  ? '#3E7C6B14'
+                                  : r.kind === 'protocol'
+                                    ? '#5B7C9914'
+                                    : '#7A5BA614',
+                            }}
+                          >
+                            {r.kind === 'record' ? '记录' : r.kind === 'protocol' ? '方法' : '样本'}
+                            · {r.target.label}
+                          </Link>
+                        ) : (
+                          <span
+                            key={`${r.kind}-${r.id}`}
+                            className="inline-flex items-center gap-1 rounded-md bg-line/40 px-2 py-1 text-[12px] text-ink-mute"
+                            title="目标已删除或不存在"
+                          >
+                            {r.kind === 'record' ? '记录' : r.kind === 'protocol' ? '方法' : '样本'}
+                            · 已失效
+                          </span>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                )}
+                {record.referencedBy.length > 0 && (
+                  <div className={record.refs.length > 0 ? 'mt-2.5 border-t border-line pt-2.5' : ''}>
+                    <p className="mb-1.5 text-[11.5px] text-ink-mute">
+                      被引用（{record.referencedBy.length}）
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {record.referencedBy.map((rb) => (
+                        <Link
+                          key={rb.recordId}
+                          to={`/records/${rb.recordId}`}
+                          title={`${rb.recordDate} · ${rb.status === 'ongoing' ? '进行中' : rb.status === 'done' ? '已完成' : '已失败'}`}
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-medium transition-opacity hover:opacity-75"
+                          style={{ color: '#3E7C6B', backgroundColor: '#3E7C6B14' }}
+                        >
+                          记录 · {rb.title}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.section>
+          )}
 
           {/* conclusion / next step */}
           <motion.section variants={sectionVariants} className="grid gap-4 md:grid-cols-2">

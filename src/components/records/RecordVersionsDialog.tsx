@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Eye, EyeOff, History, RotateCcw } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import DOMPurify from 'dompurify'
+import { evaluateTablesInHtml } from '@/lib/evaluate-tables'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -145,7 +146,7 @@ export default function RecordVersionsDialog({
                             <div className="rich-render mt-1 rounded-lg border border-line">
                               <div
                                 className="rich-editor-content !min-h-0 !p-3 text-[13px]"
-                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(snap.contentHtml) }}
+                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(evaluateTablesInHtml(snap.contentHtml)) }}
                               />
                             </div>
                           </div>

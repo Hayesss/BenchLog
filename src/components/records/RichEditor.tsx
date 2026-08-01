@@ -4,8 +4,11 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
+import { evalToDisplay, isFormula } from '@/lib/table-formula'
 import { trpc } from '@/providers/trpc'
 import ImageAnnotateDialog from './ImageAnnotateDialog'
+import { SeqBlock } from './SeqBlock'
+import { PlateMap } from './PlateMap'
 import { Editor, EditorContent, Extension, Node, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
@@ -125,6 +128,26 @@ function compressImage(file: File): Promise<string> {
   })
 }
 
+/* ---------------- 表格解析：选区所在表格 → 文本矩阵（入库/CSV/公式预览共用） ---------------- */
+function extractCurrentTableFrom(editor: Editor): string[][] | null {
+  const { $from } = editor.state.selection
+  for (let d = $from.depth; d > 0; d--) {
+    const node = $from.node(d)
+    if (node.type.name === 'table') {
+      const rows: string[][] = []
+      node.forEach((row) => {
+        const cells: string[] = []
+        row.forEach((cell) => {
+          cells.push(cell.textContent.replace(/\u00a0/g, ' ').trim())
+        })
+        rows.push(cells)
+      })
+      return rows
+    }
+  }
+  return null
+}
+
 /* ---------------- @ 引用 chip（Benchling entity chip） ---------------- */
 type RefKind = 'record' | 'protocol' | 'sample'
 type RefItem = {
@@ -167,6 +190,9 @@ const RefChip = Node.create({
     return [
       {
         tag: 'a[data-ref-chip]',
+        // 关键：必须压过 Link mark 的 a[href]（PM 规则按 priority 降序，默认 50，同级 marks 先于 nodes）。
+        // 否则芯片在编辑器重挂载时降级为普通链接（data-* 全丢），再次保存即抹掉 record_refs 索引
+        priority: 60,
         getAttrs: (el) => {
           const dom = el as HTMLElement
           return {
@@ -349,6 +375,26 @@ const SLASH_ITEMS: SlashItem[] = [
   { title: '表格', hint: '插入 3×3 表格', keywords: 'table biaoge', run: (e) => e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
   { title: '图片', hint: '上传并插入图片', keywords: 'image img tupian', run: (_e, open) => open() },
   {
+    title: '序列块',
+    hint: 'DNA/RNA/蛋白序列（着色+统计）',
+    keywords: 'seq xulie dna rna protein sequence jiyin',
+    run: (e) =>
+      e.chain().focus().insertContent([
+        { type: 'seqBlock', attrs: { kind: 'dna', seq: '' } },
+        { type: 'paragraph' },
+      ]).run(),
+  },
+  {
+    title: '孔板图',
+    hint: '96/24 孔板布局标记',
+    keywords: 'plate kongban well platemap 96 24 kong',
+    run: (e) =>
+      e.chain().focus().insertContent([
+        { type: 'plateMap', attrs: { rows: 8, cols: 12, title: '', wells: '{}' } },
+        { type: 'paragraph' },
+      ]).run(),
+  },
+  {
     title: '新一天',
     hint: '日期分段（今天）',
     keywords: 'newday xinyitian riqi date day fen',
@@ -385,9 +431,17 @@ function makeSlashExtension(openImagePicker: () => void) {
           char: '/',
           items: ({ query }) => {
             const q = query.trim().toLowerCase()
-            return SLASH_ITEMS.filter(
+            const matched = SLASH_ITEMS.filter(
               (i) => !q || i.title.toLowerCase().includes(q) || i.keywords.includes(q),
-            ).slice(0, 8)
+            )
+            // 排序：标题前缀命中 > 标题包含 > 关键词命中（否则「/序列」被无/有序列表抢占，序列块不可达）
+            const rank = (i: SlashItem) =>
+              q && i.title.toLowerCase().startsWith(q)
+                ? 0
+                : q && i.title.toLowerCase().includes(q)
+                  ? 1
+                  : 2
+            return matched.sort((a, b) => rank(a) - rank(b)).slice(0, 8)
           },
           command: ({ editor: e, range, props }) => {
             e.chain().focus().deleteRange(range).run()
@@ -585,6 +639,8 @@ const RichEditor = forwardRef<
   // 链接浮层（替代 window.prompt）：预填当前 href，应用/移除分离
   const [linkOpen, setLinkOpen] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
+  // F1：公式单元格实时预览（光标在公式格内时工具组旁显示求值结果）
+  const [formulaPreview, setFormulaPreview] = useState<string | null>(null)
   const navigate = useNavigate()
   const utils = trpc.useUtils()
 
@@ -666,6 +722,8 @@ const RichEditor = forwardRef<
       Placeholder.configure({ placeholder }),
       DateInsert,
       RefChip,
+      SeqBlock,
+      PlateMap,
       makeSlashExtension(openImagePicker),
       makeRefChipExtension(fetchRefItems),
     ],
@@ -721,6 +779,23 @@ const RichEditor = forwardRef<
       setInTable(e.isActive('table'))
       const sel = e.state.selection
       setImgSelected(sel instanceof NodeSelection && sel.node.type.name === 'image')
+      // F1：公式单元格实时预览——光标所在格以 = 开头时，就地求值显示在工具组旁
+      let preview: string | null = null
+      if (e.isActive('table')) {
+        const { $from } = sel
+        for (let d = $from.depth; d > 0; d--) {
+          const n = $from.node(d)
+          if (n.type.name === 'tableCell' || n.type.name === 'tableHeader') {
+            const text = n.textContent.replace(/ /g, ' ').trim()
+            if (isFormula(text)) {
+              const grid = extractCurrentTableFrom(e)
+              if (grid) preview = `= ${evalToDisplay(text, grid, [-1, -1])}`
+            }
+            break
+          }
+        }
+      }
+      setFormulaPreview(preview)
       setTick((t) => t + 1)
     },
     onCreate: ({ editor: e }) => {
@@ -755,22 +830,7 @@ const RichEditor = forwardRef<
   /** P2-D2：解析光标所在表格为行数组（含表头行；合并格按 textContent 取值，v1 简化） */
   const extractCurrentTable = (): string[][] | null => {
     if (!editor) return null
-    const { $from } = editor.state.selection
-    for (let d = $from.depth; d > 0; d--) {
-      const node = $from.node(d)
-      if (node.type.name === 'table') {
-        const rows: string[][] = []
-        node.forEach((row) => {
-          const cells: string[] = []
-          row.forEach((cell) => {
-            cells.push(cell.textContent.replace(/\u00a0/g, ' ').trim())
-          })
-          rows.push(cells)
-        })
-        return rows
-      }
-    }
-    return null
+    return extractCurrentTableFrom(editor)
   }
 
   /** E7：当前表格导出 CSV（含 BOM 让 Excel 识别 UTF-8 中文，引号按 RFC4180 转义） */
@@ -1053,6 +1113,15 @@ const RichEditor = forwardRef<
             >
               CSV
             </button>
+            {/* F1：公式实时预览（光标在 = 开头单元格内时显示求值结果） */}
+            {formulaPreview && (
+              <span
+                className="ml-1 flex h-7 items-center rounded-md bg-bench-wash px-2 font-mono text-[11.5px] font-medium text-bench-deep"
+                title="当前单元格公式的实时计算结果（分享页/版本预览等渲染态将直接显示该值）"
+              >
+                {formulaPreview}
+              </span>
+            )}
           </>
         )}
 

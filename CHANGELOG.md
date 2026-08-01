@@ -4,6 +4,42 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-08-01 · 批次F 科学联动：表格公式 / Relevant Items 双向链接 / 序列块 / 孔板图
+
+批次F 四项全落地，并借 F4 实弹挖出并修复 E6 引入的芯片降级潜伏 bug：
+
+**F1 表格公式（渲染态求值 + 编辑态预览）**
+
+- 引擎 src/lib/table-formula.ts：递归下降解析（tokenize→expr/term/factor），SUM/AVG(AVERAGE)/COUNT/MAX/MIN（范围 A1:B5 或列表 A1,B3）+ 四则（+-*/×÷，中文逗号兼容）+ 括号 + 负数；A1 记法支持双字母列；嵌套公式递归求值 + visiting 集防循环；错误值对齐 Excel 风格（#REF/#NUM/#NAME/#SYNTAX/#DIV0/#EMPTY/#CYCLE）；显式字段声明过 erasableSyntaxOnly
+- 渲染态 src/lib/evaluate-tables.ts：evaluateTablesInHtml 在 DOMPurify 前把 = 开头格替换为求值（保留 data-formula + title 原文 + rich-formula-cell 琥珀底色），接入分享页与版本历史
+- 编辑态：选区落入公式格时工具栏实时预览（= 结果），作者见公式、读者见值；引擎单测 17/17
+
+**F4 Relevant Items 双向链接（record_refs 索引）**
+
+- 新表 record_refs（record→record/protocol/sample 单向边）：unique(recordId,targetKind,targetId) + target 反查索引 + user 索引；迁移脚本幂等建表 + information_schema 验证 + 存量回填（真实库执行：命中 1 条自引用按规则滤除，0 行符合预期）
+- syncRecordRefs：解析 contentHtml 里 data-ref-chip（正则读 data-kind/data-ref-id，去重、滤自引用），create / update(仅 contentHtml 变更时，undefined 跳过语义) / restoreVersion 三处写入点全量重建；purge 级联清双向边
+- byId 附带 refs（三目标 join 名称/副信息/跳转链接，样本带盒子名+孔位如「冻存盒 · B3」，已删目标降级「已失效」）+ referencedBy（反查来源记录 title/date/status，滤已删来源）
+- RecordDetail 新增「引用 LINKS」面板：本记录引用 chips（记录绿 #3E7C6B/方法蓝灰 #5B7C99/样本紫 #7A5BA6）+ 被引用区，均可点击跳转
+
+**F3 序列块节点（seqBlock）+ F2 孔板图节点（plateMap）**
+
+- seqBlock（block atom，attrs seq/kind）：斜杠「/序列块」插入；纯 DOM NodeView——DNA/RNA/蛋白三型切换、合法性过滤（ACGTN/ACGUN/20 氨基酸字母，粘贴 FASTA 自动剔除空白数字）、实时统计（长度 bp/aa + GC%）、碱基 10 分组低饱和着色（A 绿/T,U 琥珀/G 蓝灰/C 紫/N 灰）；renderHTML 静态着色结构（data-seq 存原序列）过 DOMPurify，分享页/版本历史直接呈现；只读隐藏编辑控件
+- plateMap（block atom，attrs rows/cols/title/wells JSON）：斜杠「/孔板图」插入；纯 DOM NodeView——96(8×12)/24(4×6) 板型切换（越界孔位自动剔除）、标题编辑、孔位点击循环 空→样本(绿)→对照(蓝)→排除(斜纹)，行字母列数字坐标 + 图例 + 计数统计；renderHTML class 网格无内联样式过 sanitize；只读禁交互
+- 斜杠菜单排序修复（本批必修 UX bug）：「/序列」原先被「无**序列**表/有**序列**表」子串匹配抢占致序列块不可达——加 rank（标题前缀命中 > 标题包含 > 关键词）
+
+**根因修复：RefChip 解析优先级（E6 潜伏 bug，F4 实测显形）**
+
+- 症状：芯片编辑器内正常，保存后二次打开降级为普通链接（data-ref-chip/data-kind/data-ref-id 全丢，仅余 class/href/文本），再次保存即抹掉 record_refs 索引并丢失跳盒子能力
+- 根因：PM 解析规则按 priority 降序（默认 50，同级 marks 先于 nodes 收集）——Link mark 的 `a[href]` 永远抢赢 RefChip 的 `a[data-ref-chip]`，编辑器重挂载时芯片被 Link 吃掉
+- 修复：RefChip.parseHTML 规则 priority: 60 压过 Link；顺带 create 分支补 setSnapshot（原 create 后 dirty 残留必触发 2.5s 冗余 update 并多写一行幽灵版本快照）
+
+**验证**
+
+- 冒烟 12/12 真实库（refs 解析去重空值/公式 5 用例含嵌套#DIV0/create 建 3 边/byId 双向三目标 label/sub/href（样本 B3）/update 重解析清空/undefined 跳过/restoreVersion 重建/自引用过滤/purge 级联）；`npx tsc -b` 通过；产物 121 文件 diff 一致、65 项 gzip+brotli（br 1017KB）；boot.js/RecordDetail chunk 入包验证齐（syncRecordRefs/record_refs/data-seq-block/data-plate-map/priority:60）
+- **playwright 生产实测 18/18**：注册→序列块插入/非法字符过滤（acgtxyz123 n→ACGTN，5 bp · GC 40.0%）/着色→孔板插入/A1 点击循环 空→样本→对照/计数/标题→@引用芯片→表格公式预览 = 5→保存→LINKS 面板双向（B 见引用 A、A 见被引用 B）→分享页三件套静态渲染（序列着色/孔板对照孔/公式格求值 = 5）→撤销分享；测试数据已清理
+
+---
+
 ## 2026-08-01 · 性能 P1：查询精简 + 记录列表服务端分页
 
 性能专项 P1 落地（承接 P0 静态服务 / P2 代码分割）：

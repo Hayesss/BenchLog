@@ -258,6 +258,12 @@
   .rich-editor-content.resize-cursor {
     cursor: col-resize;
   }
+  /* F1：渲染态求值后的公式单元格——warning 色底纹+等宽，title 悬停显示原公式 */
+  .rich-editor-content .rich-formula-cell {
+    background: #B98A3E14;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+  }
   /* 勾选清单 */
   .rich-editor-content ul[data-type='taskList'] {
     list-style: none;
@@ -343,4 +349,248 @@
   input, textarea { border-color: transparent !important; box-shadow: none !important; }
   .rich-editor-content { min-height: 0 !important; }
   .shadow-card, .shadow-overlay { box-shadow: none !important; }
+}
+
+/* ---- 序列块 seqBlock（批次F F3）：编辑态 NodeView 与渲染态静态结构共用 ---- */
+.rich-seq-block {
+  border: 1px solid #E3E1D9;
+  border-radius: 10px;
+  background: #FAF9F5;
+  padding: 10px 12px;
+  margin: 8px 0;
+}
+.rich-seq-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+.rich-seq-kinds {
+  display: inline-flex;
+  gap: 4px;
+}
+.rich-seq-kindbtn {
+  border: 1px solid #E3E1D9;
+  border-radius: 6px;
+  background: #fff;
+  color: #6B6A63;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.rich-seq-kindbtn[aria-pressed='true'] {
+  background: #3E7C6B;
+  border-color: #3E7C6B;
+  color: #fff;
+}
+.rich-seq-kind {
+  display: inline-block;
+  border-radius: 6px;
+  background: #3E7C6B14;
+  color: #3E7C6B;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  padding: 3px 7px;
+}
+.rich-seq-stats {
+  color: #8A8880;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+}
+.rich-seq-editbtn {
+  margin-left: auto;
+  border: 1px solid #E3E1D9;
+  border-radius: 6px;
+  background: #fff;
+  color: #3E7C6B;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.rich-seq-editbtn:hover {
+  border-color: #3E7C6B;
+}
+.rich-seq-body {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12.5px;
+  line-height: 1.9;
+  word-break: break-all;
+}
+.rich-seq-body .seq-chunk {
+  margin-right: 10px;
+}
+.rich-seq-body .seq-a { color: #3E7C6B; }
+.rich-seq-body .seq-t,
+.rich-seq-body .seq-u { color: #B98A3E; }
+.rich-seq-body .seq-g { color: #5B7C99; }
+.rich-seq-body .seq-c { color: #7A5BA6; }
+.rich-seq-body .seq-n { color: #9A988F; }
+.rich-seq-body .seq-aa { color: #55534C; }
+.rich-seq-body .seq-empty { color: #B5B3AA; font-family: inherit; }
+.rich-seq-textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid #E3E1D9;
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px 10px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: #2E2D29;
+  outline: none;
+}
+.rich-seq-textarea:focus {
+  border-color: #3E7C6B;
+}
+/* 编辑器内 NodeView 选中态（atom 点击选中） */
+.rich-editor-content .ProseMirror-selectednode.rich-seq-block {
+  outline: 2px solid #3E7C6B55;
+  outline-offset: 1px;
+}
+
+/* ---- 孔板图 plateMap（批次F F2）：编辑态 NodeView 与渲染态静态结构共用 ---- */
+.rich-plate-map {
+  border: 1px solid #E3E1D9;
+  border-radius: 10px;
+  background: #FAF9F5;
+  padding: 10px 12px;
+  margin: 8px 0;
+}
+.pm-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+.pm-title {
+  font-weight: 600;
+  font-size: 12.5px;
+  color: #2E2D29;
+}
+.pm-title-input {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #2E2D29;
+  padding: 3px 8px;
+  outline: none;
+  min-width: 140px;
+  transition: all 0.15s ease;
+}
+.pm-title-input:hover,
+.pm-title-input:focus {
+  border-color: #E3E1D9;
+  background: #fff;
+}
+.pm-types {
+  display: inline-flex;
+  gap: 4px;
+}
+.pm-typebtn {
+  border: 1px solid #E3E1D9;
+  border-radius: 6px;
+  background: #fff;
+  color: #6B6A63;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.pm-typebtn[aria-pressed='true'] {
+  background: #3E7C6B;
+  border-color: #3E7C6B;
+  color: #fff;
+}
+.pm-stats {
+  margin-left: auto;
+  color: #8A8880;
+  font-size: 11px;
+}
+.pm-grid {
+  display: grid;
+  gap: 3px;
+  align-items: center;
+}
+.pm-cols-12 {
+  grid-template-columns: 16px repeat(12, 1fr);
+}
+.pm-cols-6 {
+  grid-template-columns: 16px repeat(6, 1fr);
+}
+.pm-corner {
+  width: 16px;
+}
+.pm-colhead,
+.pm-rowhead {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 9.5px;
+  color: #9A988F;
+  text-align: center;
+  line-height: 1;
+  user-select: none;
+}
+.pm-well {
+  display: inline-block;
+  width: 100%;
+  aspect-ratio: 1;
+  max-width: 22px;
+  border-radius: 50%;
+  border: 1px solid #D8D5CC;
+  background: #fff;
+  justify-self: center;
+  padding: 0;
+}
+.pm-well.pm-s {
+  background: #3E7C6B;
+  border-color: #3E7C6B;
+}
+.pm-well.pm-c {
+  background: #5B7C99;
+  border-color: #5B7C99;
+}
+.pm-well.pm-x {
+  background: repeating-linear-gradient(45deg, #fff 0 3px, #D8D5CC 3px 4px);
+  border-color: #C9C6BC;
+}
+button.pm-well {
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+button.pm-well:hover:not(:disabled) {
+  transform: scale(1.18);
+}
+button.pm-well:disabled {
+  cursor: default;
+}
+.pm-legend {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 10.5px;
+  color: #8A8880;
+}
+.pm-legend .pm-lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pm-legend .pm-well {
+  width: 10px;
+  max-width: 10px;
+}
+/* 编辑器内 NodeView 选中态 */
+.rich-editor-content .ProseMirror-selectednode.rich-plate-map {
+  outline: 2px solid #3E7C6B55;
+  outline-offset: 1px;
 }

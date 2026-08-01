@@ -8,11 +8,17 @@ import {
   recordImages,
   recordAttachments,
   recordVersions,
+  recordRefs,
   projects,
   protocols,
 } from "@db/schema";
 import type { RecordSnapshot } from "@db/schema";
 import { dateStr, deviationSchema, recordStatusSchema } from "./zodSchemas";
+import {
+  refsWithMeta,
+  referencedByRecords,
+  syncRecordRefs,
+} from "./lib/record-refs";
 
 const recordFieldsInput = {
   title: z.string().min(1),
@@ -230,7 +236,12 @@ export const recordRouter = createRouter({
       .from(recordImages)
       .where(eq(recordImages.recordId, input.id))
       .orderBy(recordImages.createdAt);
-    return { ...withMeta, images };
+    // F4 Relevant Items：正向引用（本记录 chips 指向）+ 反向被引用（谁的 chips 指向本记录）
+    const [refs, referencedBy] = await Promise.all([
+      refsWithMeta(ctx.user.id, input.id),
+      referencedByRecords(ctx.user.id, input.id),
+    ]);
+    return { ...withMeta, images, refs, referencedBy };
   }),
 
   create: authedQuery.input(z.object(recordFieldsInput)).mutation(async ({ ctx, input }) => {
@@ -244,6 +255,8 @@ export const recordRouter = createRouter({
         userId: ctx.user.id,
       })
       .$returningId();
+    // F4：富文本芯片引用全量建索引
+    await syncRecordRefs(ctx.user.id, id, input.contentHtml);
     return { id };
   }),
 
@@ -264,6 +277,10 @@ export const recordRouter = createRouter({
         })
         .where(and(eq(records.id, id), eq(records.userId, ctx.user.id)));
       void res;
+      // F4：仅 contentHtml 变更时重建引用索引（undefined 跳过语义——未传则不解析）
+      if (data.contentHtml !== undefined) {
+        await syncRecordRefs(ctx.user.id, id, data.contentHtml);
+      }
       return { ok: true };
     }),
 
@@ -314,6 +331,8 @@ export const recordRouter = createRouter({
           tags: snap.tags ?? [],
         })
         .where(and(eq(records.id, version.recordId), eq(records.userId, ctx.user.id)));
+      // F4：快照回写后按快照内容重建引用索引
+      await syncRecordRefs(ctx.user.id, version.recordId, snap.contentHtml);
       return { ok: true, recordId: version.recordId };
     }),
 
@@ -407,8 +426,20 @@ export const recordRouter = createRouter({
     return { ok: true };
   }),
 
-  /** 彻底删除：级联清掉 images/attachments/versions（不可恢复） */
+  /** 彻底删除：级联清掉 images/attachments/versions/refs（不可恢复） */
   purge: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    await getDb()
+      .delete(recordRefs)
+      .where(and(eq(recordRefs.userId, ctx.user.id), eq(recordRefs.recordId, input.id)));
+    await getDb()
+      .delete(recordRefs)
+      .where(
+        and(
+          eq(recordRefs.userId, ctx.user.id),
+          eq(recordRefs.targetKind, "record"),
+          eq(recordRefs.targetId, input.id),
+        ),
+      );
     await getDb()
       .delete(recordImages)
       .where(and(eq(recordImages.recordId, input.id), eq(recordImages.userId, ctx.user.id)));
