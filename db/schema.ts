@@ -791,3 +791,61 @@ export const mouseBreeding = mysqlTable(
 );
 export type MouseBreeding = typeof mouseBreeding.$inferSelect;
 export type InsertMouseBreeding = typeof mouseBreeding.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* 批次#21 项目组（Team）：组实体 + 成员（平等）+ 库存授权（kind 预留扩展）   */
+/* ------------------------------------------------------------------ */
+
+/** 项目组：ownerId 为组建者（管组名/成员/解散），不重复入 team_members */
+export const teams = mysqlTable(
+  "teams",
+  {
+    id: serial("id").primaryKey(),
+    name: varchar("name", { length: 80 }).notNull(),
+    ownerId: bigint("ownerId", { mode: "number", unsigned: true }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => [index("teams_owner_idx").on(t.ownerId)],
+);
+export type Team = typeof teams.$inferSelect;
+export type InsertTeam = typeof teams.$inferInsert;
+
+/** 项目组成员：成员平等（无角色）；组建者隐含于 teams.ownerId */
+export const teamMembers = mysqlTable(
+  "team_members",
+  {
+    id: serial("id").primaryKey(),
+    teamId: bigint("teamId", { mode: "number", unsigned: true }).notNull(),
+    memberId: bigint("memberId", { mode: "number", unsigned: true }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("team_members_unique").on(t.teamId, t.memberId),
+    index("team_members_member_idx").on(t.memberId),
+  ],
+);
+export type TeamMember = typeof teamMembers.$inferSelect;
+export type InsertTeamMember = typeof teamMembers.$inferInsert;
+
+/**
+ * 组级数据授权：所有者把自己的某类数据整体授权给一个项目组。
+ * kind 预留扩展：mouseStock（小鼠库存，本批接入）/ record / protocol / analysis。
+ * mouseStock 语义为「整个库存」，targetOwnerId 即库存所有者；role 为全组成员统一级别。
+ */
+export const teamShares = mysqlTable(
+  "team_shares",
+  {
+    id: serial("id").primaryKey(),
+    teamId: bigint("teamId", { mode: "number", unsigned: true }).notNull(),
+    ownerId: bigint("ownerId", { mode: "number", unsigned: true }).notNull(), // 数据所有者（授权人）
+    kind: mysqlEnum("kind", ["mouseStock", "record", "protocol", "analysis"]).notNull(),
+    role: mysqlEnum("role", ["viewer", "editor"]).notNull().default("viewer"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("team_shares_unique").on(t.teamId, t.ownerId, t.kind),
+    index("team_shares_owner_idx").on(t.ownerId, t.kind),
+  ],
+);
+export type TeamShare = typeof teamShares.$inferSelect;
+export type InsertTeamShare = typeof teamShares.$inferInsert;

@@ -10,6 +10,7 @@ import {
   Heart,
   Hourglass,
   Layers,
+  UsersRound,
   LayoutGrid,
   Minus,
   Pencil,
@@ -40,9 +41,12 @@ import {
 import { cn } from '@/lib/utils'
 import { trpc } from '@/providers/trpc'
 import { GENDER_META, MOUSE_STATUS, SOURCES, ageLabel } from '@/components/mice/mouse-meta'
+import { SyncStockDialog } from '@/components/mice/SyncStockDialog'
+import { useAuth } from '@/hooks/useAuth'
 
 type StrainRow = {
   id: number
+  userId: number // 批次#21：库存所有者（前端按来源分组/判定权限）
   name: string
   background: string | null
   genotypeDesc: string | null
@@ -57,8 +61,12 @@ type StrainRow = {
   alert: boolean
 }
 
+// 批次#21：库存来源（team.stockSources 返回项）
+type StockSource = { ownerId: number; ownerName: string; access: 'owner' | 'editor' | 'viewer' }
+
 type MouseRow = {
   id: number
+  userId: number // 批次#21：库存所有者（行级权限判定）
   strainId: number
   earNo: string
   gender: string
@@ -86,10 +94,12 @@ function StrainDialog({
   open,
   onOpenChange,
   existing,
+  stockOwnerId,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   existing: StrainRow | null
+  stockOwnerId: number | null
 }) {
   const utils = trpc.useUtils()
   const [name, setName] = useState('')
@@ -133,7 +143,8 @@ function StrainDialog({
       lowStockThreshold: Math.max(0, Number(threshold) || 0),
     }
     if (existing) updateMut.mutate({ id: existing.id, ...body })
-    else createMut.mutate(body)
+    // 批次#21：在授权库存建品系时带 stockOwnerId（归该库存所有者域）
+    else createMut.mutate(stockOwnerId != null ? { ...body, stockOwnerId } : body)
   }
 
   return (
@@ -878,6 +889,7 @@ function MouseTasksCard() {
 /* ------------------------------------------------------------------ */
 type PairRow = {
   id: number
+  userId: number // 批次#21：库存所有者（行级权限判定）
   strainId: number
   maleId: number
   femaleId: number
@@ -1227,9 +1239,18 @@ function MendelCard() {
   )
 }
 
-function BreedingTab({ strains }: { strains: StrainRow[] }) {
+function BreedingTab({
+  strains,
+  stockSources,
+  accessOf,
+}: {
+  strains: StrainRow[]
+  stockSources: StockSource[]
+  accessOf: (ownerId: number) => StockSource['access']
+}) {
   const utils = trpc.useUtils()
   const pairsQ = trpc.mouse.listPairs.useQuery()
+  const [stockFilter, setStockFilter] = useState<number | null>(null) // 批次#21：来源筛选
   const [pairDialog, setPairDialog] = useState(false)
   const [litterPair, setLitterPair] = useState<PairRow | null>(null)
   const [removePair, setRemovePair] = useState<PairRow | null>(null)
@@ -1251,7 +1272,9 @@ function BreedingTab({ strains }: { strains: StrainRow[] }) {
     onError: (e) => toast.error(`删除失败：${e.message}`),
   })
 
-  const pairs = (pairsQ.data ?? []) as PairRow[]
+  const pairs = ((pairsQ.data ?? []) as PairRow[]).filter(
+    (x) => stockFilter == null || x.userId === stockFilter,
+  )
   const active = pairs.filter((p) => p.status === 'active')
   const ended = pairs.filter((p) => p.status === 'ended')
 
@@ -1266,6 +1289,20 @@ function BreedingTab({ strains }: { strains: StrainRow[] }) {
         >
           <Plus className="h-3.5 w-3.5" /> 新建配种对
         </button>
+        {stockSources.length > 1 && (
+          <select
+            value={stockFilter ?? ''}
+            onChange={(e) => setStockFilter(e.target.value ? Number(e.target.value) : null)}
+            className="h-8 rounded-lg border border-line bg-surface px-2 text-[12.5px] text-ink outline-none focus:border-bench"
+          >
+            <option value="">全部来源</option>
+            {stockSources.map((s) => (
+              <option key={s.ownerId} value={s.ownerId}>
+                {s.ownerName} 的库存
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {pairsQ.isLoading ? (
@@ -1307,30 +1344,34 @@ function BreedingTab({ strains }: { strains: StrainRow[] }) {
                   合笼 {p.startDate} · 已产 {p.litters} 胎{p.cage ? ` · ${p.cage.cageNo}` : ''}
                   {parentGone && <span className="ml-1 text-warning">亲本已非存活，建议结束</span>}
                 </p>
-                <div className="mt-3 flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setLitterPair(p)}
-                    className="flex h-8 flex-1 items-center justify-center gap-1 rounded-lg bg-bench-wash text-[12.5px] font-medium text-bench-ink transition-colors hover:bg-bench hover:text-white"
-                  >
-                    <Baby className="h-3.5 w-3.5" /> 幼崽登记
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => endMut.mutate({ id: p.id, endDate: format(new Date(), 'yyyy-MM-dd') })}
-                    className="flex h-8 items-center rounded-lg border border-line px-2.5 text-[12px] font-medium text-ink-soft transition-colors hover:border-line-strong"
-                  >
-                    结束
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="删除配种对"
-                    onClick={() => setRemovePair(p)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-mute transition-colors hover:bg-paper hover:text-danger"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+                {accessOf(p.userId) !== 'viewer' && (
+                  <div className="mt-3 flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setLitterPair(p)}
+                      className="flex h-8 flex-1 items-center justify-center gap-1 rounded-lg bg-bench-wash text-[12.5px] font-medium text-bench-ink transition-colors hover:bg-bench hover:text-white"
+                    >
+                      <Baby className="h-3.5 w-3.5" /> 幼崽登记
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => endMut.mutate({ id: p.id, endDate: format(new Date(), 'yyyy-MM-dd') })}
+                      className="flex h-8 items-center rounded-lg border border-line px-2.5 text-[12px] font-medium text-ink-soft transition-colors hover:border-line-strong"
+                    >
+                      结束
+                    </button>
+                    {accessOf(p.userId) === 'owner' && (
+                      <button
+                        type="button"
+                        aria-label="删除配种对"
+                        onClick={() => setRemovePair(p)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-mute transition-colors hover:bg-paper hover:text-danger"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })}
@@ -1400,133 +1441,220 @@ function BreedingTab({ strains }: { strains: StrainRow[] }) {
 /* ------------------------------------------------------------------ */
 function BoardTab({
   strains,
+  stockSources,
+  myId,
   onNewStrain,
   onEditStrain,
   onNewMouse,
   onBatchMouse,
+  onAskRemoveStrain,
 }: {
   strains: StrainRow[]
-  onNewStrain: () => void
+  stockSources: StockSource[]
+  myId: number | null
+  onNewStrain: (stockOwnerId: number) => void
   onEditStrain: (s: StrainRow) => void
   onNewMouse: (strainId: number) => void
   onBatchMouse: (strainId: number) => void
+  onAskRemoveStrain: (s: StrainRow) => void
 }) {
   const overviewQ = trpc.mouse.overview.useQuery()
-  const ov = overviewQ.data
+  const stocks = overviewQ.data?.stocks ?? []
+  const [syncOpen, setSyncOpen] = useState(false)
 
-  const stats = [
-    { label: '存活个体', value: ov?.aliveTotal ?? '—', sub: '全部品系' },
-    { label: '品系', value: ov?.strainTotal ?? '—', sub: '维护中' },
-    { label: '笼位', value: ov?.cageTotal ?? '—', sub: `占用 ${ov?.cageOccupied ?? '—'}` },
-    { label: '扩繁预警', value: ov?.alerts.length ?? '—', sub: '品系', danger: (ov?.alerts.length ?? 0) > 0 },
-  ]
+  // 分组：我的库存恒在首位；授权库存仅在有品系时显示
+  const groups = stockSources.filter(
+    (s) => s.ownerId === myId || strains.some((x) => x.userId === s.ownerId),
+  )
 
   return (
-    <div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {stats.map((s) => (
-          <div key={s.label} className="rounded-xl border border-line bg-surface p-4 shadow-card">
-            <p className="caption-en">{s.label}</p>
-            <p className={cn('mt-1.5 font-display text-[26px] font-bold leading-[32px]', s.danger ? 'text-danger' : 'text-ink')}>
-              {s.value}
-            </p>
-            <p className="mt-0.5 text-[11.5px] text-ink-mute">{s.sub}</p>
-          </div>
-        ))}
-      </div>
-
-      {(ov?.alerts.length ?? 0) > 0 && (
-        <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-danger/30 bg-danger/5 px-4 py-3">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
-          <div className="text-[12.5px] leading-[19px] text-ink">
-            <span className="font-medium text-danger">库存不足，建议安排扩繁：</span>
-            {ov!.alerts.map((a) => `${a.name}（存活 ${a.alive}/${a.threshold}）`).join('、')}
-          </div>
-        </div>
-      )}
-
-      <MouseTasksCard />
-
-      <div className="mb-2 mt-6 flex items-center justify-between">
-        <p className="caption-en">品系库存 STRAINS</p>
-        <button
-          type="button"
-          onClick={onNewStrain}
-          className="flex h-8 items-center gap-1 rounded-md px-2 text-[12.5px] font-medium text-bench transition-colors hover:bg-bench-wash"
-        >
-          <Plus className="h-3.5 w-3.5" /> 新建品系
-        </button>
-      </div>
-
-      {strains.length === 0 ? (
-        <button
-          type="button"
-          onClick={onNewStrain}
-          className="flex w-full flex-col items-center gap-2.5 rounded-xl border border-dashed border-line-strong py-12 transition-colors duration-150 hover:border-bench hover:bg-bench-wash/30"
-        >
-          <Rat className="h-8 w-8 text-ink-mute" strokeWidth={1.5} />
-          <p className="text-[13px] text-ink-mute">还没有品系 — 点击新建第一个品系</p>
-        </button>
-      ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {strains.map((s) => (
-            <div key={s.id} className={cn('rounded-xl border bg-surface p-4 shadow-card', s.alert ? 'border-danger/40' : 'border-line')}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="flex items-center gap-2 text-[15px] font-semibold text-ink">
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
-                    <span className="truncate">{s.name}</span>
-                    {s.alert && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-danger" />}
-                  </p>
-                  <p className="mt-0.5 truncate text-[11.5px] text-ink-mute">
-                    {[s.background, s.maintenance, s.genotypeDesc].filter(Boolean).join(' · ') || '—'}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  aria-label="编辑品系"
-                  onClick={() => onEditStrain(s)}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-paper hover:text-ink"
+    <div className="space-y-8">
+      {groups.map((g) => {
+        const isMine = g.ownerId === myId
+        const canWrite = g.access === 'owner' || g.access === 'editor'
+        const ov = stocks.find((s) => s.ownerId === g.ownerId)
+        const gStrains = strains.filter((s) => s.userId === g.ownerId)
+        const stats = [
+          { label: '存活个体', value: ov?.aliveTotal ?? '—', sub: '全部品系' },
+          { label: '品系', value: ov?.strainTotal ?? '—', sub: '维护中' },
+          { label: '笼位', value: ov?.cageTotal ?? '—', sub: `占用 ${ov?.cageOccupied ?? '—'}` },
+          { label: '扩繁预警', value: ov?.alerts.length ?? '—', sub: '品系', danger: (ov?.alerts.length ?? 0) > 0 },
+        ]
+        return (
+          <section key={g.ownerId}>
+            {/* 库存来源标题行 */}
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <h2 className="font-display text-[16px] font-bold text-ink">
+                {isMine ? '我的库存' : `${g.ownerName} 的库存`}
+              </h2>
+              {!isMine && (
+                <span
+                  className={cn(
+                    'rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                    g.access === 'editor'
+                      ? 'border-bench/40 bg-bench-wash text-bench'
+                      : 'border-line bg-paper text-ink-mute',
+                  )}
                 >
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <div className="mt-3 flex items-baseline gap-3">
-                <span className="font-display text-[24px] font-bold leading-[28px] text-ink">{s.alive}</span>
-                <span className="text-[11.5px] text-ink-mute">
-                  <span style={{ color: GENDER_META.male.color }}>♂ {s.male}</span>
-                  {' · '}
-                  <span style={{ color: GENDER_META.female.color }}>♀ {s.female}</span>
-                  {s.unknownGender > 0 && ` · 未知 ${s.unknownGender}`}
+                  {g.access === 'editor' ? '可编辑' : '可查看'}
                 </span>
-              </div>
-              <div className="mt-2.5 flex items-center justify-between">
-                <span className={cn('text-[11.5px]', s.ungenotyped > 0 ? 'text-warning' : 'text-ink-mute')}>
-                  {s.ungenotyped > 0 ? `未鉴定 ${s.ungenotyped} 只` : '基因型已鉴定完'}
-                  {s.lowStockThreshold > 0 && ` · 阈值 ${s.lowStockThreshold}`}
-                </span>
-                <span className="flex items-center gap-1">
+              )}
+              <span className="ml-auto flex items-center gap-2">
+                {isMine && (
                   <button
                     type="button"
-                    aria-label={`${s.name} 按数量批量登记`}
-                    onClick={() => onBatchMouse(s.id)}
-                    className="flex h-7 items-center gap-1 rounded-md border border-line px-2 text-[12px] font-medium text-ink-soft transition-colors hover:border-bench hover:text-bench"
+                    onClick={() => setSyncOpen(true)}
+                    className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[12.5px] font-medium text-ink-soft shadow-card transition-colors duration-150 hover:border-bench hover:text-bench"
                   >
-                    <Layers className="h-3 w-3" /> 批量
+                    <UsersRound className="h-3.5 w-3.5" />
+                    同步到项目组
                   </button>
+                )}
+                {canWrite && (
                   <button
                     type="button"
-                    onClick={() => onNewMouse(s.id)}
-                    className="flex h-7 items-center gap-1 rounded-md bg-bench-wash px-2 text-[12px] font-medium text-bench-ink transition-colors hover:bg-bench hover:text-white"
+                    onClick={() => onNewStrain(g.ownerId)}
+                    className="flex h-8 items-center gap-1.5 rounded-lg bg-bench px-3 text-[12.5px] font-medium text-white shadow-card transition-colors duration-150 hover:bg-bench-deep"
                   >
-                    <Plus className="h-3 w-3" /> 登记
+                    <Plus className="h-3.5 w-3.5" />
+                    新建品系
                   </button>
-                </span>
-              </div>
+                )}
+              </span>
             </div>
-          ))}
-        </div>
-      )}
+
+            {/* 统计卡 */}
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {stats.map((s) => (
+                <div key={s.label} className="rounded-xl border border-line bg-surface p-4 shadow-card">
+                  <p className="caption-en">{s.label}</p>
+                  <p className={cn('mt-1.5 font-display text-[26px] font-bold leading-[32px]', s.danger ? 'text-danger' : 'text-ink')}>
+                    {s.value}
+                  </p>
+                  <p className="mt-0.5 text-[11.5px] text-ink-mute">{s.sub}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* 扩繁预警条 */}
+            {(ov?.alerts.length ?? 0) > 0 && (
+              <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-danger/40 bg-danger/5 px-4 py-2.5">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-danger" />
+                <p className="text-[12.5px] text-ink">
+                  扩繁预警：
+                  {ov!.alerts.map((a) => `${a.name}（存活 ${a.alive}/${a.threshold}）`).join('、')}
+                </p>
+              </div>
+            )}
+
+            {/* 任务建议（仅自有库存；后端仅按自有库存派生） */}
+            {isMine && (
+              <div className="mt-3">
+                <MouseTasksCard />
+              </div>
+            )}
+
+            {/* 品系卡片 */}
+            <div className="mt-4">
+              {gStrains.length === 0 ? (
+                canWrite ? (
+                  <button
+                    type="button"
+                    onClick={() => onNewStrain(g.ownerId)}
+                    className="flex w-full flex-col items-center gap-2.5 rounded-xl border border-dashed border-line-strong py-12 transition-colors duration-150 hover:border-bench hover:bg-bench-wash/30"
+                  >
+                    <Rat className="h-8 w-8 text-ink-mute" strokeWidth={1.5} />
+                    <p className="text-[13px] text-ink-mute">
+                      {isMine ? '还没有品系 — 点击新建第一个品系' : '该库存还没有品系 — 点击新建'}
+                    </p>
+                  </button>
+                ) : (
+                  <p className="rounded-xl border border-dashed border-line py-8 text-center text-[12.5px] text-ink-mute">
+                    该库存还没有品系
+                  </p>
+                )
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {gStrains.map((s) => (
+                    <div key={s.id} className={cn('rounded-xl border bg-surface p-4 shadow-card', s.alert ? 'border-danger/40' : 'border-line')}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="flex items-center gap-2 text-[15px] font-semibold text-ink">
+                            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
+                            <span className="truncate">{s.name}</span>
+                            {s.alert && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-danger" />}
+                          </p>
+                          <p className="mt-0.5 truncate text-[11.5px] text-ink-mute">
+                            {[s.background, s.maintenance, s.genotypeDesc].filter(Boolean).join(' · ') || '—'}
+                          </p>
+                        </div>
+                        {canWrite && (
+                          <span className="flex shrink-0 items-center gap-1">
+                            <button
+                              type="button"
+                              aria-label="编辑品系"
+                              onClick={() => onEditStrain(s)}
+                              className="flex h-7 w-7 items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-paper hover:text-ink"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            {g.access === 'owner' && (
+                              <button
+                                type="button"
+                                aria-label="删除品系"
+                                onClick={() => onAskRemoveStrain(s)}
+                                className="flex h-7 w-7 items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-danger/10 hover:text-danger"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-3 flex items-baseline gap-3">
+                        <span className="font-display text-[24px] font-bold leading-[28px] text-ink">{s.alive}</span>
+                        <span className="text-[11.5px] text-ink-mute">
+                          <span style={{ color: GENDER_META.male.color }}>♂ {s.male}</span>
+                          {' · '}
+                          <span style={{ color: GENDER_META.female.color }}>♀ {s.female}</span>
+                          {s.unknownGender > 0 && ` · 未知 ${s.unknownGender}`}
+                        </span>
+                      </div>
+                      <div className="mt-2.5 flex items-center justify-between">
+                        <span className={cn('text-[11.5px]', s.ungenotyped > 0 ? 'text-warning' : 'text-ink-mute')}>
+                          {s.ungenotyped > 0 ? `未鉴定 ${s.ungenotyped} 只` : '基因型已鉴定完'}
+                          {s.lowStockThreshold > 0 && ` · 阈值 ${s.lowStockThreshold}`}
+                        </span>
+                        {canWrite && (
+                          <span className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              aria-label={`${s.name} 按数量批量登记`}
+                              onClick={() => onBatchMouse(s.id)}
+                              className="flex h-7 items-center gap-1 rounded-md border border-line px-2 text-[12px] font-medium text-ink-soft transition-colors hover:border-bench hover:text-bench"
+                            >
+                              <Layers className="h-3 w-3" /> 批量
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onNewMouse(s.id)}
+                              className="flex h-7 items-center gap-1 rounded-md bg-bench-wash px-2 text-[12px] font-medium text-bench-ink transition-colors hover:bg-bench hover:text-white"
+                            >
+                              <Plus className="h-3 w-3" /> 登记
+                            </button>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )
+      })}
+
+      <SyncStockDialog open={syncOpen} onOpenChange={setSyncOpen} />
     </div>
   )
 }
@@ -1662,6 +1790,8 @@ function GenotypingDialog({
 /* ------------------------------------------------------------------ */
 function MiceTab({
   strains,
+  stockSources,
+  accessOf,
   onNewMouse,
   onBatchMouse,
   onEditMouse,
@@ -1669,6 +1799,8 @@ function MiceTab({
   onAskRemove,
 }: {
   strains: StrainRow[]
+  stockSources: StockSource[]
+  accessOf: (ownerId: number) => StockSource['access']
   onNewMouse: () => void
   onBatchMouse: () => void
   onEditMouse: (m: MouseRow) => void
@@ -1676,6 +1808,7 @@ function MiceTab({
   onAskRemove: (m: MouseRow) => void
 }) {
   const [strainId, setStrainId] = useState<number | null>(null)
+  const [stockFilter, setStockFilter] = useState<number | null>(null) // 批次#21：来源筛选（null=全部可见）
   const [gender, setGender] = useState<string>('all')
   const [status, setStatus] = useState<string>('alive')
   const [ungenotypedOnly, setUngenotypedOnly] = useState(false)
@@ -1693,12 +1826,29 @@ function MiceTab({
     maxAgeWeeks: maxAge === '' ? undefined : Number(maxAge),
     ungenotyped: ungenotypedOnly || undefined,
   })
-  const rows = (listQ.data ?? []) as MouseRow[]
+  const rows = ((listQ.data ?? []) as MouseRow[]).filter(
+    (m) => stockFilter == null || m.userId === stockFilter,
+  )
 
   return (
     <div>
       {/* 筛选条 */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
+        {/* 批次#21：来源筛选 */}
+        {stockSources.length > 1 && (
+          <select
+            value={stockFilter ?? ''}
+            onChange={(e) => setStockFilter(e.target.value ? Number(e.target.value) : null)}
+            className="h-8 rounded-lg border border-line bg-surface px-2 text-[12.5px] text-ink outline-none focus:border-bench"
+          >
+            <option value="">全部来源</option>
+            {stockSources.map((s) => (
+              <option key={s.ownerId} value={s.ownerId}>
+                {s.ownerName} 的库存（{s.access === 'owner' ? '所有者' : s.access === 'editor' ? '可编辑' : '可查看'}）
+              </option>
+            ))}
+          </select>
+        )}
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
@@ -1827,9 +1977,15 @@ function MiceTab({
                       <td className="max-w-[140px] truncate px-3 py-2.5 text-ink-mute">{m.notes ?? ''}</td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center justify-end gap-0.5">
-                          <button type="button" onClick={() => onStatusMouse(m)} className="h-7 rounded-md px-2 text-[12px] text-ink-soft transition-colors hover:bg-bench-wash hover:text-ink">状态</button>
-                          <button type="button" aria-label="编辑" onClick={() => onEditMouse(m)} className="flex h-7 w-7 items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-bench-wash hover:text-ink"><Pencil className="h-3.5 w-3.5" /></button>
-                          <button type="button" aria-label="删除" onClick={() => onAskRemove(m)} className="flex h-7 w-7 items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-danger/10 hover:text-danger"><Trash2 className="h-3.5 w-3.5" /></button>
+                          {accessOf(m.userId) !== 'viewer' && (
+                            <button type="button" onClick={() => onStatusMouse(m)} className="h-7 rounded-md px-2 text-[12px] text-ink-soft transition-colors hover:bg-bench-wash hover:text-ink">状态</button>
+                          )}
+                          {accessOf(m.userId) !== 'viewer' && (
+                            <button type="button" aria-label="编辑" onClick={() => onEditMouse(m)} className="flex h-7 w-7 items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-bench-wash hover:text-ink"><Pencil className="h-3.5 w-3.5" /></button>
+                          )}
+                          {accessOf(m.userId) === 'owner' && (
+                            <button type="button" aria-label="删除" onClick={() => onAskRemove(m)} className="flex h-7 w-7 items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-danger/10 hover:text-danger"><Trash2 className="h-3.5 w-3.5" /></button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1856,9 +2012,15 @@ function MiceTab({
                   </p>
                   {m.notes && <p className="mt-1 truncate text-[11.5px] text-ink-mute">{m.notes}</p>}
                   <div className="mt-2.5 flex gap-1.5">
-                    <button type="button" onClick={() => onStatusMouse(m)} className="flex h-8 flex-1 items-center justify-center rounded-lg border border-line text-[12px] font-medium text-ink-soft">状态流转</button>
-                    <button type="button" onClick={() => onEditMouse(m)} className="flex h-8 flex-1 items-center justify-center rounded-lg border border-line text-[12px] font-medium text-ink-soft">编辑</button>
-                    <button type="button" aria-label="删除" onClick={() => onAskRemove(m)} className="flex h-8 w-9 items-center justify-center rounded-lg border border-line text-ink-mute hover:text-danger"><Trash2 className="h-3.5 w-3.5" /></button>
+                    {accessOf(m.userId) !== 'viewer' && (
+                      <button type="button" onClick={() => onStatusMouse(m)} className="flex h-8 flex-1 items-center justify-center rounded-lg border border-line text-[12px] font-medium text-ink-soft">状态流转</button>
+                    )}
+                    {accessOf(m.userId) !== 'viewer' && (
+                      <button type="button" onClick={() => onEditMouse(m)} className="flex h-8 flex-1 items-center justify-center rounded-lg border border-line text-[12px] font-medium text-ink-soft">编辑</button>
+                    )}
+                    {accessOf(m.userId) === 'owner' && (
+                      <button type="button" aria-label="删除" onClick={() => onAskRemove(m)} className="flex h-8 w-9 items-center justify-center rounded-lg border border-line text-ink-mute hover:text-danger"><Trash2 className="h-3.5 w-3.5" /></button>
+                    )}
                   </div>
                 </div>
               )
@@ -1875,9 +2037,19 @@ function MiceTab({
 /* ------------------------------------------------------------------ */
 /* Tab 3：笼位                                                           */
 /* ------------------------------------------------------------------ */
-function CagesTab() {
+function CagesTab({
+  stockSources,
+  accessOf,
+  myId,
+}: {
+  stockSources: StockSource[]
+  accessOf: (ownerId: number) => StockSource['access']
+  myId: number | null
+}) {
   const utils = trpc.useUtils()
   const cagesQ = trpc.mouse.listCages.useQuery()
+  const [stockFilter, setStockFilter] = useState<number | null>(null) // 批次#21：来源筛选
+  const [targetStock, setTargetStock] = useState<number | null>(null) // 新建笼位目标库存
   const [dialogOpen, setDialogOpen] = useState(false)
   const [cageNo, setCageNo] = useState('')
   const [room, setRoom] = useState('')
@@ -1905,30 +2077,64 @@ function CagesTab() {
     onError: (e) => toast.error(e.message),
   })
 
-  const cages = cagesQ.data ?? []
+  const cages = (cagesQ.data ?? []).filter(
+    (c) => stockFilter == null || c.userId === stockFilter,
+  )
+  // 可写入的来源（owner/editor）；新建笼位目标默认自己
+  const writableSources = stockSources.filter((s) => s.access !== 'viewer')
 
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
         <p className="caption-en">笼位 CAGES · {cages.length}</p>
-        <button
-          type="button"
-          onClick={() => setDialogOpen(true)}
-          className="flex h-8 items-center gap-1 rounded-md px-2 text-[12.5px] font-medium text-bench transition-colors hover:bg-bench-wash"
-        >
-          <Plus className="h-3.5 w-3.5" /> 新建笼位
-        </button>
+        <div className="flex items-center gap-2">
+          {stockSources.length > 1 && (
+            <select
+              value={stockFilter ?? ''}
+              onChange={(e) => setStockFilter(e.target.value ? Number(e.target.value) : null)}
+              className="h-8 rounded-lg border border-line bg-surface px-2 text-[12.5px] text-ink outline-none focus:border-bench"
+            >
+              <option value="">全部来源</option>
+              {stockSources.map((s) => (
+                <option key={s.ownerId} value={s.ownerId}>
+                  {s.ownerName} 的库存
+                </option>
+              ))}
+            </select>
+          )}
+          {writableSources.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setTargetStock(stockFilter != null && accessOf(stockFilter) !== 'viewer' ? stockFilter : myId)
+                setDialogOpen(true)
+              }}
+              className="flex h-8 items-center gap-1 rounded-md px-2 text-[12.5px] font-medium text-bench transition-colors hover:bg-bench-wash"
+            >
+              <Plus className="h-3.5 w-3.5" /> 新建笼位
+            </button>
+          )}
+        </div>
       </div>
 
       {cages.length === 0 ? (
-        <button
-          type="button"
-          onClick={() => setDialogOpen(true)}
-          className="flex w-full flex-col items-center gap-2.5 rounded-xl border border-dashed border-line-strong py-12 transition-colors duration-150 hover:border-bench hover:bg-bench-wash/30"
-        >
-          <LayoutGrid className="h-8 w-8 text-ink-mute" strokeWidth={1.5} />
-          <p className="text-[13px] text-ink-mute">还没有笼位 — 点击新建</p>
-        </button>
+        writableSources.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => {
+              setTargetStock(stockFilter != null && accessOf(stockFilter) !== 'viewer' ? stockFilter : myId)
+              setDialogOpen(true)
+            }}
+            className="flex w-full flex-col items-center gap-2.5 rounded-xl border border-dashed border-line-strong py-12 transition-colors duration-150 hover:border-bench hover:bg-bench-wash/30"
+          >
+            <LayoutGrid className="h-8 w-8 text-ink-mute" strokeWidth={1.5} />
+            <p className="text-[13px] text-ink-mute">还没有笼位 — 点击新建</p>
+          </button>
+        ) : (
+          <p className="rounded-xl border border-dashed border-line py-8 text-center text-[12.5px] text-ink-mute">
+            该来源还没有笼位
+          </p>
+        )
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {cages.map((c) => (
@@ -1942,14 +2148,16 @@ function CagesTab() {
                 </div>
                 <div className="flex items-center gap-1">
                   <span className="font-mono text-[12px] font-medium text-ink-soft">{c.aliveCount} 只</span>
-                  <button
-                    type="button"
-                    aria-label="删除笼位"
-                    onClick={() => setPendingRemove(c.id)}
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-danger/10 hover:text-danger"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  {accessOf(c.userId) === 'owner' && (
+                    <button
+                      type="button"
+                      aria-label="删除笼位"
+                      onClick={() => setPendingRemove(c.id)}
+                      className="flex h-7 w-7 items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-danger/10 hover:text-danger"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
               {c.occupants.length > 0 && (
@@ -1984,7 +2192,14 @@ function CagesTab() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[380px]">
           <DialogHeader>
-            <DialogTitle className="font-display text-[16px]">新建笼位</DialogTitle>
+            <DialogTitle className="font-display text-[16px]">
+              新建笼位
+              {targetStock != null && targetStock !== myId && (
+                <span className="ml-2 text-[12px] font-normal text-ink-mute">
+                  → {stockSources.find((s) => s.ownerId === targetStock)?.ownerName ?? ''} 的库存
+                </span>
+              )}
+            </DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1.5">
@@ -2006,7 +2221,14 @@ function CagesTab() {
             <button
               type="button"
               disabled={createMut.isPending || cageNo.trim() === ''}
-              onClick={() => createMut.mutate({ cageNo: cageNo.trim(), room: room.trim() || undefined, rack: rack.trim() || undefined })}
+              onClick={() =>
+                createMut.mutate({
+                  cageNo: cageNo.trim(),
+                  room: room.trim() || undefined,
+                  rack: rack.trim() || undefined,
+                  ...(targetStock != null && targetStock !== myId ? { stockOwnerId: targetStock } : {}),
+                })
+              }
               className="flex h-9 items-center rounded-lg bg-bench px-4 text-[13px] font-medium text-white shadow-card transition-colors hover:bg-bench-deep disabled:opacity-50"
             >
               创建
@@ -2046,8 +2268,15 @@ export default function Mice() {
 
   const strainsQ = trpc.mouse.listStrains.useQuery()
   const strains = (strainsQ.data ?? []).map((s) => ({ ...s, ...s.stats })) as StrainRow[]
+  // 批次#21：库存来源与我的访问级别（分组渲染 + 按钮权限收口）
+  const { user } = useAuth()
+  const stockSourcesQ = trpc.team.stockSources.useQuery({ kind: 'mouseStock' })
+  const stockSources = (stockSourcesQ.data ?? []) as StockSource[]
+  const accessOf = (ownerId: number): StockSource['access'] =>
+    stockSources.find((s) => s.ownerId === ownerId)?.access ?? (ownerId === user?.id ? 'owner' : 'viewer')
 
-  const [strainDialog, setStrainDialog] = useState<{ open: boolean; existing: StrainRow | null }>({ open: false, existing: null })
+  const [strainDialog, setStrainDialog] = useState<{ open: boolean; existing: StrainRow | null; stockOwnerId: number | null }>({ open: false, existing: null, stockOwnerId: null })
+  const [removeStrain, setRemoveStrain] = useState<StrainRow | null>(null)
   const [mouseDialog, setMouseDialog] = useState<{ open: boolean; existing: MouseRow | null; strainId: number | null }>({ open: false, existing: null, strainId: null })
   const [batchDialog, setBatchDialog] = useState<{ open: boolean; strainId: number | null }>({ open: false, strainId: null })
   const [statusMouse, setStatusMouse] = useState<MouseRow | null>(null)
@@ -2061,6 +2290,17 @@ export default function Mice() {
       void utils.mouse.listStrains.invalidate()
       void utils.mouse.overview.invalidate()
       void utils.mouse.taskSuggestions.invalidate()
+    },
+    onError: (e) => toast.error(`删除失败：${e.message}`),
+  })
+
+  // 批次#21：品系删除（库存看板卡片入口；品系下有鼠时后端拒绝并回文案）
+  const removeStrainMut = trpc.mouse.removeStrain.useMutation({
+    onSuccess: () => {
+      toast.success('品系已删除')
+      setRemoveStrain(null)
+      void utils.mouse.listStrains.invalidate()
+      void utils.mouse.overview.invalidate()
     },
     onError: (e) => toast.error(`删除失败：${e.message}`),
   })
@@ -2118,15 +2358,20 @@ export default function Mice() {
       {tab === 'board' && (
         <BoardTab
           strains={strains}
-          onNewStrain={() => setStrainDialog({ open: true, existing: null })}
-          onEditStrain={(s) => setStrainDialog({ open: true, existing: s })}
+          stockSources={stockSources}
+          myId={user?.id ?? null}
+          onNewStrain={(oid) => setStrainDialog({ open: true, existing: null, stockOwnerId: oid })}
+          onEditStrain={(s) => setStrainDialog({ open: true, existing: s, stockOwnerId: null })}
           onNewMouse={(sid) => setMouseDialog({ open: true, existing: null, strainId: sid })}
           onBatchMouse={(sid) => setBatchDialog({ open: true, strainId: sid })}
+          onAskRemoveStrain={setRemoveStrain}
         />
       )}
       {tab === 'mice' && (
         <MiceTab
           strains={strains}
+          stockSources={stockSources}
+          accessOf={accessOf}
           onNewMouse={() => setMouseDialog({ open: true, existing: null, strainId: null })}
           onBatchMouse={() => setBatchDialog({ open: true, strainId: null })}
           onEditMouse={(m) => setMouseDialog({ open: true, existing: m, strainId: null })}
@@ -2134,10 +2379,10 @@ export default function Mice() {
           onAskRemove={setRemoveMouse}
         />
       )}
-      {tab === 'breeding' && <BreedingTab strains={strains} />}
-      {tab === 'cages' && <CagesTab />}
+      {tab === 'breeding' && <BreedingTab strains={strains} stockSources={stockSources} accessOf={accessOf} />}
+      {tab === 'cages' && <CagesTab stockSources={stockSources} accessOf={accessOf} myId={user?.id ?? null} />}
 
-      <StrainDialog open={strainDialog.open} existing={strainDialog.existing} onOpenChange={(v) => setStrainDialog((s) => ({ ...s, open: v }))} />
+      <StrainDialog open={strainDialog.open} existing={strainDialog.existing} stockOwnerId={strainDialog.stockOwnerId} onOpenChange={(v) => setStrainDialog((s) => ({ ...s, open: v }))} />
       <MouseDialog
         open={mouseDialog.open}
         existing={mouseDialog.existing}
@@ -2152,6 +2397,27 @@ export default function Mice() {
         onOpenChange={(v) => setBatchDialog((s) => ({ ...s, open: v }))}
       />
       <StatusDialog mouse={statusMouse} onClose={() => setStatusMouse(null)} />
+
+      {/* 品系删除确认（批次#21） */}
+      <AlertDialog open={removeStrain != null} onOpenChange={(v) => !v && setRemoveStrain(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除品系「{removeStrain?.name}」？</AlertDialogTitle>
+            <AlertDialogDescription>
+              仅当该品系下没有任何小鼠（含历史台账）时可删除；否则请先处理个体。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => removeStrain && removeStrainMut.mutate({ id: removeStrain.id })}
+              className="bg-danger text-white hover:bg-danger/90"
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={removeMouse != null} onOpenChange={(v) => !v && setRemoveMouse(null)}>
         <AlertDialogContent>

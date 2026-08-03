@@ -4,6 +4,45 @@ BenchLog 各版本详细改动记录（新→旧）。每次推送同步更新�
 
 ---
 
+## 2026-08-03 · 批次#21 项目组 Team + 小鼠库存同步（含库存删除入口修复）
+
+用户点单：小鼠库存删除 bug 修复 + 建项目组把库存同步给伙伴。定案：整个库存一次性同步（非单品系）、组成员平等（授权级别按 team_shares.role 全组统一）、kind 枚举预留 record/protocol/analysis 扩展。删除 bug 真凶=前端入口缺失（removeStrain 端点闲置零调用，后端实测正常）。
+
+**数据层**
+
+- 新表 `teams`（ownerId=组建者，唯一特权：管人/改名/解散）+ `team_members`（成员平等无角色，`unique(teamId,memberId)`）+ `team_shares`（teamId+ownerId+kind+role，`unique(teamId,ownerId,kind)`，kind 枚举 mouseStock/record/protocol/analysis 预留）；迁移脚本幂等已执行真实库
+
+**权限中枢（api/lib/team.ts）**
+
+- `teamRoleOf`（owner>member>null）+ `assertTeamAccess`（null→NOT_FOUND 防探测）+ `assertTeamOwner`（→FORBIDDEN「仅组建者可执行此操作」）
+- `visibleStockOwnerIds`：自己 ∪ 我所在/我建的组被授权的库存所有者；`stockAccess`（多组授权取最高 editor>viewer）；`assertStockReadable/Writable/Owner` 三层（无权 NOT_FOUND / viewer FORBIDDEN / 仅所有者 FORBIDDEN）
+
+**teamRouter（新）**
+
+- create / listMine（owned+joined 各附 ownerName/memberCount）/ byId（成员+授权列表+myRole）/ rename / disband（级联清 team_members+team_shares）/ addMember（owner 专属，幂等）/ removeMember（owner 任意、member 自退）/ directory（用户目录搜索）/ shareStock（任成员可把自己库存授权给全组，幂等 upsert 改级）/ unshareStock / myStockShares / stockSources
+
+**mouseRouter 全改造（库存以所有者 userId 为域）**
+
+- getOwned* 四函数 → getAccessible*（read/write/own 三级 checkAccess）；listStrains/listMice/listCages/listPairs/overview 全部改 inArray(visibleStockOwnerIds)
+- createStrain/createCage +stockOwnerId 可选（editor 代建归目标库存域）；createMouse/batchCreateMice/registerLitter 代写一律落库存所有者域（耳号唯一/连号按所有者域）
+- 物理删除（removeStrain/removeCage/removeMouse/removePair）全部 owner-only；createPair 禁跨库存组合；updateMouse 禁跨库存迁移品系；taskSuggestions 仅自有库存派生
+- overview 重构返回 `{ stocks: [...] }`：自有库存恒显示、授权库存有品系才显示
+
+**前端**
+
+- 新页 `/teams`（导航「项目组」UsersRound）：我建的组（建组/改名/解散级联说明）+ 我所在的组（退出）；详情弹窗（成员管理：组建者徽标/移除/自退、目录搜索加人；组内同步数据列表）
+- Mice 看板 BoardTab 重写：按库存来源分组（我的库存恒首、{ownerName} 的库存带权限徽标），每组独立统计卡+预警；「同步到项目组」按钮（自有库存）挂新组件 SyncStockDialog（已授权改级/撤销 + 候选组选择+级别预选）
+- **删除入口修复**：品系卡片补「删除品系」按钮（owner-only 显示）+ AlertDialog（品系下有鼠含历史台账时保护）；MiceTab/BreedingTab/CagesTab 三 tab 全部按 accessOf 收口（viewer 全隐 / editor 可写 / owner 全显，来源下拉筛选）
+- 小鼠行内删除按钮（MiceTab onAskRemove 链路）owner-only 显示
+
+**验证**
+
+- 冒烟 21/21（真实库 createCaller）：建组拉人/非组建者拉人拒/editor 同步后 B 三列表+overview 双库存可见/B 代登记归 A 域/B 删鼠删品系 FORBIDDEN/降级 viewer 写拒读通/品系有鼠删除保护+清空后删除成功/撤销回收/disband 级联清空
+- playwright 双账号 11/11：注册→建组→拉人→建品系→同步 editor→B 看板见「A 的库存」分组→B 代建品系落 A 组→B 无删除品系按钮→A 撤销→B 分组消失
+- tsc -b / vite build / boot.js esbuild 全绿；入包 Teams 独立 chunk + boot.js teams 代码命中
+
+---
+
 ## 2026-08-01 · 批次#20-II-a 协作底座：对象级成员共享（记录/方法/生信三类 × owner/editor/viewer）
 
 方案1（对象级共享角色）先行落地，方案2（团队空间）登记后续、接口已按三类通用 kind 预留兼容：

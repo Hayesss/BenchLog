@@ -28,6 +28,7 @@ import {
   Tag,
   Trash2,
   Users,
+  UsersRound,
   X,
   Zap,
 } from 'lucide-react'
@@ -55,6 +56,7 @@ const NAV_ITEMS = [
   { to: '/schedule', label: '实验安排', en: 'Schedule', icon: CalendarDays },
   { to: '/export', label: '汇报导出', en: 'Export', icon: FileDown },
   { to: '/shared', label: '共享给我', en: 'Shared', icon: Users },
+  { to: '/teams', label: '项目组', en: 'Teams', icon: UsersRound },
   { to: '/trash', label: '最近删除', en: 'Trash', icon: Trash2 },
 ] as const
 

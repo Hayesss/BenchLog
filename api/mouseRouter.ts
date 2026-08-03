@@ -5,6 +5,22 @@ import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { mouseStrains, mouseCages, mice, mouseBreeding } from "@db/schema";
 import { dateStr } from "./zodSchemas";
+import { assertStockWritable, stockAccess, visibleStockOwnerIds } from "./lib/team";
+
+/** 库存访问级别：read=可见即可；write=editor+/owner；own=仅库存所有者（物理删除） */
+type AccessLevel = "read" | "write" | "own";
+
+function checkAccess(
+  access: "owner" | "editor" | "viewer" | null,
+  level: AccessLevel,
+  noun: string,
+) {
+  if (!access) throw new TRPCError({ code: "NOT_FOUND", message: `${noun}不存在或无权访问` });
+  if (level === "own" && access !== "owner")
+    throw new TRPCError({ code: "FORBIDDEN", message: "仅库存所有者可执行此操作" });
+  if (level === "write" && access === "viewer")
+    throw new TRPCError({ code: "FORBIDDEN", message: "你对此库存只有查看权限" });
+}
 
 // 性别：male/female/unknown
 const genderEnum = z.enum(["male", "female", "unknown"]);
@@ -13,36 +29,30 @@ const statusEnum = z.enum(["alive", "sacrificed", "dead", "culled"]);
 // 看板颜色：#RRGGBB
 const colorHex = z.string().regex(/^#[0-9a-fA-F]{6}$/, "颜色须为 #RRGGBB 格式");
 
-/** 归属校验：返回当前用户本人的品系，否则 NOT_FOUND */
-async function getOwnedStrain(userId: number, id: number) {
-  const rows = await getDb()
-    .select()
-    .from(mouseStrains)
-    .where(and(eq(mouseStrains.id, id), eq(mouseStrains.userId, userId)));
+/** 协作感知品系校验（批次#21）：按 id 取行，再按库存所有者域断言访问级别 */
+async function getAccessibleStrain(userId: number, id: number, level: AccessLevel = "read") {
+  const rows = await getDb().select().from(mouseStrains).where(eq(mouseStrains.id, id));
   const strain = rows[0];
   if (!strain) throw new TRPCError({ code: "NOT_FOUND", message: "品系不存在" });
+  checkAccess(await stockAccess(userId, strain.userId), level, "品系");
   return strain;
 }
 
-/** 归属校验：返回当前用户本人的笼位，否则 NOT_FOUND */
-async function getOwnedCage(userId: number, id: number) {
-  const rows = await getDb()
-    .select()
-    .from(mouseCages)
-    .where(and(eq(mouseCages.id, id), eq(mouseCages.userId, userId)));
+/** 协作感知笼位校验（批次#21） */
+async function getAccessibleCage(userId: number, id: number, level: AccessLevel = "read") {
+  const rows = await getDb().select().from(mouseCages).where(eq(mouseCages.id, id));
   const cage = rows[0];
   if (!cage) throw new TRPCError({ code: "NOT_FOUND", message: "笼位不存在" });
+  checkAccess(await stockAccess(userId, cage.userId), level, "笼位");
   return cage;
 }
 
-/** 归属校验：返回当前用户本人的小鼠，否则 NOT_FOUND */
-async function getOwnedMouse(userId: number, id: number) {
-  const rows = await getDb()
-    .select()
-    .from(mice)
-    .where(and(eq(mice.id, id), eq(mice.userId, userId)));
+/** 协作感知小鼠校验（批次#21） */
+async function getAccessibleMouse(userId: number, id: number, level: AccessLevel = "read") {
+  const rows = await getDb().select().from(mice).where(eq(mice.id, id));
   const mouse = rows[0];
   if (!mouse) throw new TRPCError({ code: "NOT_FOUND", message: "小鼠不存在" });
+  checkAccess(await stockAccess(userId, mouse.userId), level, "小鼠");
   return mouse;
 }
 
@@ -93,14 +103,12 @@ async function allocateEarNos(
   return out;
 }
 
-/** 归属校验：返回当前用户本人的配种对，否则 NOT_FOUND */
-async function getOwnedPair(userId: number, id: number) {
-  const rows = await getDb()
-    .select()
-    .from(mouseBreeding)
-    .where(and(eq(mouseBreeding.id, id), eq(mouseBreeding.userId, userId)));
+/** 协作感知配种对校验（批次#21） */
+async function getAccessiblePair(userId: number, id: number, level: AccessLevel = "read") {
+  const rows = await getDb().select().from(mouseBreeding).where(eq(mouseBreeding.id, id));
   const pair = rows[0];
   if (!pair) throw new TRPCError({ code: "NOT_FOUND", message: "配种对不存在" });
+  checkAccess(await stockAccess(userId, pair.userId), level, "配种对");
   return pair;
 }
 
@@ -122,13 +130,15 @@ export const mouseRouter = createRouter({
   /** 品系列表：每品系附存活/性别/未鉴定统计与扩繁预警标记 */
   listStrains: authedQuery.query(async ({ ctx }) => {
     const db = getDb();
+    // 批次#21：可见库存集合 = 自己 ∪ 我所在组被授权的库存（行带 userId 供前端按来源分组）
+    const ids = await visibleStockOwnerIds(ctx.user.id);
     const strains = await db
       .select()
       .from(mouseStrains)
-      .where(eq(mouseStrains.userId, ctx.user.id))
+      .where(inArray(mouseStrains.userId, ids))
       .orderBy(asc(mouseStrains.createdAt));
     if (strains.length === 0) return [];
-    // 该用户全部存活小鼠，按品系聚合统计
+    // 可见库存全部存活小鼠，按品系聚合统计
     const aliveMice = await db
       .select({
         strainId: mice.strainId,
@@ -136,7 +146,7 @@ export const mouseRouter = createRouter({
         genotype: mice.genotype,
       })
       .from(mice)
-      .where(and(eq(mice.userId, ctx.user.id), eq(mice.status, "alive")));
+      .where(and(inArray(mice.userId, ids), eq(mice.status, "alive")));
     const statsMap = new Map<number, StrainStats>();
     for (const m of aliveMice) {
       const s = statsMap.get(m.strainId) ?? emptyStats();
@@ -165,13 +175,16 @@ export const mouseRouter = createRouter({
         maintenance: z.string().max(24).optional(),
         color: colorHex.optional(),
         lowStockThreshold: z.number().int().min(0).max(999).optional(),
+        stockOwnerId: z.number().optional(), // 批次#21：目标库存（缺省自己；须 editor+）
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const ownerId = input.stockOwnerId ?? ctx.user.id;
+      await assertStockWritable(ctx.user.id, ownerId);
       const [{ id }] = await getDb()
         .insert(mouseStrains)
         .values({
-          userId: ctx.user.id,
+          userId: ownerId,
           name: input.name,
           background: input.background ?? null,
           genotypeDesc: input.genotypeDesc ?? null,
@@ -197,7 +210,7 @@ export const mouseRouter = createRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await getOwnedStrain(ctx.user.id, input.id);
+      await getAccessibleStrain(ctx.user.id, input.id, "write");
       const patch: Partial<{
         name: string;
         background: string | null;
@@ -213,10 +226,11 @@ export const mouseRouter = createRouter({
       if (input.color != null) patch.color = input.color;
       if (input.lowStockThreshold != null) patch.lowStockThreshold = input.lowStockThreshold;
       if (Object.keys(patch).length > 0) {
+        // 权限已在 getAccessibleStrain 断言；drizzle undefined 跳过语义保证只写 patch 字段
         await getDb()
           .update(mouseStrains)
           .set(patch)
-          .where(and(eq(mouseStrains.id, input.id), eq(mouseStrains.userId, ctx.user.id)));
+          .where(eq(mouseStrains.id, input.id));
       }
       return { ok: true };
     }),
@@ -225,18 +239,16 @@ export const mouseRouter = createRouter({
   removeStrain: authedQuery
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await getOwnedStrain(ctx.user.id, input.id);
+      const strain = await getAccessibleStrain(ctx.user.id, input.id, "own");
       const db = getDb();
       const [{ cnt }] = await db
         .select({ cnt: sql<number>`count(*)` })
         .from(mice)
-        .where(and(eq(mice.userId, ctx.user.id), eq(mice.strainId, input.id)));
+        .where(and(eq(mice.userId, strain.userId), eq(mice.strainId, input.id)));
       if (Number(cnt) > 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "该品系下仍有小鼠，无法删除" });
       }
-      await db
-        .delete(mouseStrains)
-        .where(and(eq(mouseStrains.id, input.id), eq(mouseStrains.userId, ctx.user.id)));
+      await db.delete(mouseStrains).where(eq(mouseStrains.id, input.id));
       return { ok: true };
     }),
 
@@ -257,7 +269,9 @@ export const mouseRouter = createRouter({
         .optional(),
     )
     .query(async ({ ctx, input }) => {
-      const conds = [eq(mice.userId, ctx.user.id)];
+      // 批次#21：可见库存集合（行带 userId，前端按来源分组/筛选）
+      const ids = await visibleStockOwnerIds(ctx.user.id);
+      const conds = [inArray(mice.userId, ids)];
       if (input?.strainId != null) conds.push(eq(mice.strainId, input.strainId));
       if (input?.cageId != null) conds.push(eq(mice.cageId, input.cageId));
       if (input?.gender && input.gender !== "all") conds.push(eq(mice.gender, input.gender));
@@ -311,13 +325,15 @@ export const mouseRouter = createRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await getOwnedStrain(ctx.user.id, input.strainId);
-      if (input.cageId != null) await getOwnedCage(ctx.user.id, input.cageId);
-      await assertEarNoUnique(ctx.user.id, input.strainId, input.earNo);
+      // 批次#21：库存域由品系所有者决定；editor 代登记也归库存所有者域
+      const strain = await getAccessibleStrain(ctx.user.id, input.strainId, "write");
+      const ownerId = strain.userId;
+      if (input.cageId != null) await getAccessibleCage(ctx.user.id, input.cageId, "write");
+      await assertEarNoUnique(ownerId, input.strainId, input.earNo);
       const [{ id }] = await getDb()
         .insert(mice)
         .values({
-          userId: ctx.user.id,
+          userId: ownerId,
           strainId: input.strainId,
           earNo: input.earNo,
           gender: input.gender,
@@ -354,17 +370,18 @@ export const mouseRouter = createRouter({
     .mutation(async ({ ctx, input }) => {
       const total = input.maleCount + input.femaleCount;
       if (total <= 0) throw new TRPCError({ code: "BAD_REQUEST", message: "公 / 母数量至少填一个" });
-      await getOwnedStrain(ctx.user.id, input.strainId);
-      if (input.cageId != null) await getOwnedCage(ctx.user.id, input.cageId);
+      const strain = await getAccessibleStrain(ctx.user.id, input.strainId, "write");
+      const ownerId = strain.userId;
+      if (input.cageId != null) await getAccessibleCage(ctx.user.id, input.cageId, "write");
 
       const prefix = (input.earPrefix ?? "").trim();
       // 一次分配 total 个再切分，避免公/母两次扫描互相看不见导致重号
-      const allEarNos = await allocateEarNos(ctx.user.id, input.strainId, prefix, input.earStart, total);
+      const allEarNos = await allocateEarNos(ownerId, input.strainId, prefix, input.earStart, total);
       const maleEarNos = allEarNos.slice(0, input.maleCount);
       const femaleEarNos = allEarNos.slice(input.maleCount);
 
       const common = {
-        userId: ctx.user.id,
+        userId: ownerId,
         strainId: input.strainId,
         birthDate: input.birthDate ?? null,
         genotype: input.genotype ?? null,
@@ -397,14 +414,20 @@ export const mouseRouter = createRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const mouse = await getOwnedMouse(ctx.user.id, input.id);
+      const mouse = await getAccessibleMouse(ctx.user.id, input.id, "write");
+      const ownerId = mouse.userId;
       const nextStrainId = input.strainId ?? mouse.strainId;
       const nextEarNo = input.earNo ?? mouse.earNo;
-      if (input.strainId != null) await getOwnedStrain(ctx.user.id, input.strainId);
-      if (input.cageId != null) await getOwnedCage(ctx.user.id, input.cageId);
+      // 跨库存迁移品系不允许：目标品系须同库存域
+      if (input.strainId != null) {
+        const target = await getAccessibleStrain(ctx.user.id, input.strainId, "write");
+        if (target.userId !== ownerId)
+          throw new TRPCError({ code: "BAD_REQUEST", message: "不能把小鼠迁移到其他所有者的库存" });
+      }
+      if (input.cageId != null) await getAccessibleCage(ctx.user.id, input.cageId, "write");
       // 品系或耳号有变化时重新校验唯一性（排除自身）
       if (input.strainId != null || input.earNo != null) {
-        await assertEarNoUnique(ctx.user.id, nextStrainId, nextEarNo, mouse.id);
+        await assertEarNoUnique(ownerId, nextStrainId, nextEarNo, mouse.id);
       }
       const patch: Partial<{
         strainId: number;
@@ -428,7 +451,7 @@ export const mouseRouter = createRouter({
         await getDb()
           .update(mice)
           .set(patch)
-          .where(and(eq(mice.id, input.id), eq(mice.userId, ctx.user.id)));
+          .where(eq(mice.id, input.id));
       }
       return { ok: true };
     }),
@@ -444,7 +467,7 @@ export const mouseRouter = createRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await getOwnedMouse(ctx.user.id, input.id);
+      await getAccessibleMouse(ctx.user.id, input.id, "write");
       const today = new Date().toISOString().slice(0, 10);
       const patch =
         input.status === "alive"
@@ -457,28 +480,28 @@ export const mouseRouter = createRouter({
       await getDb()
         .update(mice)
         .set(patch)
-        .where(and(eq(mice.id, input.id), eq(mice.userId, ctx.user.id)));
+        .where(eq(mice.id, input.id));
       return { ok: true };
     }),
 
-  /** 删除小鼠：误登记物理删除 */
+  /** 删除小鼠：误登记物理删除（owner-only，批次#21） */
   removeMouse: authedQuery
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await getOwnedMouse(ctx.user.id, input.id);
-      await getDb()
-        .delete(mice)
-        .where(and(eq(mice.id, input.id), eq(mice.userId, ctx.user.id)));
+      await getAccessibleMouse(ctx.user.id, input.id, "own");
+      await getDb().delete(mice).where(eq(mice.id, input.id));
       return { ok: true };
     }),
 
   /** 笼位列表：每笼附存活数与居住个体（限 alive），按房间、笼号排序 */
   listCages: authedQuery.query(async ({ ctx }) => {
     const db = getDb();
+    // 批次#21：可见库存集合（行带 userId 供前端按来源分组）
+    const ids = await visibleStockOwnerIds(ctx.user.id);
     const cages = await db
       .select()
       .from(mouseCages)
-      .where(eq(mouseCages.userId, ctx.user.id))
+      .where(inArray(mouseCages.userId, ids))
       .orderBy(asc(mouseCages.room), asc(mouseCages.cageNo));
     if (cages.length === 0) return [];
     const occupants = await db
@@ -491,7 +514,7 @@ export const mouseRouter = createRouter({
       })
       .from(mice)
       .innerJoin(mouseStrains, eq(mouseStrains.id, mice.strainId))
-      .where(and(eq(mice.userId, ctx.user.id), eq(mice.status, "alive")));
+      .where(and(inArray(mice.userId, ids), eq(mice.status, "alive")));
     const occMap = new Map<number, { id: number; earNo: string; strainName: string; gender: string }[]>();
     for (const o of occupants) {
       if (o.cageId == null) continue;
@@ -512,13 +535,16 @@ export const mouseRouter = createRouter({
         cageNo: z.string().min(1).max(40),
         room: z.string().max(60).optional(),
         rack: z.string().max(60).optional(),
+        stockOwnerId: z.number().optional(), // 批次#21：目标库存（缺省自己；须 editor+）
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const ownerId = input.stockOwnerId ?? ctx.user.id;
+      await assertStockWritable(ctx.user.id, ownerId);
       const [{ id }] = await getDb()
         .insert(mouseCages)
         .values({
-          userId: ctx.user.id,
+          userId: ownerId,
           cageNo: input.cageNo,
           room: input.room ?? null,
           rack: input.rack ?? null,
@@ -531,12 +557,12 @@ export const mouseRouter = createRouter({
   removeCage: authedQuery
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await getOwnedCage(ctx.user.id, input.id);
+      const cage = await getAccessibleCage(ctx.user.id, input.id, "own");
       const db = getDb();
       const [{ cnt }] = await db
         .select({ cnt: sql<number>`count(*)` })
         .from(mice)
-        .where(and(eq(mice.userId, ctx.user.id), eq(mice.cageId, input.id), eq(mice.status, "alive")));
+        .where(and(eq(mice.userId, cage.userId), eq(mice.cageId, input.id), eq(mice.status, "alive")));
       if (Number(cnt) > 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "笼内仍有存活小鼠，无法删除" });
       }
@@ -544,10 +570,8 @@ export const mouseRouter = createRouter({
       await db
         .update(mice)
         .set({ cageId: null })
-        .where(and(eq(mice.userId, ctx.user.id), eq(mice.cageId, input.id)));
-      await db
-        .delete(mouseCages)
-        .where(and(eq(mouseCages.id, input.id), eq(mouseCages.userId, ctx.user.id)));
+        .where(and(eq(mice.userId, cage.userId), eq(mice.cageId, input.id)));
+      await db.delete(mouseCages).where(eq(mouseCages.id, input.id));
       return { ok: true };
     }),
 
@@ -555,10 +579,12 @@ export const mouseRouter = createRouter({
   /** 配种对列表：附品系/亲本耳号/笼位标签；active 在前，按开始日期倒序 */
   listPairs: authedQuery.query(async ({ ctx }) => {
     const db = getDb();
+    // 批次#21：可见库存集合（行带 userId 供前端按来源分组）
+    const ids = await visibleStockOwnerIds(ctx.user.id);
     const pairs = await db
       .select()
       .from(mouseBreeding)
-      .where(eq(mouseBreeding.userId, ctx.user.id))
+      .where(inArray(mouseBreeding.userId, ids))
       .orderBy(asc(mouseBreeding.status), desc(mouseBreeding.startDate), desc(mouseBreeding.createdAt));
     if (pairs.length === 0) return [];
     const strainIds = [...new Set(pairs.map((p) => p.strainId))];
@@ -567,14 +593,14 @@ export const mouseRouter = createRouter({
     const [strainRows, mouseRows, cageRows] = await Promise.all([
       db.select({ id: mouseStrains.id, name: mouseStrains.name, color: mouseStrains.color })
         .from(mouseStrains)
-        .where(and(eq(mouseStrains.userId, ctx.user.id), inArray(mouseStrains.id, strainIds))),
+        .where(inArray(mouseStrains.id, strainIds)),
       db.select({ id: mice.id, earNo: mice.earNo, status: mice.status })
         .from(mice)
-        .where(and(eq(mice.userId, ctx.user.id), inArray(mice.id, mouseIds))),
+        .where(inArray(mice.id, mouseIds)),
       cageIds.length
         ? db.select({ id: mouseCages.id, cageNo: mouseCages.cageNo })
             .from(mouseCages)
-            .where(and(eq(mouseCages.userId, ctx.user.id), inArray(mouseCages.id, cageIds)))
+            .where(inArray(mouseCages.id, cageIds))
         : Promise.resolve([] as { id: number; cageNo: string }[]),
     ]);
     const sMap = new Map(strainRows.map((s) => [s.id, s]));
@@ -603,12 +629,15 @@ export const mouseRouter = createRouter({
     )
     .mutation(async ({ ctx, input }) => {
       if (input.maleId === input.femaleId) throw new TRPCError({ code: "BAD_REQUEST", message: "公 / 母不能是同一只" });
-      await getOwnedStrain(ctx.user.id, input.strainId);
-      if (input.cageId != null) await getOwnedCage(ctx.user.id, input.cageId);
+      const strain = await getAccessibleStrain(ctx.user.id, input.strainId, "write");
+      if (input.cageId != null) await getAccessibleCage(ctx.user.id, input.cageId, "write");
       const [male, female] = await Promise.all([
-        getOwnedMouse(ctx.user.id, input.maleId),
-        getOwnedMouse(ctx.user.id, input.femaleId),
+        getAccessibleMouse(ctx.user.id, input.maleId, "write"),
+        getAccessibleMouse(ctx.user.id, input.femaleId, "write"),
       ]);
+      // 批次#21：配种双方与品系须同属一个库存域（禁止跨库存组合）
+      if (male.userId !== strain.userId || female.userId !== strain.userId)
+        throw new TRPCError({ code: "BAD_REQUEST", message: "配种双方与品系须属同一库存" });
       if (male.strainId !== input.strainId || female.strainId !== input.strainId) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "配种双方须与所选品系一致" });
       }
@@ -620,7 +649,7 @@ export const mouseRouter = createRouter({
       const [{ id }] = await getDb()
         .insert(mouseBreeding)
         .values({
-          userId: ctx.user.id,
+          userId: strain.userId,
           strainId: input.strainId,
           maleId: input.maleId,
           femaleId: input.femaleId,
@@ -636,19 +665,19 @@ export const mouseRouter = createRouter({
   endPair: authedQuery
     .input(z.object({ id: z.number(), endDate: dateStr, endReason: z.string().max(200).optional() }))
     .mutation(async ({ ctx, input }) => {
-      await getOwnedPair(ctx.user.id, input.id);
+      await getAccessiblePair(ctx.user.id, input.id, "write");
       await getDb()
         .update(mouseBreeding)
         .set({ status: "ended", endDate: input.endDate, endReason: input.endReason ?? null })
-        .where(and(eq(mouseBreeding.id, input.id), eq(mouseBreeding.userId, ctx.user.id)));
+        .where(eq(mouseBreeding.id, input.id));
       return { ok: true };
     }),
 
   /** 删除配种对记录（不影响小鼠台账） */
   removePair: authedQuery.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
-    await getDb()
-      .delete(mouseBreeding)
-      .where(and(eq(mouseBreeding.id, input.id), eq(mouseBreeding.userId, ctx.user.id)));
+    // 批次#21：owner-only，并补存在性校验（原实现无行时静默成功）
+    await getAccessiblePair(ctx.user.id, input.id, "own");
+    await getDb().delete(mouseBreeding).where(eq(mouseBreeding.id, input.id));
     return { ok: true };
   }),
 
@@ -672,18 +701,18 @@ export const mouseRouter = createRouter({
     .mutation(async ({ ctx, input }) => {
       const total = input.maleCount + input.femaleCount;
       if (total <= 0) throw new TRPCError({ code: "BAD_REQUEST", message: "公 / 母数量至少填一个" });
-      const pair = await getOwnedPair(ctx.user.id, input.pairId);
+      const pair = await getAccessiblePair(ctx.user.id, input.pairId, "write");
       if (pair.status !== "active") throw new TRPCError({ code: "BAD_REQUEST", message: "该配种对已结束，不能登记幼崽" });
       const cageId = input.cageId ?? pair.cageId ?? null;
-      if (cageId != null) await getOwnedCage(ctx.user.id, cageId);
+      if (cageId != null) await getAccessibleCage(ctx.user.id, cageId, "write");
 
       const prefix = (input.earPrefix ?? "").trim();
-      const allEarNos = await allocateEarNos(ctx.user.id, pair.strainId, prefix, input.earStart, total);
+      const allEarNos = await allocateEarNos(pair.userId, pair.strainId, prefix, input.earStart, total);
       const maleEarNos = allEarNos.slice(0, input.maleCount);
       const femaleEarNos = allEarNos.slice(input.maleCount);
       const litterNo = pair.litters + 1;
       const common = {
-        userId: ctx.user.id,
+        userId: pair.userId,
         strainId: pair.strainId,
         birthDate: input.birthDate,
         genotype: input.genotype ?? null,
@@ -700,7 +729,7 @@ export const mouseRouter = createRouter({
       await getDb()
         .update(mouseBreeding)
         .set({ litters: litterNo })
-        .where(and(eq(mouseBreeding.id, pair.id), eq(mouseBreeding.userId, ctx.user.id)));
+        .where(eq(mouseBreeding.id, pair.id));
       return { created: total, litterNo, maleEarNos, femaleEarNos };
     }),
 
@@ -711,6 +740,7 @@ export const mouseRouter = createRouter({
    * - wean：21-35 日龄且未分笼 → 断奶分笼
    * 前端一键转为全局待办（todos，text 前缀「【小鼠】」）
    */
+  // 批次#21：任务建议仅针对自有库存派生（他人库存的任务应由其所有者处理，不越界生成）
   taskSuggestions: authedQuery.query(async ({ ctx }) => {
     const db = getDb();
     const strains = await db.select().from(mouseStrains).where(eq(mouseStrains.userId, ctx.user.id));
@@ -789,41 +819,51 @@ export const mouseRouter = createRouter({
     return suggestions;
   }),
 
+  /** 总览（批次#21 重构）：按库存来源分组聚合 stocks 数组；前端按「我的库存 / 各授权库存」分组渲染 */
   overview: authedQuery.query(async ({ ctx }) => {
     const db = getDb();
+    const ids = await visibleStockOwnerIds(ctx.user.id);
     const strains = await db
       .select()
       .from(mouseStrains)
-      .where(eq(mouseStrains.userId, ctx.user.id));
+      .where(inArray(mouseStrains.userId, ids));
     const cages = await db
-      .select({ id: mouseCages.id })
+      .select({ id: mouseCages.id, userId: mouseCages.userId })
       .from(mouseCages)
-      .where(eq(mouseCages.userId, ctx.user.id));
+      .where(inArray(mouseCages.userId, ids));
     const aliveMice = await db
-      .select({ strainId: mice.strainId, cageId: mice.cageId })
+      .select({ strainId: mice.strainId, cageId: mice.cageId, userId: mice.userId })
       .from(mice)
-      .where(and(eq(mice.userId, ctx.user.id), eq(mice.status, "alive")));
-    const aliveByStrain = new Map<number, number>();
-    const occupiedCages = new Set<number>();
-    for (const m of aliveMice) {
-      aliveByStrain.set(m.strainId, (aliveByStrain.get(m.strainId) ?? 0) + 1);
-      if (m.cageId != null) occupiedCages.add(m.cageId);
-    }
-    // 扩繁预警：阈值 > 0 且存活低于阈值
-    const alerts = strains
-      .filter((s) => s.lowStockThreshold > 0 && (aliveByStrain.get(s.id) ?? 0) < s.lowStockThreshold)
-      .map((s) => ({
-        strainId: s.id,
-        name: s.name,
-        alive: aliveByStrain.get(s.id) ?? 0,
-        threshold: s.lowStockThreshold,
-      }));
-    return {
-      aliveTotal: aliveMice.length,
-      strainTotal: strains.length,
-      cageTotal: cages.length,
-      cageOccupied: occupiedCages.size,
-      alerts,
-    };
+      .where(and(inArray(mice.userId, ids), eq(mice.status, "alive")));
+    const stocks = ids.map((ownerId) => {
+      const myStrains = strains.filter((s) => s.userId === ownerId);
+      const myCages = cages.filter((c) => c.userId === ownerId);
+      const myMice = aliveMice.filter((m) => m.userId === ownerId);
+      const aliveByStrain = new Map<number, number>();
+      const occupiedCages = new Set<number>();
+      for (const m of myMice) {
+        aliveByStrain.set(m.strainId, (aliveByStrain.get(m.strainId) ?? 0) + 1);
+        if (m.cageId != null) occupiedCages.add(m.cageId);
+      }
+      // 扩繁预警：阈值 > 0 且存活低于阈值
+      const alerts = myStrains
+        .filter((s) => s.lowStockThreshold > 0 && (aliveByStrain.get(s.id) ?? 0) < s.lowStockThreshold)
+        .map((s) => ({
+          strainId: s.id,
+          name: s.name,
+          alive: aliveByStrain.get(s.id) ?? 0,
+          threshold: s.lowStockThreshold,
+        }));
+      return {
+        ownerId,
+        aliveTotal: myMice.length,
+        strainTotal: myStrains.length,
+        cageTotal: myCages.length,
+        cageOccupied: occupiedCages.size,
+        alerts,
+      };
+    });
+    // 自有库存恒显示（空也显示「我的库存」）；授权库存仅在已有品系时显示
+    return { stocks: stocks.filter((s) => s.ownerId === ctx.user.id || s.strainTotal > 0) };
   }),
 });

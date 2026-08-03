@@ -19,6 +19,7 @@ import { aiProfileRouter } from "./aiProfileRouter";
 import { shareRouter } from "./shareRouter";
 import { recordTemplateRouter } from "./recordTemplateRouter";
 import { memberRouter } from "./memberRouter";
+import { teamRouter } from "./teamRouter";
 
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
@@ -47,6 +48,7 @@ export const appRouter = createRouter({
   share: shareRouter,
   recordTemplate: recordTemplateRouter,
   member: memberRouter,
+  team: teamRouter,
 });
 
 export type AppRouter = typeof appRouter;

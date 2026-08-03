@@ -26,6 +26,7 @@ const Samples = lazy(() => import('./pages/Samples'))
 const BoxDetail = lazy(() => import('./pages/BoxDetail'))
 const Mice = lazy(() => import('./pages/Mice'))
 const SharedWithMe = lazy(() => import('./pages/SharedWithMe'))
+const Teams = lazy(() => import('./pages/Teams'))
 const Projects = lazy(() => import('./pages/Projects'))
 
 /** 公开页（Layout 外）的全屏加载态 */
@@ -75,6 +76,7 @@ export default function App() {
         <Route path="samples/:boxId" element={<BoxDetail />} />
         <Route path="mice" element={<Mice />} />
         <Route path="shared" element={<SharedWithMe />} />
+          <Route path="teams" element={<Teams />} />
       </Route>
     </Routes>
   )
